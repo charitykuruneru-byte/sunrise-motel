@@ -7,6 +7,9 @@ on:
       - ".github/workflows/build-apk.yml"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -20,22 +23,33 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
+      # No gradlew wrapper in repo — use system Gradle 8.7 (matches AGP 8.5.2).
+      - uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.7
+
       - name: Build release APK
         run: |
           cd SunriseMotelApp
-          chmod +x gradlew
-          ./gradlew assembleRelease
+          gradle assembleRelease --no-daemon
+
+      # Gradle outputs app-release.apk — rename so the /download page and
+      # popup URL (.../releases/latest/download/SunriseMotel.apk) resolve.
+      - name: Rename APK
+        run: |
+          mv SunriseMotelApp/app/build/outputs/apk/release/app-release.apk SunriseMotelApp/app/build/outputs/apk/release/SunriseMotel.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: SunriseMotel-apk
-          path: SunriseMotelApp/app/build/outputs/apk/release/*.apk
+          path: SunriseMotelApp/app/build/outputs/apk/release/SunriseMotel.apk
 
       - name: Attach APK to GitHub Release
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v1
         with:
-          files: SunriseMotelApp/app/build/outputs/apk/release/*.apk
+          files: SunriseMotelApp/app/build/outputs/apk/release/SunriseMotel.apk
           tag_name: v1.0.${{ github.run_number }}
           generate_release_notes: true
+
