@@ -12,26 +12,26 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: "temurin"
           java-version: "17"
 
-      # ubuntu-latest runners already ship the Android SDK — archived
-      # setup-android@v3 action broke, so use the preinstalled SDK directly.
+      # ubuntu runners already ship the Android SDK (cmdline-tools under
+      # $ANDROID_HOME) — sdkmanager is NOT on PATH, so call it by full path.
       - name: Ensure Android platform + build-tools
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platforms;android-34" "build-tools;34.0.0" "platform-tools"
 
       # No gradlew wrapper in repo — use system Gradle 8.7 (matches AGP 8.5.2).
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.7
 
