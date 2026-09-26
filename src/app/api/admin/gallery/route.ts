@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { galleryImagesTable } from "@/db/schema";
 import { clientIp, logAudit } from "@/lib/audit";
 import { seedDatabaseIfEmpty } from "@/db/seed";
+import { readSession } from "@/lib/staff-auth";
 import { asc, eq } from "drizzle-orm";
 
 export async function GET() {
@@ -18,6 +19,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const user = readSession(request);
+  if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   try {
     const body = (await request.json()) as {
       title: string;
@@ -58,6 +61,8 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const user = readSession(request);
+  if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
