@@ -110,20 +110,27 @@ export function SunriseFullLogo({ className = "", animated = false }: { classNam
   );
 }
 
-/** Animated page-load splash: the ring draws itself, the sun rises behind the mountains, rays fade in. */
+/** Animated page-load splash: the ring draws itself, the sun rises behind the mountains, rays fade in.
+ *  Safety: force-hides after 2.5s even if timers/JS stall, so visitors never get stuck on the logo. */
 export function PageLoadingSplash({ onFinished }: { onFinished?: () => void }) {
   const [fading, setFading] = React.useState(false);
   const [hidden, setHidden] = React.useState(false);
 
   React.useEffect(() => {
-    const t1 = window.setTimeout(() => setFading(true), 1500);
+    const t1 = window.setTimeout(() => setFading(true), 1200);
     const t2 = window.setTimeout(() => {
       setHidden(true);
       onFinished?.();
-    }, 2000);
+    }, 1700);
+    // Absolute fallback: never trap the visitor behind the splash.
+    const t3 = window.setTimeout(() => {
+      setHidden(true);
+      onFinished?.();
+    }, 2500);
     return () => {
       window.clearTimeout(t1);
       window.clearTimeout(t2);
+      window.clearTimeout(t3);
     };
   }, [onFinished]);
 

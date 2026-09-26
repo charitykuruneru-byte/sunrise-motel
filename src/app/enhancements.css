@@ -23,8 +23,11 @@
 .footer-full-logo { width: 150px; background: #fff; border-radius: 14px; padding: 6px; }
 
 /* ================= LOADING SPLASH (logo animation) ================= */
-.page-loading-splash { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: #ffffff; transition: opacity 0.5s ease, visibility 0.5s ease; }
-.page-loading-splash.splash-fading { opacity: 0; visibility: hidden; pointer-events: none; }
+/* Plain-CSS safety net: if JS fails to hydrate on a slow/blocked connection,
+   the splash still fades away instead of trapping visitors on the logo. */
+@keyframes splash-safety-hide { to { opacity: 0; visibility: hidden; pointer-events: none; } }
+.page-loading-splash { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: #ffffff; transition: opacity 0.5s ease, visibility 0.5s ease; animation: splash-safety-hide 0.6s ease 4s forwards; }
+.page-loading-splash.splash-fading { opacity: 0; visibility: hidden; pointer-events: none; animation: none; }
 .splash-logo-card { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 24px; }
 .splash-logo { width: min(64vw, 240px); }
 .splash-logo .emblem-ring { stroke-dasharray: 1081; stroke-dashoffset: 1081; animation: splash-ring 1.1s ease-out forwards; }
