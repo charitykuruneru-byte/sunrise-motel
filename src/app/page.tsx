@@ -37,7 +37,6 @@ import {
   X,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import AppDownloadBanner from "@/components/AppDownloadBanner";
 import InstallAppPopup from "@/components/InstallAppPopup";
 import { GalleryGrid } from "@/components/experience-pages";
 import { PageLoadingSplash, SunriseFullLogo, SunriseLogo } from "@/components/sunrise-logo";
@@ -207,7 +206,6 @@ export default function HomePage() {
 
   return (
     <div className="sunrise-app-root">
-      <AppDownloadBanner />
       <InstallAppPopup />
       <PageLoadingSplash />
 

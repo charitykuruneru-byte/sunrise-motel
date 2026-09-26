@@ -80,6 +80,55 @@
 .gallery-more a { padding: 0 18px; }
 .lightbox-caption { margin: 10px 0 0; font-size: 12px; color: rgba(255, 255, 255, 0.75); }
 
+/* ================= SELL GRID: swipeable, same-height, always-shoppable cards ================= */
+/* Mobile: horizontal snap carousel (one card ≈ 85vw). Desktop: keeps the grid. */
+@media (max-width: 768px) {
+  .gallery-grid.sell-grid,
+  .rooms-cards-list.sell-grid,
+  .menu-page-grid.sell-grid {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    gap: 16px;
+    padding: 4px 16px 16px;
+    margin: 0 -16px;
+    scrollbar-width: none;
+  }
+  .gallery-grid.sell-grid::-webkit-scrollbar,
+  .rooms-cards-list.sell-grid::-webkit-scrollbar,
+  .menu-page-grid.sell-grid::-webkit-scrollbar { display: none; }
+  .sell-grid .gallery-card.sell-card,
+  .sell-grid .room-card-structured.sell-card,
+  .sell-grid .menu-page-card.sell-card {
+    min-width: 85vw;
+    max-width: 85vw;
+    scroll-snap-align: center;
+    flex-shrink: 0;
+  }
+}
+
+.sell-card { border-radius: 14px; }
+.sell-photo { position: relative; aspect-ratio: 4 / 3; height: 280px; overflow: hidden; border-radius: 14px 14px 0 0; background: #222; }
+@media (min-width: 769px) {
+  .sell-photo { height: 320px; }
+}
+.sell-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sell-gradient {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: flex; justify-content: space-between; align-items: flex-end; gap: 8px;
+  padding: 40px 12px 10px; color: #fff;
+  background: linear-gradient(0deg, rgba(0,0,0,0.7), transparent);
+  font-size: 13px;
+}
+.sell-gradient strong { font-size: 14px; }
+.sell-gradient span { font-weight: 800; white-space: nowrap; }
+.sell-cta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sell-cta a { text-decoration: none; }
+.sell-dish { display: flex; flex-direction: column; }
+.sell-dish-photo { border-radius: 14px 14px 0 0; }
+.sell-dish-cta { margin-top: 12px; }
+
 /* ================= TRACK PAGE ================= */
 .track-card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 22px; max-width: 760px; margin: 0 auto; box-shadow: 0 8px 26px rgba(0, 0, 0, 0.05); }
 .track-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }

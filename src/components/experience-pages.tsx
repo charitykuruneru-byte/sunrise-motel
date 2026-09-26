@@ -251,11 +251,11 @@ export function GalleryGrid({ limit, showHeading = true }: { limit?: number; sho
           <button key={c} className={filter === c ? "active" : ""} onClick={() => setFilter(c)}>{c}</button>
         ))}
       </div>
-      <div className="gallery-grid">
+      <div className="gallery-grid sell-grid">
         {visible.map((img, i) => (
-          <button key={img.id} className="gallery-tile" onClick={() => setLightbox({ index: i })} aria-label={`Open ${img.title}`}>
+          <button key={img.id} className="gallery-tile gallery-card sell-card" onClick={() => setLightbox({ index: i })} aria-label={`Open ${img.title}`}>
             <img src={img.imageUrl} alt={img.altText} loading="lazy" onError={(e) => { e.currentTarget.src = "/images/courtyard.jpg"; }} />
-            <span className="gallery-tile-label"><strong>{img.title}</strong><small>{img.category}</small></span>
+            <span className="gallery-tile-label sell-label"><strong>{img.title}</strong><small>{img.category}</small></span>
           </button>
         ))}
       </div>
@@ -533,10 +533,10 @@ export function StayPage() {
             <button type="button" className="btn-open-slideshow-secondary" onClick={fetchRooms}>Try again</button>
           </div>
         ) : (
-        <div className="rooms-cards-list">
+        <div className="rooms-cards-list sell-grid">
           {rooms.map((room) => (
-            <article key={room.id} className={`room-card-structured ${room.isSoldOut ? "card-sold-out" : ""}`}>
-              <div className="room-photo-header">
+            <article key={room.id} className={`room-card-structured sell-card ${room.isSoldOut ? "card-sold-out" : ""}`}>
+              <div className="room-photo-header sell-photo">
                 <img
                   src={(room.images && room.images[0]) || "/images/hero-standard.jpg"}
                   alt={`${room.name} at Sunrise Motel`}
@@ -556,6 +556,10 @@ export function StayPage() {
                 >
                   <Layers size={14} /> {room.images.length} photos
                 </button>
+                <div className="sell-gradient">
+                  <strong>{room.name}</strong>
+                  <span>{formatMoney(room.rate)} / night</span>
+                </div>
               </div>
 
               <div className="room-card-content">
@@ -587,9 +591,9 @@ export function StayPage() {
                   ))}
                 </div>
 
-                <div className="room-card-actions">
+                <div className="room-card-actions sell-cta">
                   <button className="btn-open-slideshow-secondary" onClick={() => { setActiveSlideshow(room); setSlideIdx(0); }}>
-                    <Layers size={14} /> Slideshow
+                    <Layers size={14} /> View Room
                   </button>
                   {room.isSoldOut ? (
                     <button className="btn-book-room btn-disabled" disabled>Sold Out</button>
@@ -605,7 +609,7 @@ export function StayPage() {
                         setLateOut(false);
                       }}
                     >
-                      Book Room <ArrowRight size={15} />
+                      Book Now <ArrowRight size={15} />
                     </button>
                   )}
                 </div>
@@ -843,10 +847,16 @@ export function DinePage() {
           ))}
         </div>
 
-        <div className="menu-page-grid" style={{ marginTop: 20 }}>
+        <div className="menu-page-grid sell-grid" style={{ marginTop: 20 }}>
           {visibleItems.map((item) => (
-            <article key={item.id} className="menu-page-card">
-              <img src={item.img} alt={item.name} />
+            <article key={item.id} className="menu-page-card sell-card sell-dish">
+              <div className="sell-photo sell-dish-photo">
+                <img src={item.img} alt={item.name} loading="lazy" />
+                <div className="sell-gradient">
+                  <strong>{item.name}</strong>
+                  <span>{formatMoney(item.price)}</span>
+                </div>
+              </div>
               <div>
                 <span>{item.category}</span>
                 <h3>{item.name}</h3>
@@ -854,10 +864,14 @@ export function DinePage() {
                 <div className="menu-page-card-bottom">
                   <strong>{formatMoney(item.price)}</strong>
                   <div className="extra-stepper">
-                    <button onClick={() => removeItem(item.id)}><Minus size={12} /></button>
+                    <button onClick={() => removeItem(item.id)} aria-label={`Less ${item.name}`}><Minus size={12} /></button>
                     <span>{cart[item.id] || 0}</span>
-                    <button onClick={() => addItem(item.id)}><Plus size={12} /></button>
+                    <button onClick={() => addItem(item.id)} aria-label={`More ${item.name}`}><Plus size={12} /></button>
                   </div>
+                </div>
+                <div className="sell-cta sell-dish-cta">
+                  <a className="btn-open-slideshow-secondary" href={`/dine?action=table&dishId=${item.id}`}>Order for Table</a>
+                  <a className="btn-book-room btn-active-book" href={`/dine?action=takeaway&dishId=${item.id}`}>Takeaway</a>
                 </div>
               </div>
             </article>

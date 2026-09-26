@@ -55,6 +55,14 @@ class MainActivity : AppCompatActivity() {
         offlineView = findViewById(R.id.offlineView)
         findViewById<Button>(R.id.retryButton).setOnClickListener { loadHome() }
 
+        // FIX: pull-to-refresh must ONLY fire at the very top of the page.
+        // Otherwise scrolling up mid-page freezes into endless refreshes.
+        swipeRefresh.setDistanceToTriggerSync(300)
+        swipeRefresh.setOnChildScrollUpCallback { _, _ -> webView.scrollY > 0 }
+        webView.viewTreeObserver.addOnScrollChangedListener {
+            swipeRefresh.isEnabled = webView.scrollY == 0
+        }
+
         val settings: WebSettings = webView.settings
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
@@ -93,6 +101,7 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView, url: String) {
                 progressBar.visibility = View.GONE
                 swipeRefresh.isRefreshing = false
+                swipeRefresh.isEnabled = webView.scrollY == 0
                 CookieManager.getInstance().flush()
             }
 
