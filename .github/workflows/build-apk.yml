@@ -21,7 +21,14 @@ jobs:
           distribution: "temurin"
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
+      # ubuntu-latest runners already ship the Android SDK — archived
+      # setup-android@v3 action broke, so use the preinstalled SDK directly.
+      - name: Ensure Android platform + build-tools
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
 
       # No gradlew wrapper in repo — use system Gradle 8.7 (matches AGP 8.5.2).
       - uses: gradle/actions/setup-gradle@v3
