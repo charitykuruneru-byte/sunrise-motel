@@ -22,6 +22,13 @@
       "when": 1790412537034,
       "tag": "0002_flawless_natasha_romanoff",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790433068060,
+      "tag": "0003_little_kronos",
+      "breakpoints": true
     }
   ]
 }

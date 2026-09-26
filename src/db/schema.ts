@@ -161,6 +161,20 @@ export const auditLogTable = pgTable("audit_log", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+// Fallback image store. Used when Vercel Blob is not configured (local dev, the
+// trycloudflare tunnel, or a missing/expired BLOB_READ_WRITE_TOKEN) so admin photo
+// uploads always land somewhere permanent instead of dead-ending. Bytes are kept
+// in Postgres and served back by /api/images/[id].
+export const uploadedImagesTable = pgTable("uploaded_images", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  filename: varchar("filename", { length: 160 }).notNull(),
+  contentType: varchar("content_type", { length: 64 }).notNull(),
+  size: integer("size").notNull(),
+  data: text("data").notNull(), // base64 of the image bytes
+  uploadedBy: varchar("uploaded_by", { length: 160 }), // "Admin — Willard Kulemeka"
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export type BookingEvent = typeof bookingEventsTable.$inferSelect;
 export type AuditLog = typeof auditLogTable.$inferSelect;
 export type Staff = typeof staffTable.$inferSelect;
@@ -170,3 +184,4 @@ export type Post = typeof postsTable.$inferSelect;
 export type MenuItem = typeof menuItemsTable.$inferSelect;
 export type GalleryImage = typeof galleryImagesTable.$inferSelect;
 export type Invoice = typeof invoicesTable.$inferSelect;
+export type UploadedImage = typeof uploadedImagesTable.$inferSelect;
