@@ -254,13 +254,16 @@ export function GalleryGrid({ limit, showHeading = true }: { limit?: number; sho
       <div className="gallery-grid">
         {visible.map((img, i) => (
           <button key={img.id} className="gallery-tile" onClick={() => setLightbox({ index: i })} aria-label={`Open ${img.title}`}>
-            <img src={img.imageUrl} alt={img.altText} loading="lazy" />
+            <img src={img.imageUrl} alt={img.altText} loading="lazy" onError={(e) => { e.currentTarget.src = "/images/courtyard.jpg"; }} />
             <span className="gallery-tile-label"><strong>{img.title}</strong><small>{img.category}</small></span>
           </button>
         ))}
       </div>
       {limit && images.length > limit && (
         <div className="gallery-more"><a className="btn-open-slideshow-secondary" href="/gallery"><Layers size={14} /> See all {images.length} pictures</a></div>
+      )}
+      {images.length === 0 && (
+        <div className="empty-state"><Layers size={22} /><p>Pictures are loading… if they stay blank, refresh the page.</p></div>
       )}
 
       {lightbox && visible[lightbox.index] && (
@@ -317,6 +320,7 @@ export function StayPage() {
   const [children, setChildren] = useState(0);
   const [rooms, setRooms] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [roomsError, setRoomsError] = useState("");
 
   // Slideshow
   const [activeSlideshow, setActiveSlideshow] = useState<any | null>(null);
@@ -335,12 +339,19 @@ export function StayPage() {
 
   const fetchRooms = async () => {
     setLoading(true);
+    setRoomsError("");
     try {
       const res = await fetch(`/api/availability?checkIn=${checkIn}&checkOut=${checkOut}`);
+      if (!res.ok) throw new Error(`Availability check failed (${res.status}).`);
       const data = await res.json();
-      if (data.rooms) setRooms(data.rooms);
+      if (data.error) throw new Error(data.error);
+      const list = Array.isArray(data.rooms) ? data.rooms : [];
+      setRooms(list);
+      if (list.length === 0) setRoomsError("No rooms came back from the server for these dates. Try different dates or WhatsApp us.");
     } catch (e) {
       console.error(e);
+      setRoomsError(e instanceof Error ? e.message : "Could not load rooms. Check your connection and try again.");
+      setRooms([]);
     } finally {
       setLoading(false);
     }
@@ -516,13 +527,22 @@ export function StayPage() {
         {loading && rooms.length === 0 ? (
           <div className="rooms-loading"><Loader2 size={22} className="spin" /><p>Checking live room inventory…</p></div>
         ) : rooms.length === 0 ? (
-          <div className="empty-state"><BedDouble size={30} /><p>No rooms found for these dates. Try different dates or WhatsApp us.</p></div>
+          <div className="empty-state">
+            <BedDouble size={30} />
+            <p>{roomsError || "No rooms found for these dates. Try different dates or WhatsApp us."}</p>
+            <button type="button" className="btn-open-slideshow-secondary" onClick={fetchRooms}>Try again</button>
+          </div>
         ) : (
         <div className="rooms-cards-list">
           {rooms.map((room) => (
             <article key={room.id} className={`room-card-structured ${room.isSoldOut ? "card-sold-out" : ""}`}>
               <div className="room-photo-header">
-                <img src={room.images[0]} alt={`${room.name} at Sunrise Motel`} loading="lazy" />
+                <img
+                  src={(room.images && room.images[0]) || "/images/hero-standard.jpg"}
+                  alt={`${room.name} at Sunrise Motel`}
+                  loading="lazy"
+                  onError={(e) => { e.currentTarget.src = "/images/hero-standard.jpg"; }}
+                />
                 <div className="photo-tag-overlay">
                   <span className={`availability-chip ${room.isSoldOut ? "chip-sold-out" : room.availableCount === 1 ? "chip-low" : "chip-available"}`}>
                     {room.statusText}
@@ -609,7 +629,11 @@ export function StayPage() {
               <span className="slide-counter">{slideIdx + 1} / {activeSlideshow.images.length}</span>
             </div>
             <div className="slideshow-viewport">
-              <img src={activeSlideshow.images[slideIdx]} alt={`${activeSlideshow.name} — photo ${slideIdx + 1} of ${activeSlideshow.images.length}`} />
+              <img
+                src={activeSlideshow.images[slideIdx] || "/images/hero-standard.jpg"}
+                alt={`${activeSlideshow.name} — photo ${slideIdx + 1} of ${activeSlideshow.images.length}`}
+                onError={(e) => { e.currentTarget.src = "/images/hero-standard.jpg"; }}
+              />
               <button className="slide-nav-btn prev-btn" onClick={() => setSlideIdx((prev) => (prev - 1 + activeSlideshow.images.length) % activeSlideshow.images.length)} aria-label="Previous photo">
                 <ChevronLeft size={24} />
               </button>
@@ -620,7 +644,7 @@ export function StayPage() {
             <div className="slideshow-thumbnails-row">
               {activeSlideshow.images.map((img: string, i: number) => (
                 <button key={img} className={`thumbnail-btn ${i === slideIdx ? "active" : ""}`} onClick={() => setSlideIdx(i)}>
-                  <img src={img} alt="" />
+                  <img src={img} alt="" onError={(e) => { e.currentTarget.src = "/images/hero-standard.jpg"; }} />
                 </button>
               ))}
             </div>
