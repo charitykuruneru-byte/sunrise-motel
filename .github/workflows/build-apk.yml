@@ -35,6 +35,19 @@ jobs:
         with:
           gradle-version: 8.7
 
+      # google-services.json is gitignored — restore it from the
+      # GOOGLE_SERVICES_JSON repo secret (raw file contents). Without this,
+      # processReleaseGoogleServices fails with "File google-services.json is missing".
+      - name: Restore google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::error::GOOGLE_SERVICES_JSON secret is missing. Add repo Settings > Secrets > Actions > GOOGLE_SERVICES_JSON with the raw google-services.json contents."
+            exit 1
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON" > SunriseMotelApp/app/google-services.json
+
       - name: Build release APK
         run: |
           cd SunriseMotelApp
