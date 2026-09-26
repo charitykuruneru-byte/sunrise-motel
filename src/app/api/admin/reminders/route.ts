@@ -4,7 +4,7 @@ import { bookings, staffTable } from "@/db/schema";
 import { and, eq, isNull, lt, ne } from "drizzle-orm";
 import { logBookingEvent } from "@/lib/booking-events";
 import { clientIp, logAudit } from "@/lib/audit";
-import { sendMail } from "@/lib/mail";
+import { publicBaseUrl, sendMail } from "@/lib/mail";
 import { readSession, sessionLabel } from "@/lib/staff-auth";
 import { nowDate } from "@/lib/time";
 
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
           await sendMail({
             to,
             subject: `Action required: ${b.reference}${b.bookingNumber ? ` (${b.bookingNumber})` : ""} waiting ${Math.floor(ageH)}h`,
-            html: `<p>Booking <strong>${b.reference}</strong> for <strong>${b.guestName}</strong> (${b.roomType}, ${b.checkIn} → ${b.checkOut}) has been pending for ${Math.floor(ageH)} hours.</p><p>Please confirm / approve / cancel or request follow-up in the <a href="${process.env.NEXT_PUBLIC_APP_URL || ""}/admin">manager portal</a>.</p>`,
+            html: `<p>Booking <strong>${b.reference}</strong> for <strong>${b.guestName}</strong> (${b.roomType}, ${b.checkIn} → ${b.checkOut}) has been pending for ${Math.floor(ageH)} hours.</p><p>Please confirm / approve / cancel or request follow-up in the <a href="${publicBaseUrl(request)}/admin">manager portal</a>.</p>`,
           });
         }
         await db.update(bookings).set({ lastReminderAt: now, reminderCount: (b.reminderCount ?? 0) + 1 }).where(eq(bookings.id, b.id));

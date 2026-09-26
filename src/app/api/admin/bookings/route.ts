@@ -4,7 +4,7 @@ import { bookingEventsTable, bookings, invoicesTable } from "@/db/schema";
 import { logBookingEvent } from "@/lib/booking-events";
 import { clientIp, logAudit } from "@/lib/audit";
 import { buildInvoicePdf, parseExtras } from "@/lib/invoice-pdf";
-import { sendInvoiceEmail } from "@/lib/mail";
+import { publicBaseUrl, sendInvoiceEmail } from "@/lib/mail";
 import { readSession } from "@/lib/staff-auth";
 import { nowDate } from "@/lib/time";
 import { asc, desc, eq, ilike, or } from "drizzle-orm";
@@ -212,7 +212,7 @@ export async function PATCH(request: Request) {
 
     // Notify guest + admin on approve/confirm/cancel/follow-up
     try {
-      const base = process.env.NEXT_PUBLIC_APP_URL || "";
+      const base = publicBaseUrl(request);
       const adminEmail = process.env.ADMIN_EMAIL;
       const subjectMap: Record<string, string> = {
         approved: `Sunrise Motel — booking ${booking.reference} approved`,

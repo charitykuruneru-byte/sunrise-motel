@@ -1,3 +1,27 @@
+// Single place that decides which public domain goes into emails
+// (guest track links, manager portal links). Reads the live tunnel URL from
+// PUBLIC_APP_URL (preferred, not NEXT_PUBLIC_ so secrets stay server-side),
+// falls back to NEXT_PUBLIC_APP_URL, and never returns localhost on Vercel.
+export function publicBaseUrl(request?: Request) {
+  const fromEnv =
+    process.env.PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "";
+  if (fromEnv && !/localhost|127\.0\.0\.1/i.test(fromEnv)) return fromEnv.replace(/\/$/, "");
+  if (fromEnv) return fromEnv.replace(/\/$/, ""); // local dev: localhost is correct there
+  if (request) {
+    try {
+      const u = new URL(request.url);
+      if (u.hostname !== "localhost" && u.hostname !== "127.0.0.1") {
+        return `${u.protocol}//${u.host}`;
+      }
+    } catch {
+      // ignore — fall through
+    }
+  }
+  return "";
+}
+
 export type MailAttachment = { filename: string; content: Buffer; contentType: string };
 
 export async function sendMail(opts: {
@@ -64,7 +88,7 @@ export function guestEmailHtml(opts: {
   extras: string[];
 }) {
   const balance = Math.max(0, opts.total - opts.paid);
-  const base = process.env.NEXT_PUBLIC_APP_URL || "";
+  const base = publicBaseUrl();
   const row = (k: string, v: string) =>
     `<tr><td style="padding:6px 8px;color:#756c64;border-bottom:1px solid #f1ebe2">${k}</td><td style="padding:6px 8px;font-weight:bold;border-bottom:1px solid #f1ebe2">${v}</td></tr>`;
   return `
@@ -112,7 +136,7 @@ export function adminAlertHtml(opts: {
   requests: string | null;
   extras: string[];
 }) {
-  const base = process.env.NEXT_PUBLIC_APP_URL || "";
+  const base = publicBaseUrl();
   return `
   <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;color:#171513">
     <h2 style="margin:0 0 6px">New booking to review — ${opts.bookingNumber ?? opts.reference}</h2>
