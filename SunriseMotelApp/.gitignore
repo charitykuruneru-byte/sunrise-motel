@@ -1,0 +1,4 @@
+#SunriseMotelApp local files (cloud builds on GitHub Actions instead)
+SunriseMotelApp/local.properties
+SunriseMotelApp/**/*.jks
+SunriseMotelApp/**/*.keystore
