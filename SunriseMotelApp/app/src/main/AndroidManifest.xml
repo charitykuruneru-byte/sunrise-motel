@@ -4,6 +4,7 @@
     <!-- Internet + network state only. No location, camera, or contacts. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:label="Sunrise Motel"
@@ -11,6 +12,14 @@
         android:theme="@style/Theme.SunriseMotel"
         android:usesCleartextTraffic="false"
         android:hardwareAccelerated="true">
+        <!-- Broadcast push receiver (ADDITIVE — needs google-services.json + Firebase project). -->
+        <service
+            android:name=".MyFirebaseService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -1,4 +1,6 @@
-#SunriseMotelApp local files (cloud builds on GitHub Actions instead)
+# SunriseMotelApp local files (cloud builds on GitHub Actions instead)
 SunriseMotelApp/local.properties
 SunriseMotelApp/**/*.jks
 SunriseMotelApp/**/*.keystore
+# Firebase app config — per-device keys, never commit
+SunriseMotelApp/app/google-services.json

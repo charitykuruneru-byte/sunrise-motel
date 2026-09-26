@@ -151,6 +151,7 @@ export default function AdminPage() {
 
   const [showAddPost, setShowAddPost] = useState(false);
   const [post, setPost] = useState({ title: "", category: "Event", day: "SAT", date: "26", time: "12:00 — 20:00", detail: "", priceTag: "", imageUrl: "" });
+  const [notifyAppUsers, setNotifyAppUsers] = useState(false);
 
   // --- Manager login gate (staff or admin account, legacy password still works) ---
   const [authed, setAuthed] = useState(false);
@@ -412,8 +413,29 @@ export default function AdminPage() {
     if (data.post) {
       setPosts((prev) => [data.post, ...prev]);
       setShowAddPost(false);
+      // Additive: optionally broadcast this post to all installed apps.
+      if (notifyAppUsers) {
+        try {
+          const nres = await fetch("/api/admin/send-notification", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: data.post.title,
+              body: data.post.detail ? String(data.post.detail).slice(0, 160) : "New post from Sunrise Motel.",
+              url: "/unwind",
+              imageUrl: data.post.imageUrl || undefined,
+            }),
+          });
+          const ndata = await nres.json().catch(() => ({}));
+          notify(ndata.delivered ? "Post published + app users notified" : "Post published (push not configured — see /admin/notifications)");
+        } catch {
+          notify("Post published (push failed — see /admin/notifications)");
+        }
+        setNotifyAppUsers(false);
+      } else {
+        notify("Post published");
+      }
       setPost({ title: "", category: "Event", day: "SAT", date: "26", time: "12:00 — 20:00", detail: "", priceTag: "", imageUrl: "" });
-      notify("Post published");
     } else notify(data.error || "Could not publish");
   };
 
@@ -599,6 +621,7 @@ export default function AdminPage() {
         {isAdmin && <button className={tab === "staff" ? "active" : ""} onClick={() => setTab("staff")}><Users size={15} /> Staff ({staffList.length})</button>}
         {isAdmin && <button className={tab === "rooms" ? "active" : ""} onClick={() => setTab("rooms")}><BedDouble size={15} /> Rooms ({roomsList.length})</button>}
         <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}><Download size={15} /> Reports</button>
+        <a className="admin-btn" href="/admin/notifications" style={{ textDecoration: "none" }}><Send size={15} /> App push</a>
       </nav>
 
       {/* ---------------- BOOKINGS ---------------- */}
@@ -901,6 +924,10 @@ export default function AdminPage() {
                 </select>
               </label>
               <label><span>Details</span><textarea required rows={3} value={post.detail} onChange={(e) => setPost({ ...post, detail: e.target.value })} placeholder="What, when, price and any terms…" /></label>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                <input type="checkbox" checked={notifyAppUsers} onChange={(e) => setNotifyAppUsers(e.target.checked)} />
+                <span>Also send push notification to app users</span>
+              </label>
               <button type="submit" className="admin-btn admin-btn-primary admin-btn-wide"><Plus size={15} /> Publish</button>
             </form>
           </div>

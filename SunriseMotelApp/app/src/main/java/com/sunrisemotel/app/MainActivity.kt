@@ -1,12 +1,16 @@
 package com.sunrisemotel.app
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.net.http.SslError
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
@@ -25,7 +29,13 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import com.google.firebase.messaging.FirebaseMessaging
+import java.net.URL
+import org.json.JSONObject
+import kotlin.concurrent.thread
 
 /**
  * WebView-only wrapper for https://sunrise-motel.vercel.app.
@@ -191,11 +201,84 @@ class MainActivity : AppCompatActivity() {
         } else {
             loadHome()
         }
+
+        // Additive services: push permission + topic + update check.
+        startAppServices()
     }
 
     private fun loadHome() {
         offlineView.visibility = View.GONE
         webView.loadUrl(BuildConfig.BASE_URL)
+    }
+
+    // ADDITIVE: version check + push permission + FCM topic subscribe.
+    // Booking/WebView logic above is untouched.
+    private fun startAppServices() {
+        // Android 13+ needs an explicit notification permission ask.
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIF_PERMISSION_REQUEST)
+        }
+        // Join the broadcast topic so /admin/notifications reaches this device.
+        try {
+            FirebaseMessaging.getInstance().subscribeToTopic("all_users")
+        } catch (e: Exception) {
+            Log.w("SunriseApp", "FCM unavailable (google-services.json missing?): ${e.message}")
+        }
+        checkForAppUpdate()
+    }
+
+    // Polls the site's version truth once per launch; prompts when the
+    // installed versionCode is older. Never blocks page loads.
+    private fun checkForAppUpdate() {
+        thread {
+            try {
+                val conn = URL(BuildConfig.BASE_URL.trimEnd('/') + "/api/version").openConnection()
+                conn.connectTimeout = 8000
+                conn.readTimeout = 8000
+                val body = conn.getInputStream().bufferedReader().readText()
+                val json = JSONObject(body)
+                val remoteCode = json.optInt("latestVersionCode", BuildConfig.VERSION_CODE)
+                if (remoteCode <= BuildConfig.VERSION_CODE) return@thread
+                val name = json.optString("latestVersionName", "")
+                val apkUrl = json.optString("apkUrl", "")
+                val force = json.optBoolean("forceUpdate", false)
+                val notes = json.optJSONArray("whatsNew")?.let { arr ->
+                    (0 until arr.length()).map { arr.optString(it) }.filter { it.isNotBlank() }
+                } ?: emptyList()
+                runOnUiThread { showUpdateDialog(name, apkUrl, force, notes) }
+            } catch (e: Exception) {
+                Log.w("SunriseApp", "Version check failed: ${e.message}")
+            }
+        }
+    }
+
+    private fun showUpdateDialog(versionName: String, apkUrl: String, force: Boolean, notes: List<String>) {
+        val message = buildString {
+            if (notes.isEmpty()) {
+                append("Please update to keep booking smoothly.")
+            } else {
+                append("What's improved:\n")
+                notes.forEach { append("\n• ").append(it) }
+            }
+        }
+        val builder = AlertDialog.Builder(this)
+            .setTitle("New Update Available - v$versionName")
+            .setMessage(message)
+            .setPositiveButton("Update Now") { _, _ ->
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)))
+                } catch (_: Exception) {
+                }
+                if (force) finish()
+            }
+        if (force) {
+            builder.setCancelable(false)
+        } else {
+            builder.setNegativeButton("Later", null)
+        }
+        builder.show()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -228,5 +311,6 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val FILE_CHOOSER_REQUEST = 1001
+        private const val NOTIF_PERMISSION_REQUEST = 1002
     }
 }

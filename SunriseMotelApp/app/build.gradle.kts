@@ -1,6 +1,8 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    // Apply AFTER you add google-services.json (otherwise the build fails).
+    // id("com.google.gms.google-services")
 }
 
 android {
@@ -41,4 +43,6 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     implementation("com.google.android.material:material:1.12.0")
+    // Broadcast push — uncomment AFTER adding google-services.json:
+    // implementation("com.google.firebase:firebase-messaging:23.4.0")
 }

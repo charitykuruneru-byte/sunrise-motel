@@ -1,0 +1,13 @@
+{
+  "latestVersionCode": 2,
+  "latestVersionName": "1.1",
+  "apkUrl": "https://github.com/charitykuruneru-byte/sunrise-motel/releases/latest/download/SunriseMotel.apk",
+  "forceUpdate": false,
+  "whatsNew": [
+    "Added Saturday Live Music events",
+    "Improved gallery view on mobile",
+    "Fixed swipe refresh bug",
+    "Added Table Booking from gallery"
+  ],
+  "releaseDate": "2026-09-27"
+}
