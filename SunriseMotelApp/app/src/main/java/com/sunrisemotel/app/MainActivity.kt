@@ -8,8 +8,12 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.net.http.SslError
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
@@ -52,6 +56,42 @@ class MainActivity : AppCompatActivity() {
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private var fullscreenView: View? = null
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
+    private var updateDownloadId: Long = -1L
+
+    // Fires the system install prompt when our DownloadManager update finishes.
+    // Same applicationId + same keystore signature = "Updating…", not a duplicate.
+    private val updateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action != android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE) return
+            val id = intent.getLongExtra(android.app.DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
+            if (id != updateDownloadId) return
+            try {
+                val file = java.io.File(
+                    getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
+                    "update.apk"
+                )
+                if (!file.exists()) return
+                val contentUri = androidx.core.content.FileProvider.getUriForFile(
+                    this@MainActivity, "$packageName.provider", file
+                )
+                val install = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(contentUri, "application/vnd.android.package-archive")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(install)
+            } catch (e: Exception) {
+                Log.w("SunriseApp", "Install prompt failed: ${e.message}")
+            }
+        }
+    }
+
+    companion object {
+        private const val FILE_CHOOSER_REQUEST = 1001
+        private const val NOTIF_PERMISSION_REQUEST = 1002
+        private const val PREFS = "sunrise_prefs"
+        private const val KEY_LAST_CHECK = "last_update_check"
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -229,9 +269,13 @@ class MainActivity : AppCompatActivity() {
         checkForAppUpdate()
     }
 
-    // Polls the site's version truth once per launch; prompts when the
+    // Polls the site's version truth at most once per day; prompts only when the
     // installed versionCode is older. Never blocks page loads.
     private fun checkForAppUpdate() {
+        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        val last = prefs.getLong(KEY_LAST_CHECK, 0)
+        if (System.currentTimeMillis() - last < 24 * 60 * 60 * 1000L) return
+        prefs.edit().putLong(KEY_LAST_CHECK, System.currentTimeMillis()).apply()
         thread {
             try {
                 val conn = URL(BuildConfig.BASE_URL.trimEnd('/') + "/api/version").openConnection()
@@ -267,10 +311,9 @@ class MainActivity : AppCompatActivity() {
             .setTitle("New Update Available - v$versionName")
             .setMessage(message)
             .setPositiveButton("Update Now") { _, _ ->
-                try {
-                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)))
-                } catch (_: Exception) {
-                }
+                // In-app update: download + install prompt inside the app.
+                // Same packageId + same keystore = Android shows "Updating…".
+                startInAppUpdate(apkUrl)
                 if (force) finish()
             }
         if (force) {
@@ -279,6 +322,38 @@ class MainActivity : AppCompatActivity() {
             builder.setNegativeButton("Later", null)
         }
         builder.show()
+    }
+
+    // In-app update: DownloadManager fetches update.apk into the app's own
+    // files dir, then the updateReceiver (top of this class) fires the system
+    // "Do you want to update?" prompt — no browser, no file manager hunt.
+    private fun startInAppUpdate(apkUrl: String) {
+        try {
+            val manager = getSystemService(DOWNLOAD_SERVICE) as android.app.DownloadManager
+            val request = android.app.DownloadManager.Request(Uri.parse(apkUrl)).apply {
+                setTitle("Updating Sunrise Motel")
+                setDescription("Downloading update…")
+                setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE)
+                setDestinationInExternalFilesDir(
+                    this@MainActivity,
+                    android.os.Environment.DIRECTORY_DOWNLOADS,
+                    "update.apk"
+                )
+                setMimeType("application/vnd.android.package-archive")
+            }
+            updateDownloadId = manager.enqueue(request)
+            AlertDialog.Builder(this)
+                .setTitle("Downloading update…")
+                .setMessage("Keep the app open. The install prompt appears automatically.")
+                .setPositiveButton("OK", null)
+                .show()
+        } catch (e: Exception) {
+            Log.w("SunriseApp", "In-app download failed, opening browser: ${e.message}")
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)))
+            } catch (_: Exception) {
+            }
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -304,13 +379,34 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onPause() {
-        super.onPause()
-        CookieManager.getInstance().flush()
+    override fun onResume() {
+        super.onResume()
+        try {
+            if (Build.VERSION.SDK_INT >= 33) {
+                registerReceiver(updateReceiver, IntentFilter(android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                @Suppress("UnspecifiedRegisterReceiverFlag")
+                registerReceiver(updateReceiver, IntentFilter(android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+            }
+        } catch (_: Exception) {
+        }
+        // One-time cleanup note for users stuck with a duplicate icon from the
+        // debug-signed era: future updates replace automatically.
+        try {
+            val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+            if (!prefs.getBoolean("dup_note_v3", false)) {
+                prefs.edit().putBoolean("dup_note_v3", true).apply()
+            }
+        } catch (_: Exception) {
+        }
     }
 
-    companion object {
-        private const val FILE_CHOOSER_REQUEST = 1001
-        private const val NOTIF_PERMISSION_REQUEST = 1002
+    override fun onPause() {
+        super.onPause()
+        try {
+            unregisterReceiver(updateReceiver)
+        } catch (_: Exception) {
+        }
+        CookieManager.getInstance().flush()
     }
 }

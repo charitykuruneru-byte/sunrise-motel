@@ -29,6 +29,7 @@ import {
   X,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import ImageUploader from "@/components/ImageUploader";
 import { SunriseLogo } from "@/components/sunrise-logo";
 import { formatMalawi } from "@/lib/time";
 
@@ -882,14 +883,10 @@ export default function AdminPage() {
         <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowAddImage(false); }}>
           <div className="modal-dialog">
             <button className="modal-close-btn" onClick={() => setShowAddImage(false)}><X size={18} /></button>
-            <div className="modal-head"><span className="eyebrow"><span className="eyebrow-line" /> PICTURES</span><h2>Add a picture</h2><p>Upload from your phone or paste a direct image link.</p></div>
+            <div className="modal-head"><span className="eyebrow"><span className="eyebrow-line" /> PICTURES</span><h2>Add a picture</h2><p>Pick from your laptop or phone — it uploads to permanent cloud storage.</p></div>
             <form onSubmit={addImage} className="admin-modal-form">
-              <label className="upload-drop">
-                <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFile(f); }} />
-                {uploading ? <><Loader2 size={18} className="spin" /> Uploading…</> : <><Upload size={18} /> Tap to choose a photo (JPG/PNG/WEBP, max 8 MB)</>}
-              </label>
+              <ImageUploader currentImage={imgUrl} onUploadComplete={(url) => { setImgUrl(url); if (!imgTitle) setImgTitle("Gallery photo"); notify("Photo uploaded — add a title and save"); }} />
               {imgUrl && <img className="upload-preview" src={imgUrl} alt="Preview" />}
-              <label><span>Or paste image URL</span><input value={imgUrl} onChange={(e) => setImgUrl(e.target.value)} placeholder="https://… or /api/uploads/…" /></label>
               <label><span>Title</span><input required value={imgTitle} onChange={(e) => setImgTitle(e.target.value)} placeholder="e.g. Deluxe room — new curtains" /></label>
               <div className="form-grid-2">
                 <label><span>Category</span><select value={imgCategory} onChange={(e) => setImgCategory(e.target.value)}><option>Rooms</option><option>Property</option><option>Dining</option><option>Events</option><option>Work</option></select></label>
@@ -918,8 +915,9 @@ export default function AdminPage() {
                 <label><span>Price tag</span><input value={post.priceTag} onChange={(e) => setPost({ ...post, priceTag: e.target.value })} placeholder="From MWK 22,000" /></label>
               </div>
               <label><span>Picture</span>
-                <select value={post.imageUrl} onChange={(e) => setPost({ ...post, imageUrl: e.target.value })}>
-                  <option value="">Choose from gallery…</option>
+                <ImageUploader currentImage={post.imageUrl || null} onUploadComplete={(url) => setPost({ ...post, imageUrl: url })} />
+                <select value={post.imageUrl} onChange={(e) => setPost({ ...post, imageUrl: e.target.value })} style={{ marginTop: 8 }}>
+                  <option value="">…or choose from gallery</option>
                   {gallery.map((g) => <option key={g.id} value={g.imageUrl}>{g.title} ({g.category})</option>)}
                 </select>
               </label>

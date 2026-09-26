@@ -3,6 +3,21 @@
 # Currently: "https://sunrise-motel.vercel.app" (permanent).
 # Never point it at a trycloudflare.com tunnel URL — those expire on restart.
 
+## Release signing (ONE keystore forever — or users get duplicate icons)
+1. Generate ONCE on any machine with Java (`C:\Program Files\Git\usr\bin\keytool.exe`
+   works on this PC if plain `keytool` is missing):
+   `keytool -genkey -v -keystore sunrise-motel-release.jks -alias sunrise -keyalg RSA -keysize 2048 -validity 10000`
+   Passwords/alias must match `app/build.gradle.kts` signingConfigs (`Sunrise2026!` / `sunrise`).
+   Place the file at `SunriseMotelApp/sunrise-motel-release.jks` (gitignored).
+2. Encode + save as GitHub secret (run in Git Bash / repo root):
+   `base64 -w0 SunriseMotelApp/sunrise-motel-release.jks` → copy output →
+   repo Settings → Secrets → Actions → New secret `KEYSTORE_BASE64` → paste.
+   The workflow restores it before every build, so every APK shares one signature.
+3. NEVER delete the `.jks`. Lose it = new signature = duplicates forever.
+   `versionCode` goes +1 every release (currently 3 / "1.2") with the same
+   `applicationId com.sunrisemotel.app` → Android shows "Updating…".
+4. Users already seeing 2 icons: keep the NEW one (v1.2+), uninstall the old v1.0.
+
 ## Broadcast push (Firebase) — 2 files from YOU to activate
 1. Firebase console (https://console.firebase.google.com) → Add project
    "sunrise-motel" → Add Android app, package `com.sunrisemotel.app` →

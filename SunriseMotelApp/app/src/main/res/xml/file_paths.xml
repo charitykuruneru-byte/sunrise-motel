@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- In-app update APK lives in getExternalFilesDir(DOWNLOADS)/update.apk -->
+    <external-files-path name="downloads" path="Download/" />
+</paths>

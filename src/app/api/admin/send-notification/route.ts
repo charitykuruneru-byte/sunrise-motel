@@ -57,7 +57,11 @@ export async function POST(request: Request) {
     const { getAccessToken, sendToTopic } = await import("@/lib/fcm");
     const token = await getAccessToken(serviceAccount);
     const result = await sendToTopic({ projectId, accessToken: token, topic: "all_users", title, body, url, imageUrl });
-    return NextResponse.json({ queued: true, delivered: true, messageId: result.name ?? null });
+    const successCount =
+      typeof (result as { successCount?: unknown }).successCount === "number"
+        ? ((result as { successCount?: number }).successCount as number)
+        : undefined;
+    return NextResponse.json({ queued: true, delivered: true, messageId: result.name ?? null, successCount });
   } catch (err) {
     console.error("FCM send failed", err);
     return NextResponse.json({ error: "Push failed. Check Firebase keys and try again." }, { status: 500 });

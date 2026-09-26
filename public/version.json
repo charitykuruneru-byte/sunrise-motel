@@ -1,13 +1,13 @@
 {
-  "latestVersionCode": 2,
-  "latestVersionName": "1.1",
+  "latestVersionCode": 3,
+  "latestVersionName": "1.2",
   "apkUrl": "https://github.com/charitykuruneru-byte/sunrise-motel/releases/latest/download/SunriseMotel.apk",
   "forceUpdate": false,
   "whatsNew": [
-    "Added Saturday Live Music events",
-    "Improved gallery view on mobile",
-    "Fixed swipe refresh bug",
-    "Added Table Booking from gallery"
+    "In-app update — Update Now downloads and installs inside the app, no file manager hunt",
+    "Update notice only appears when your app is actually outdated",
+    "Admin photo upload from laptop/phone straight to cloud storage",
+    "Push notification preview before sending to all app users"
   ],
   "releaseDate": "2026-09-27"
 }

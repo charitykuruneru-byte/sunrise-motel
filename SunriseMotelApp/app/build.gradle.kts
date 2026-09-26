@@ -9,11 +9,11 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.sunrisemotel.app"
+        applicationId = "com.sunrisemotel.app" // LOCKED FOREVER — never change, or users get duplicate icons
         minSdk = 21
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 3 // +1 for EVERY release: 1 -> 2 -> 3 …
+        versionName = "1.2"
         // Single place to change the website URL. Debug and release both read it.
         buildConfigField("String", "BASE_URL", "\"https://sunrise-motel.vercel.app\"")
     }
@@ -22,13 +22,22 @@ android {
         buildConfig = true
     }
 
+    signingConfigs {
+        // Single release identity forever: same keystore + alias = Android shows
+        // "Updating…" instead of installing a duplicate icon.
+        create("release") {
+            storeFile = file("../sunrise-motel-release.jks")
+            storePassword = "Sunrise2026!"
+            keyAlias = "sunrise"
+            keyPassword = "Sunrise2026!"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Debug signing keeps GitHub Actions cloud builds working with no secrets.
-            // For Play Store, add a signingConfigs block with your keystore.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

@@ -2,5 +2,6 @@
 SunriseMotelApp/local.properties
 SunriseMotelApp/**/*.jks
 SunriseMotelApp/**/*.keystore
+SunriseMotelApp/sunrise-motel-release.jks
 # Firebase app config — per-device keys, never commit
 SunriseMotelApp/app/google-services.json

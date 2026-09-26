@@ -72,5 +72,6 @@ export async function sendToTopic(opts: {
     const text = await res.text().catch(() => "");
     throw new Error(`FCM send failed (${res.status}): ${text.slice(0, 300)}`);
   }
-  return (await res.json()) as { name?: string };
+  const json = (await res.json()) as { name?: string; successCount?: number };
+  return json;
 }

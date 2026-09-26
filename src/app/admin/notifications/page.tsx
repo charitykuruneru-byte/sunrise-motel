@@ -1,8 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import ImageUploader from "@/components/ImageUploader";
 
-type SendState = { tone: "idle" | "ok" | "warn" | "err"; text: string };
+type SendState = { tone: "idle" | "ok" | "warn" | "err"; text: string; count?: number };
 
 // New admin page: broadcast a push notification to ALL installed apps
 // via POST /api/admin/send-notification (FCM topic "all_users").
@@ -28,10 +29,13 @@ export default function NotificationsAdminPage() {
         error?: string;
         delivered?: boolean;
         reason?: string;
+        successCount?: number;
+        failureCount?: number;
       };
       if (!res.ok) throw new Error(data.error || "Send failed.");
       if (data.delivered) {
-        setState({ tone: "ok", text: "Sent to all app users." });
+        const n = typeof data.successCount === "number" ? ` Sent to ${data.successCount} device${data.successCount === 1 ? "" : "s"}.` : " Sent to all app users.";
+        setState({ tone: "ok", text: n, count: data.successCount });
         setTitle("");
         setBody("");
       } else {
@@ -58,11 +62,28 @@ export default function NotificationsAdminPage() {
           <label className="form-input-label"><span>Message *</span><textarea value={body} onChange={(e) => setBody(e.target.value)} required rows={3} placeholder="Don't miss it — braai, drinks and music on the lawn." /></label>
           <div className="form-grid-2">
             <label className="form-input-label"><span>Open page in app</span><input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="/unwind" /></label>
-            <label className="form-input-label"><span>Image URL (optional)</span><input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://…/poster.jpg" /></label>
+            <label className="form-input-label"><span>Poster image</span>
+              <ImageUploader currentImage={imageUrl || null} onUploadComplete={(u) => setImageUrl(u)} />
+            </label>
           </div>
           {state.tone !== "idle" && (
             <div className="booking-error-banner" style={state.tone === "ok" ? { borderColor: "var(--sage)" } : undefined}>
               <span>{state.text}</span>
+            </div>
+          )}
+          {/* Phone mockup preview — exactly how it looks in the status bar. */}
+          {(title.trim() || body.trim()) && (
+            <div style={{ marginTop: 16, border: '1px solid var(--line)', borderRadius: 16, padding: 14, background: '#0d0c0b', color: '#fff' }}>
+              <small style={{ fontSize: 10, letterSpacing: 2, opacity: 0.6 }}>PHONE PREVIEW</small>
+              <div style={{ display: 'flex', gap: 10, marginTop: 8, alignItems: 'flex-start' }}>
+                <img src="/icon-192.png" alt="" width={40} height={40} style={{ borderRadius: 10 }} />
+                <div>
+                  <strong style={{ fontSize: 14 }}>{title.trim() || "Title"}</strong>
+                  <p style={{ fontSize: 13, opacity: 0.85, margin: '2px 0 0' }}>{body.trim() || "Message"}</p>
+                  <small style={{ fontSize: 11, opacity: 0.6 }}>Sunrise Motel · now · opens {url || "/"}</small>
+                </div>
+              </div>
+              {imageUrl && <img src={imageUrl} alt="" style={{ width: '100%', marginTop: 10, borderRadius: 8, maxHeight: 180, objectFit: 'cover' }} />}
             </div>
           )}
           <button type="submit" className="btn-submit-booking-request" disabled={busy || !title.trim() || !body.trim()}>
