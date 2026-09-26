@@ -7,6 +7,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "staff:invite": "node --no-warnings scripts/staff-invite.mjs",
     "vercel-build": "npx drizzle-kit migrate --config=drizzle.config.ts && next build"
   },
   "dependencies": {

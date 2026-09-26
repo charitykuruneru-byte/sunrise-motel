@@ -129,7 +129,7 @@ export default function AdminPage() {
   const [reminders, setReminders] = useState<{ pendingCount: number; reminderDue: { id: string; reference: string; bookingNumber: string | null; guestName: string; hours: number }[] } | null>(null);
   const [staffList, setStaffList] = useState<{ id: string; staffCode: string; name: string; email: string; phone: string | null; role: string; isActive: boolean; lastLoginAt: string | null }[]>([]);
   const [roomsList, setRoomsList] = useState<{ id: string; name: string; rate: number; totalInventory: number; isActive: boolean }[]>([]);
-  const [staffForm, setStaffForm] = useState({ name: "", email: "", phone: "", role: "staff", password: "" });
+  const [staffForm, setStaffForm] = useState({ name: "", email: "", phone: "", role: "staff", password: "", sendCredentials: true });
   const [roomForm, setRoomForm] = useState({ id: "", name: "", rate: "", totalInventory: "3" });
 
   const [query, setQuery] = useState("");
@@ -457,8 +457,28 @@ export default function AdminPage() {
     const res = await fetch("/api/admin/staff", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(staffForm) });
     const data = await res.json();
     if (!res.ok) { notify(data.error || "Could not add staff"); return; }
-    setStaffForm({ name: "", email: "", phone: "", role: "staff", password: "" });
-    notify(`Added ${data.staff.staffCode} — ${data.staff.name}.`);
+    const creds = data.credentials as { password: string; emailed: boolean; reason?: string } | null;
+    setStaffForm({ name: "", email: "", phone: "", role: "staff", password: "", sendCredentials: true });
+    if (creds) {
+      notify(creds.emailed
+        ? `Added ${data.staff.staffCode} — ${data.staff.name}. Password ${creds.password} emailed to ${data.staff.email}.`
+        : `Added ${data.staff.staffCode} — ${data.staff.name}. Password ${creds.password} — email failed (${creds.reason || "check SMTP settings"}), share it on WhatsApp.`);
+    } else {
+      notify(`Added ${data.staff.staffCode} — ${data.staff.name}.`);
+    }
+    loadAll();
+  };
+
+  // Reset a login and email the new details to that person.
+  const emailStaffLogin = async (id: string, name: string, email: string) => {
+    if (!confirm(`Create a new password for ${name} and email the login details to ${email}? Their current password stops working immediately.`)) return;
+    const res = await fetch("/api/admin/staff", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, sendCredentials: true }) });
+    const data = await res.json();
+    if (!res.ok) { notify(data.error || "Could not email login details"); return; }
+    const creds = data.credentials as { password: string; emailed: boolean; reason?: string } | null;
+    notify(creds?.emailed
+      ? `New login details emailed to ${email}.`
+      : `New password for ${name}: ${creds?.password ?? "(not returned)"} — email failed (${creds?.reason || "check SMTP settings"}), share it on WhatsApp.`);
     loadAll();
   };
 
@@ -1009,7 +1029,11 @@ export default function AdminPage() {
               <label><span>Phone</span><input value={staffForm.phone} onChange={(e) => setStaffForm({ ...staffForm, phone: e.target.value })} placeholder="+265 …" /></label>
               <label><span>Role</span><select value={staffForm.role} onChange={(e) => setStaffForm({ ...staffForm, role: e.target.value })}><option value="staff">Staff (limited)</option><option value="admin">Admin (full)</option></select></label>
             </div>
-            <label><span>Password (min 6) *</span><input required type="password" value={staffForm.password} onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })} placeholder="Set a password" /></label>
+            <label><span>{staffForm.sendCredentials ? "Password (created for them)" : "Password (min 6) *"}</span><input required={!staffForm.sendCredentials} disabled={staffForm.sendCredentials} type="password" value={staffForm.password} onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })} placeholder={staffForm.sendCredentials ? "A strong password is created and emailed" : "Set a password"} /></label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+              <input type="checkbox" checked={staffForm.sendCredentials} onChange={(e) => setStaffForm({ ...staffForm, sendCredentials: e.target.checked, password: e.target.checked ? "" : staffForm.password })} />
+              <span>Email these login details to the new user (recommended — they can set their own later)</span>
+            </label>
             <button type="submit" className="admin-btn admin-btn-primary"><Plus size={15} /> Add staff</button>
           </form>
           <div className="invoice-list">
@@ -1018,6 +1042,7 @@ export default function AdminPage() {
                 <div><strong>{s.staffCode} — {s.name}</strong><small>{s.email}</small></div>
                 <div><strong>{s.role}</strong><small>{s.isActive ? "active" : "deactivated"}</small></div>
                 <div className="invoice-actions">
+                  <button className="btn-action" onClick={() => emailStaffLogin(s.id, s.name, s.email)}>Email login</button>
                   <button className="btn-action" onClick={() => toggleStaff(s.id, !s.isActive)}>{s.isActive ? "Deactivate" : "Activate"}</button>
                   <button className="btn-action btn-danger-text" onClick={() => removeStaff(s.id, s.name)}>Remove</button>
                 </div>

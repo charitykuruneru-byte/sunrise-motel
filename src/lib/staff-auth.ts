@@ -1,13 +1,13 @@
-// Staff auth: salted scrypt password hashing + signed session cookies.
+// Staff auth: session cookies + staff lookups.
 // Roles: "admin" (full control) vs "staff" (view + approve/confirm/cancel/follow-up only).
+// Password hashing lives in ./password and is re-exported below.
 
-import { randomUUID, scrypt, timingSafeEqual } from "node:crypto";
-import { promisify } from "node:util";
 import { db } from "@/db";
 import { staffTable } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
-const scryptAsync = promisify(scrypt);
+// Re-exported so existing `import { hashPassword } from "@/lib/staff-auth"` keeps working.
+export { hashPassword, verifyPassword, generatePassword } from "./password";
 
 export type SessionRole = "admin" | "staff";
 
@@ -20,23 +20,6 @@ export type SessionUser = {
   /** Legacy single-password manager session (ADMIN_PASSWORD) — treated as admin. */
   legacy?: boolean;
 };
-
-export async function hashPassword(password: string) {
-  const salt = randomUUID().replace(/-/g, "") + randomUUID().replace(/-/g, "");
-  const derived = (await scryptAsync(password, salt, 64)) as Buffer;
-  return { salt, hash: derived.toString("hex") };
-}
-
-export async function verifyPassword(password: string, salt: string, hash: string) {
-  try {
-    const derived = (await scryptAsync(password, salt, 64)) as Buffer;
-    const expected = Buffer.from(hash, "hex");
-    if (derived.length !== expected.length) return false;
-    return timingSafeEqual(derived, expected);
-  } catch {
-    return false;
-  }
-}
 
 export function nextStaffCode(existing: string[]) {
   let max = 1;

@@ -118,6 +118,48 @@ export function guestEmailHtml(opts: {
   </div>`;
 }
 
+// Sent when an admin creates a portal login (or resets one) and asks for the
+// details to be emailed. Keeps the same dark/orange letterhead as guest mail so
+// the team recognises it instantly and does not file it as spam.
+export function staffCredentialsHtml(opts: {
+  name: string;
+  email: string;
+  password: string;
+  staffCode: string;
+  role: "admin" | "staff";
+  loginUrl?: string;
+  portalUrl?: string;
+  createdBy?: string | null;
+  reset?: boolean;
+}) {
+  const base = (opts.portalUrl ?? publicBaseUrl()).replace(/\/$/, "");
+  const loginUrl = opts.loginUrl ?? `${base}/admin`;
+  const row = (k: string, v: string) =>
+    `<tr><td style="padding:8px 10px;color:#756c64;border-bottom:1px solid #f1ebe2">${k}</td><td style="padding:8px 10px;font-weight:bold;border-bottom:1px solid #f1ebe2;font-family:'Courier New',monospace">${v}</td></tr>`;
+  const roleLabel = opts.role === "admin" ? "Admin (full control)" : "Staff (bookings only)";
+  return `
+  <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;color:#171513">
+    <div style="background:#171513;color:#fff;padding:20px 24px;border-radius:10px 10px 0 0">
+      <div style="font-size:11px;letter-spacing:3px;color:#f28c18;font-weight:bold">SUNRISE MOTEL · MANAGER PORTAL</div>
+      <h1 style="margin:6px 0 0;font-family:Georgia,serif;font-weight:400">Moni ${opts.name}, here is your ${opts.reset ? "new " : ""}login.</h1>
+      <p style="margin:8px 0 0;color:#e9d8c4;font-size:13px">Use the details below to open the manager portal. Keep them private — anyone with them can see bookings and guest details.</p>
+    </div>
+    <div style="border:1px solid #e9d8c4;border-top:0;padding:20px 24px;border-radius:0 0 10px 10px">
+      <h2 style="font-size:14px;margin:0 0 10px">Your account</h2>
+      <table style="width:100%;font-size:13px;border-collapse:collapse">
+        ${row("Email (login)", opts.email)}
+        ${row("Password", opts.password)}
+        ${row("Your staff ID", opts.staffCode)}
+        ${row("Access level", roleLabel)}
+      </table>
+      <p style="font-size:13px"><a href="${loginUrl}" style="display:inline-block;background:#f28c18;color:#171513;font-weight:bold;text-decoration:none;padding:10px 18px;border-radius:6px;margin-top:14px">Open the manager portal</a></p>
+      <p style="font-size:12px;color:#756c64">Sign in at <strong>${loginUrl}</strong> with the email and password above.${opts.createdBy ? ` This account was set up by ${opts.createdBy}.` : ""}</p>
+      <p style="font-size:12px;color:#756c64">Every action you take in the portal is recorded against your staff ID (${opts.staffCode}), so please do not share this password. Ask an admin to reset it if you think someone else has seen it.</p>
+      <p style="font-size:12px;color:#756c64">Front desk: +265 998 688 332 · Area 5, Lilongwe · <em>When you are here, you are family.</em></p>
+    </div>
+  </div>`;
+}
+
 export function adminAlertHtml(opts: {
   guestName: string;
   phone: string;
