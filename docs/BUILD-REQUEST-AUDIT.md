@@ -69,7 +69,7 @@ npx tsc --noEmit             # types
 | Every email attempt recorded honestly | ✅ | `notification_log` via `logNotification()` (`src/lib/notify.ts`) — including `skipped` rows that say *why* ("SMS gateway not configured — send this wording by WhatsApp") instead of pretending |
 | Login attempts logged | ✅ | `guest.signin_failed` (the wording never reveals whether an account exists), and the staff side logs its own failures |
 | `/admin/users` with resend / revoke / deactivate / change role | ⚖️ one console, not a route | These actions live in the single admin console `src/app/admin/page.tsx` (64 KB) against `/api/admin/staff`; there is no `/admin/users` URL. Deactivate, role change and password reset are implemented and each writes an audit row |
-| `/admin/audit-logs` page with filters + CSV/PDF | ⚖️ partial | `GET /api/admin/audit` exists and the console renders the trail; date-range/actor/action filters and the download are **not** built |
+| `/admin/audit-logs` page with filters + CSV/PDF | ⚖️ partial | `GET /api/admin/audit` already filters by free text (`q`) and `entity`, newest first, capped at `limit` (`src/app/api/admin/audit/route.ts:18-21`), and the console renders it. Missing: a date range, an actor and action filter, and any export (CSV/PDF) |
 | Rate limit: max 5 invites per hour per admin | ⛔ | Not implemented |
 
 ---
@@ -83,6 +83,14 @@ What exists now: one site-wide modal pattern (`.booking-modal-backdrop` + `.book
 `.sheet-close-btn` in `globals.css`) used by the booking sheet, the dish order, the table/braai
 reservation, the workspace booking and the `/track` lookup; a nights count and a price breakdown inside
 the sheet; and the site's own cream/gold design language.
+
+**A correction to the brief's page names, first.** The brief asks for a premium redesign of
+`/book/room/[id]`, `/book/table` and `/order/takeaway`. **Those URLs do not exist and never have.**
+`src/app` contains no `book` directory and no `order` directory — the only booking and ordering routes
+are the APIs (`/api/bookings`, `/api/desk/orders`, `/api/guest/orders`). Guests book and order inside
+**modal sheets** on `/`, `/stay`, `/room`, `/dine`, `/unwind` and `/connect`. So this brief is not a
+redesign of three pages; it is a rebuild of those sheets and of the form primitives behind them, on the
+pages that already host them.
 
 What is missing from the brief: `src/components/forms/` does not exist at all — no `PremiumInput`,
 `GuestCounter`, `DateRangePicker`, `PriceSummaryCard` or `TrustBadges`, and with them no floating
@@ -138,7 +146,7 @@ it is a question rather than a commit.
 | `findOrCreateGuest` rewritten (`src/lib/hotel.ts:64`) | It compared the raw string, so `0888 123 456` and `+265888123456` were two guests — precisely the duplicate-identity bug. It now matches on `right(digits, 9)` **in SQL**, so rows written before the rule still match, and it upgrades a legacy spelling in place |
 | `POST /api/bookings` resolves the guest (`:83`) and stores `guestId` (`:130`) | A booking made on the website used to create **no** identity at all |
 | Two duplicated phone normalisers deleted (`/api/reviews`, `/api/guest/activate`) | They had already drifted apart; both now use the shared rule, and the activation check fails *closed* when the number on the booking is not a number |
-| Migration `0007_nasty_cannonball.sql` + the indexes declared on `guestsTable` | "Email + Phone unique indexes enforced in DB" is now true of the database, not only of the code that remembers to call the helper. Verified duplicate-free first, then applied with `drizzle-kit migrate` |
+| Migration `0007_nasty_cannonball.sql` + the indexes declared on `guestsTable` | "Email + Phone unique indexes enforced in DB" is now true of the database, not only of the code that remembers to call the helper. Checked for duplicates first, then applied with `drizzle-kit migrate` — but see the honest limit below: the table held **0 rows**, so this was a formality |
 | `scripts/verify-guest-identity.mjs` (new) | Imports the **real** rules through Node's own TypeScript support, asserts 38 cases, then reports split identities in the live database read-only. `--apply` adds the indexes only when the report is clean |
 
 ## Open work, in the order I would do it
@@ -146,8 +154,11 @@ it is a question rather than a commit.
 1. **Guest password reset** (`POST /api/guest/password/forgot` + `/reset` + the link on the sign-in
    screen). The token machinery, expiry and audit rows already exist; only the issuing endpoint and the
    screen are missing. It removes a phone call to the desk for every forgotten password.
-2. **`bookings.guestId` → `NOT NULL`**, after a backfill that applies the same matching rules to the
-   bookings that predate them. This is the last piece of "every booking MUST have a userId".
+2. **`bookings.guestId` → `NOT NULL`** — a backfill that runs the same matching rules over the bookings
+   that predate them, then the constraint. This is the last piece of "every booking MUST have a userId",
+   and it is **4 rows today**, all four with a usable phone, so it is now a small job rather than a
+   migration project. It also cannot be called verified until at least one booking has actually written a
+   `guestId` (see the honest limit).
 3. **The premium booking forms** (Brief 3) — its own pass, sheet by sheet, starting with the room
    booking sheet because it is the money path.
 4. **The audit-log filters and export** (`/admin/audit-logs` behaviour behind a real route), so the owner
@@ -158,10 +169,35 @@ it is a question rather than a commit.
 
 ## The one honest limit in this file
 
-`npm run verify:identity` proves the rules and reads the database. It does **not** place a real booking
-through `POST /api/bookings` and then count the guest rows — that would write test data into the live
-database, so it was not done. The next person can prove it end to end against a scratch database (or a
-Neon branch) with two bookings using two spellings of one number and a single
-`SELECT count(*) FROM guests` afterwards.
+`npm run verify:identity` proves the *rules*, and reads the database. It does **not** place a real
+booking through `POST /api/bookings` and count the guest rows — that would write test data into the live
+database, so it was not done.
+
+**And the live database is empty of guests, which makes the strongest claim in this file the weakest
+one.** Measured read-only today:
+
+| | Count |
+|---|---|
+| `bookings` | **4** |
+| …of those, `guest_id IS NULL` | **4** (every one — the link is written only for bookings made after the fix) |
+| …of those, with a phone usable as a key | **4** |
+| `guests` | **0** |
+| `guest_accounts` | **0** |
+| `audit_log` | 43 |
+| `notification_log` | 0 |
+
+So "no duplicated email addresses, no duplicated phone numbers, therefore the unique indexes applied
+safely" is **trivially true** — it was a table with no rows to duplicate. The indexes could not have
+failed, and equally they have never rejected anything. Likewise the whole guest-identity path
+(`phone.ts`, `findOrCreateGuest`, the `guestId` write) has been proven by unit checks and by a SQL/code
+key comparison, but **not once by a real booking**, because there are no guests and every existing
+booking predates the fix.
+
+What that means concretely: the first four bookings made after this commit are the first real test. The
+cheap way to make it a real test *before* guests arrive is to run it against a scratch database (or a
+Neon branch, which this project can create in seconds) — two bookings, one number written two ways, then
+`SELECT count(*) FROM guests` must return 1. Until that runs, brief 1 is proven correct and unproven in
+practice, and this file says so rather than showing a green tick.
+
 
 
