@@ -3,9 +3,10 @@
 // running room bill (folio). Everything here is server-side only.
 
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, inArray, or } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { bookings, folioItemsTable, guestsTable, roomsTable, roomTypesTable } from "@/db/schema";
+import { normaliseEmail, normalisePhone, phoneKey } from "@/lib/phone";
 
 /** MWK money formatting — integer Kwacha, never decimals. */
 export function MWK(value: number) {
@@ -43,8 +44,22 @@ export async function ensureRoomsSeeded() {
 }
 
 /**
- * The guest identity behind a booking. Matched on phone first, then email, so a
- * returning guest keeps their stay history instead of being duplicated.
+ * The guest identity behind a booking — ONE EMAIL + ONE PHONE = ONE GUEST, forever.
+ *
+ * Matching is deliberately tolerant of how the number was typed. The guest who booked
+ * as "0888 123 456" last year and "+265 888 123 456" today is the SAME person, and the
+ * proof is their nine significant digits, not the string they happened to type. So the
+ * comparison happens on `right(digits, 9)` — in SQL, so it also catches rows written
+ * before this rule existed (an old "0888…" row still matches a new "+265888…" booking).
+ * Emails are compared lower-cased for the same reason.
+ *
+ * `phoneKey()` returns null when the value is not a number at all ("n/a", "ask at
+ * desk"), and a null key simply does not participate in matching: two rows that both
+ * say "n/a" are NOT the same guest, and must never be merged into one.
+ *
+ * This is the only place a guest identity is created. Every write path — the public
+ * booking form, the desk, the guest app — goes through here, which is what stops a
+ * returning guest being duplicated.
  */
 export async function findOrCreateGuest(input: {
   fullName: string;
@@ -52,12 +67,19 @@ export async function findOrCreateGuest(input: {
   email?: string | null;
   country?: string | null;
 }) {
-  const phone = input.phone?.trim() || null;
-  const email = input.email?.trim().toLowerCase() || null;
-  const conditions = [
-    phone ? eq(guestsTable.phone, phone) : undefined,
-    email ? eq(guestsTable.email, email) : undefined,
-  ].filter(Boolean);
+  const rawPhone = input.phone?.trim() || null;
+  const key = phoneKey(rawPhone);
+  const phone = normalisePhone(rawPhone) ?? rawPhone; // canonical, or the label as typed
+  const email = normaliseEmail(input.email);
+
+  const conditions: unknown[] = [];
+  if (key) {
+    conditions.push(sql`right(regexp_replace(${guestsTable.phone}, '[^0-9]', '', 'g'), 9) = ${key}`);
+  }
+  if (email) {
+    conditions.push(sql`lower(${guestsTable.email}) = ${email}`);
+  }
+
   if (conditions.length > 0) {
     const found = await db
       .select()
@@ -66,15 +88,20 @@ export async function findOrCreateGuest(input: {
       .limit(1);
     if (found[0]) {
       const patch: Partial<typeof guestsTable.$inferInsert> = {};
-      if (email && !found[0].email) patch.email = email;
-      if (phone && !found[0].phone) patch.phone = phone;
+      // Upgrade the row in place: a legacy spelling becomes the canonical one, so the
+      // next match is exact. Only ever when we actually have a number to canonicalise.
+      if (phone && found[0].phone !== phone) patch.phone = phone;
+      if (email && found[0].email !== email) patch.email = email;
+      if (!found[0].fullName?.trim() && input.fullName.trim()) patch.fullName = input.fullName.trim();
+      if (input.country?.trim() && !found[0].country) patch.country = input.country.trim();
       if (Object.keys(patch).length > 0) {
         patch.updatedAt = new Date();
         await db.update(guestsTable).set(patch).where(eq(guestsTable.id, found[0].id));
       }
-      return found[0];
+      return { ...found[0], ...patch } as typeof found[0];
     }
   }
+
   const [created] = await db
     .insert(guestsTable)
     .values({

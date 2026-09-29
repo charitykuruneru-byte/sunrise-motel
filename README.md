@@ -853,6 +853,25 @@ PASS  Feed is clean again
   visit, and applies on tap. Screenshots land in `docs/evidence/`. It found and now guards a real bug:
   `install` must **not** call `skipWaiting()`, or the new worker claims the page and the page reloads
   itself mid-booking before the card can paint (measured at 1,544 ms).
+* **One email + one phone = one guest.** `src/lib/phone.ts` holds the only rule for what a phone number
+  is: **nine significant digits** (so `0888 123 456`, `+265 888 123 456` and `888123456` are one person),
+  canonicalised to `+265…`, and `null` for something that is not a number at all — two bookings that both
+  say `n/a` are *not* the same guest. `findOrCreateGuest` (`src/lib/hotel.ts`) matches on
+  `right(regexp_replace(phone,'[^0-9]','','g'),9)` **in SQL**, so rows saved before the rule still match,
+  and rewrites a legacy spelling in place. The rule is enforced by the database too (migration
+  `0007_nasty_cannonball.sql`): `guests_email_identity_unique` on `lower(email)` and
+  `guests_phone_identity_unique` on the same nine digits, both partial so an empty email or an
+  unusable phone never collides with itself. `POST /api/bookings` resolves the guest **before** it
+  writes the booking and stores `guestId`, and `/review` and `/invite` use the same helper instead of
+  their own copies.
+* **`npm run verify:identity`** (→ `scripts/verify-guest-identity.mjs`) is the proof for the paragraph
+  above: it imports the **real** `src/lib/phone.ts` (Node 24 runs TypeScript directly, no build step),
+  asserts 38 cases — eight spellings of one Malawian number collapsing to one key, distinct numbers
+  staying distinct, `n/a` and blank having no key, the desk's last-6 habit, email casing — then reads the
+  live database **read-only** to report any guest identities that are already split and proves the SQL
+  key equals the code's key. It only writes when you pass `--apply`, and it refuses to add the unique
+  indexes while duplicates exist. That is how migration 0007 was applied safely.
+
 * `InstallAppPopup` — appears ~3 s after load only when the browser fires `beforeinstallprompt`
   (and never inside either Android wrapper or when already installed). *Install Now* calls the
   native prompt; "Not now" suppresses it for 7 days; `?install=1` forces it for testing.
@@ -1993,7 +2012,11 @@ closes each one.
 
 * Payments are captured and verified by a human; **no money moves automatically**.
 * Housekeeping and maintenance completion is tapped by a person.
-* Guest identity is matched on phone and email; shared contact details can merge two people.
+* Guest identity is matched on phone and email, and the match is now *canonical*: the last nine digits
+  of the number and a lower-cased address, enforced by two partial unique indexes on `guests`
+  (`guests_email_identity_unique`, `guests_phone_identity_unique`). Shared contact details still merge
+  two people on purpose — one phone number is one guest — while `n/a`, `0000` and blanks match nobody.
+  Run `npm run verify:identity` before and after any change to that rule.
 * `policy_version` still needs a human decision when the policy changes.
 * The Dine, Unwind and Connect public forms remain **display-only** unless built out — the immediate
   fix is copy that says *"we'll continue on WhatsApp"* (§20 gap 1).

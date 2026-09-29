@@ -5,6 +5,7 @@ import { bookings, invoicesTable, roomTypesTable } from "@/db/schema";
 import { logBookingEvent } from "@/lib/booking-events";
 import { clientIp, logAudit } from "@/lib/audit";
 import { buildInvoicePdf } from "@/lib/invoice-pdf";
+import { findOrCreateGuest } from "@/lib/hotel";
 import { adminAlertHtml, guestEmailHtml, sendInvoiceEmail, sendMail } from "@/lib/mail";
 import { bookingMath, nextBookingNumber } from "@/lib/pricing";
 import { malawiShortDate, malawiYear, nowDate } from "@/lib/time";
@@ -74,6 +75,13 @@ export async function POST(request: Request) {
     const roomType = roomRecord.name;
     const nightlyRate = roomRecord.rate;
 
+    // ONE PHONE + ONE EMAIL = ONE GUEST. The identity now exists from the moment the
+    // booking is made, not from the moment the desk notices it — so a returning guest's
+    // stays, payments, orders and preferences are already joined up when they arrive.
+    // Resolved BEFORE the transaction on purpose: losing the sold-out race must never be
+    // the reason a booking is left with no identity behind it.
+    const guest = await findOrCreateGuest({ fullName: guestName, phone, email });
+
     // Anti-overbooking: count overlapping live bookings inside a transaction with a row lock on the room type
     const result = await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT id FROM room_types WHERE id = ${roomTypeId} FOR UPDATE`);
@@ -119,6 +127,7 @@ export async function POST(request: Request) {
           guestName,
           phone,
           email,
+          guestId: guest.id,
           arrival,
           requests,
           extras: JSON.stringify(extras),

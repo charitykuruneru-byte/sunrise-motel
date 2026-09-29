@@ -788,6 +788,44 @@ package, which would break a working guest build. `SunriseAdminApp/README.md` re
 add if staff push is ever wanted (a `staff` topic, not `all_users`).
 
 ---
+## 6. One guest, one identity — and the four briefs, checked one by one
+
+The guest-identity brief ("one email + one phone = one guest") was audited against the code and the
+database, and the gaps that were real were fixed. The full row-by-row answer, covering all four briefs
+with evidence for **and** against each requirement, is `docs/BUILD-REQUEST-AUDIT.md`. This section is
+the evidence for the part that changed.
+
+**What was actually broken.** `findOrCreateGuest` compared the phone number as a **raw string**, so
+`0888 123 456`, `+265 888 123 456` and `888123456` were three different guests — the duplicate bug
+described in the brief, reproduced from the code rather than guessed. Worse, `POST /api/bookings` never
+called it at all: a booking made on the website wrote free-text contact details and left
+`bookings.guestId` **null** until the front desk happened to invite an account
+(`src/lib/guest-account.ts:53`). Two more files had grown their own copies of the phone rule and had
+already drifted apart (`/api/reviews`, `/api/guest/activate`).
+
+**What it is now.**
+
+| Fix | Where | Evidence |
+|---|---|---|
+| one definition of a phone number — nine significant digits, `+265…`, `null` for `n/a` | `src/lib/phone.ts` (new) | `phoneKey("0888 123 456")` = `phoneKey("+265888123456")` = `"888123456"` |
+| matching moved **into SQL**, so pre-rule rows still match and are rewritten in place | `src/lib/hotel.ts:64` | `right(regexp_replace(phone,'[^0-9]','','g'),9)` |
+| a web booking creates/links the guest | `src/app/api/bookings/route.ts:83`, `:130` | `guestId` is set before the transaction commits |
+| the two drifted copies removed | `/api/reviews`, `/api/guest/activate` | the activation check now **fails closed** on an unusable number |
+| the rule enforced by the database, not by code that remembers to call a helper | migration `drizzle/0007_nasty_cannonball.sql` | `guests_email_identity_unique` on `lower(email)`, `guests_phone_identity_unique` on the nine digits — both **confirmed present in the live database** |
+| the rule and the database proven to agree | `npm run verify:identity` → `scripts/verify-guest-identity.mjs` (new) | **ALL CHECKS PASSED** — 38 cases, then a read-only report of split identities |
+
+Migration 0007 was applied only after `verify:identity` reported **no** duplicated email addresses and
+**no** duplicated phone numbers, and the script refuses `--apply` while any exist — which is why adding
+the unique indexes could not fail on the live data.
+
+**Still open, and named rather than implied:** `bookings.guestId` is still nullable (older rows hold
+null; closing it needs a backfill that runs the same rules over existing bookings, then `SET NOT
+NULL`); a guest cannot ask for a password reset themselves — the desk can, and the 1-hour
+`password_reset` token is already consumed by `/api/guest/activate`, but nothing *issues* one yet; and
+the premium booking-form redesign of Brief 3 is not started, because it is the motel's money path and
+cannot be half-shipped. `docs/BUILD-REQUEST-AUDIT.md` lists these with what each one costs.
+
+
 
 *This file is the per-section evidence behind **Part D** of `README.md`, which documents the
 mechanism of the same change. Keep the two in step: when a gap listed here is closed, move the row

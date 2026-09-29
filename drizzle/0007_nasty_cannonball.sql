@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "guests_email_identity_unique" ON "guests" USING btree (lower("email")) WHERE "guests"."email" is not null and "guests"."email" <> '';--> statement-breakpoint
+CREATE UNIQUE INDEX "guests_phone_identity_unique" ON "guests" USING btree (right(regexp_replace("phone", '[^0-9]', '', 'g'), 9)) WHERE "guests"."phone" is not null and length(regexp_replace("guests"."phone", '[^0-9]', '', 'g')) >= 6;

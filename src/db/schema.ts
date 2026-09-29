@@ -1,4 +1,5 @@
-import { boolean, integer, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { boolean, integer, pgTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 
 export const roomTypesTable = pgTable("room_types", {
   id: varchar("id", { length: 64 }).primaryKey(),
@@ -206,22 +207,42 @@ export const roomsTable = pgTable("rooms", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-// One record per person — the CRM identity. Matched on phone first, then email.
-export const guestsTable = pgTable("guests", {
-  id: varchar("id", { length: 36 }).primaryKey(),
-  fullName: varchar("full_name", { length: 160 }).notNull(),
-  phone: varchar("phone", { length: 40 }),
-  email: varchar("email", { length: 180 }),
-  country: varchar("country", { length: 80 }),
-  notes: text("notes"),
-  stayCount: integer("stay_count").notNull().default(0),
-  totalSpent: integer("total_spent").notNull().default(0),
-  isRegular: boolean("is_regular").notNull().default(false),
-  isNoShow: boolean("is_no_show").notNull().default(false),
-  marketingConsent: boolean("marketing_consent").notNull().default(false),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+// One record per person — the CRM identity. Matched on the *identity* of the phone and
+// email, never on how they were typed (§src/lib/phone.ts).
+export const guestsTable = pgTable(
+  "guests",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    fullName: varchar("full_name", { length: 160 }).notNull(),
+    phone: varchar("phone", { length: 40 }),
+    email: varchar("email", { length: 180 }),
+    country: varchar("country", { length: 80 }),
+    notes: text("notes"),
+    stayCount: integer("stay_count").notNull().default(0),
+    totalSpent: integer("total_spent").notNull().default(0),
+    isRegular: boolean("is_regular").notNull().default(false),
+    isNoShow: boolean("is_no_show").notNull().default(false),
+    marketingConsent: boolean("marketing_consent").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    // ONE EMAIL + ONE PHONE = ONE GUEST — enforced by the DATABASE, not only by the code
+    // that remembers to call findOrCreateGuest. Two bookings racing each other used to be
+    // able to create two profiles for one person; now the second insert is refused.
+    //
+    // These are expression indexes because the identity is not the string: a lower-cased
+    // email, and the nine significant digits of the phone. A row whose phone is not a
+    // number at all ("n/a", "ask at desk") sits outside the index on purpose — two rows
+    // that both say "n/a" are NOT the same guest and must not be collapsed into one.
+    uniqueIndex("guests_email_identity_unique")
+      .on(sql`lower(${table.email})`)
+      .where(sql`${table.email} is not null and ${table.email} <> ''`),
+    uniqueIndex("guests_phone_identity_unique")
+      .on(sql`right(regexp_replace(${table.phone}, '[^0-9]', '', 'g'), 9)`)
+      .where(sql`${table.phone} is not null and length(regexp_replace(${table.phone}, '[^0-9]', '', 'g')) >= 6`),
+  ],
+);
 
 // Guest login. The email/phone is only the login name — the ACCOUNT is the
 // identity, so two adults can share a booking and a phone-only account exists.

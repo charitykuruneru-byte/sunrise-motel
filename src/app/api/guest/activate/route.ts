@@ -6,13 +6,10 @@ import { clientIp, logAudit } from "@/lib/audit";
 import { consumeToken, peekToken, setGuestPassword } from "@/lib/guest-auth";
 import { OTP_MAX_ATTEMPTS, OTP_RESEND_SECONDS, OTP_TTL_MINUTES, resendOtp, verifyOtp } from "@/lib/guest-otp";
 import { notifyByEmail } from "@/lib/notify";
+import { samePhone } from "@/lib/phone";
 import { malawiStamp } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
-
-function normalisePhone(value: string | null | undefined) {
-  return (value ?? "").replace(/[^0-9]/g, "").replace(/^265/, "").replace(/^0/, "");
-}
 
 /** Mask an address for display: t***o@example.com — never the full inbox. */
 function maskEmail(value: string | null) {
@@ -145,8 +142,12 @@ export async function POST(request: Request) {
 
     // The phone number on the booking is still checked when supplied, and it is
     // what proves ownership of the stay on the self-serve route.
+    // Fails CLOSED: if the number on the booking is not a number at all, nobody can
+    // prove ownership with it and the desk is the way in (the message says so). Both
+    // sides go through the one rule in §lib/phone.ts, so "0888 123 456" and
+    // "+265888123456" are the same number and no other spelling is a second guest.
     const onRecord = account.loginPhone;
-    if (onRecord && body.phone && normalisePhone(body.phone) !== normalisePhone(onRecord)) {
+    if (onRecord && body.phone && !samePhone(body.phone, onRecord)) {
       return NextResponse.json(
         { error: "That phone number does not match the one on your booking. The front desk can fix it for you." },
         { status: 403 },

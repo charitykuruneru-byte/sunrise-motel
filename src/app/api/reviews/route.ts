@@ -22,13 +22,10 @@ import { bookings, reviewsTable } from "@/db/schema";
 import { clientIp, logAudit } from "@/lib/audit";
 import { resolveGuestContext } from "@/lib/guest-context";
 import { loadPublishedReviews, reviewSummary, submitReview } from "@/lib/reviews";
+import { phoneTail } from "@/lib/phone";
 import { malawiDatePart } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
-
-function normalisePhone(value: string) {
-  return value.replace(/[^0-9]/g, "").replace(/^265/, "").replace(/^0/, "");
-}
 
 /** "Sep 2026" — the month the guest stayed, derived from the stay, never guessed. */
 function monthLabel(datePart: string | null | undefined) {
@@ -100,7 +97,9 @@ export async function POST(request: Request) {
     // --- The no-account path: the reference in the check-out link + their phone. ---
     if (!bookingId) {
       const reference = (body.reference ?? "").trim().toUpperCase();
-      const phone = normalisePhone(body.phone ?? "");
+      // The last six digits: somebody reads their number out over the phone, so the
+      // comparison must survive "+265 888 123 456" vs "0888 123 456" (§lib/phone.ts).
+      const phone = phoneTail(body.phone ?? "");
       if (!reference || !phone) {
         return NextResponse.json(
           {
@@ -111,7 +110,7 @@ export async function POST(request: Request) {
         );
       }
       const [found] = await db.select().from(bookings).where(eq(bookings.reference, reference)).limit(1);
-      if (!found || phone.slice(-6) !== normalisePhone(found.phone).slice(-6)) {
+      if (!found || phone !== phoneTail(found.phone)) {
         // One answer for "no such reference" and "wrong phone": no probing.
         return NextResponse.json({ error: "We could not match that reference and phone number to a stay." }, { status: 403 });
       }
