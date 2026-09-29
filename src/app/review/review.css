@@ -1,0 +1,222 @@
+/* =====================================================================
+   /review — RATE YOUR STAY (addendum "landing page", Part 2.4 + §49.1)
+   =====================================================================
+   The check-out email lands a guest here on a phone, often one-handed.
+   One route, one sheet: every class is `rv-`-prefixed and scoped to
+   `.rv-root`, and the file is imported by this route alone — the same
+   arrangement `home-premium.css` has with `/`.
+
+   Why it is not a popup: on this page the form IS the page, and the star
+   is itself the submit button, so a sheet would insert a tap into the one
+   interaction the file exists for. What it does share with the rest of
+   the site is the design — cream ground, ink text, one gold accent,
+   Georgia for the headlines, 150-250ms motion, and all of it off under
+   prefers-reduced-motion.
+   ===================================================================== */
+
+.rv-root {
+  /* --- the same tokens the landing page uses ------------------------ */
+  --rv-ink: #14110f;
+  --rv-charcoal: #241f1b;
+  --rv-cream: #fbf7f0;
+  --rv-sand: #f1e8da;
+  --rv-gold: #d4a017;
+  --rv-gold-deep: #a8780c;
+  --rv-moss: #3f5d3a;
+  --rv-line: rgba(20, 17, 15, 0.12);
+  --rv-line-soft: rgba(20, 17, 15, 0.07);
+  --rv-muted: #6d635b;
+
+  min-height: 100vh;
+  background: var(--rv-cream);
+  color: var(--rv-ink);
+  padding: 26px 18px 72px;
+}
+.rv-shell { width: min(100%, 560px); margin: 0 auto; }
+
+/* --- who is asking, and the way back ------------------------------- */
+.rv-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.rv-brand { display: flex; flex-direction: column; gap: 3px; }
+.rv-brand strong {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--rv-gold-deep);
+}
+.rv-brand span { font-size: 12px; color: var(--rv-muted); }
+.rv-home { flex: none; font-size: 12px; font-weight: 700; border-bottom: 1px solid rgba(168, 120, 12, 0.4); }
+.rv-home:hover { border-color: var(--rv-gold-deep); }
+.rv-intro { margin-bottom: 16px; font-size: 12.5px; line-height: 1.65; color: var(--rv-muted); }
+
+/* --- the card ------------------------------------------------------ */
+.rv-card {
+  background: #fff;
+  border: 1px solid var(--rv-line-soft);
+  border-radius: 14px;
+  padding: 28px;
+  box-shadow: 0 16px 40px rgba(20, 17, 15, 0.08);
+}
+.rv-eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rv-gold-deep);
+}
+.rv-card h1 { margin-top: 8px; font-family: var(--serif); font-weight: 400; font-size: 30px; line-height: 1.15; }
+.rv-sub { margin-top: 10px; max-width: 52ch; font-size: 14.5px; line-height: 1.6; color: var(--rv-muted); }
+
+/* --- the stars: the primary control, because one tap submits ------- */
+.rv-stars { display: flex; align-items: center; gap: 6px; margin-top: 22px; }
+.rv-star {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(212, 160, 23, 0.1);
+  color: var(--rv-gold-deep);
+  transition: transform 0.16s ease-out, background 0.16s ease-out;
+}
+.rv-star:hover:not(:disabled) { transform: translateY(-2px) scale(1.06); background: rgba(212, 160, 23, 0.22); }
+.rv-star:focus-visible { outline: 2px solid var(--rv-ink); outline-offset: 2px; }
+.rv-star.is-on { background: rgba(212, 160, 23, 0.2); }
+.rv-star:disabled { opacity: 0.5; cursor: progress; }
+.rv-star-readout { margin-left: 10px; font-size: 13px; font-weight: 700; color: var(--rv-muted); }
+
+/* --- fields -------------------------------------------------------- */
+.rv-field { display: block; margin-top: 20px; font-size: 13px; font-weight: 700; }
+.rv-input,
+.rv-textarea {
+  display: block;
+  width: 100%;
+  margin-top: 7px;
+  padding: 12px 14px;
+  border: 1px solid var(--rv-line);
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  font-size: 14.5px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.rv-input:focus,
+.rv-textarea:focus { outline: none; border-color: var(--rv-gold-deep); box-shadow: 0 0 0 3px rgba(212, 160, 23, 0.18); }
+.rv-textarea { min-height: 116px; resize: vertical; }
+.rv-input.is-code { font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+
+/* --- the two identity fields, shown only when the stay cannot be proved --- */
+.rv-identity {
+  margin-top: 20px;
+  padding: 18px;
+  border: 1px solid var(--rv-line-soft);
+  border-radius: 12px;
+  background: var(--rv-sand);
+}
+.rv-identity-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rv-gold-deep);
+}
+.rv-identity > p { margin-top: 8px; font-size: 12.5px; line-height: 1.6; color: #5f564e; }
+.rv-identity .rv-field { margin-top: 14px; }
+
+/* --- the error, the submit and the small print --------------------- */
+.rv-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid rgba(180, 71, 47, 0.28);
+  border-radius: 8px;
+  background: #fdeceb;
+  color: #8e3524;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.rv-error svg { flex: none; margin-top: 2px; }
+.rv-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  height: 52px;
+  margin-top: 20px;
+  border-radius: 8px;
+  background: var(--rv-gold);
+  color: var(--rv-ink);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: background 0.18s ease-out, transform 0.18s ease-out;
+}
+.rv-submit:hover:not(:disabled) { background: #e0ad1f; transform: translateY(-1px); }
+.rv-submit:disabled { opacity: 0.62; cursor: progress; }
+.rv-note { margin-top: 12px; font-size: 12px; line-height: 1.6; color: var(--rv-muted); }
+
+/* --- what other guests said (published rows only) ------------------ */
+.rv-published { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--rv-line); }
+.rv-published-top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.rv-published-top strong { font-family: var(--serif); font-weight: 400; font-size: 26px; }
+.rv-published-top small { display: block; font-size: 12px; color: var(--rv-muted); }
+.rv-glyphs { color: var(--rv-gold); font-size: 14px; letter-spacing: 2px; }
+.rv-published-list { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; list-style: none; }
+.rv-published-list li { font-size: 13px; line-height: 1.65; color: var(--rv-muted); }
+.rv-published-list strong { color: var(--rv-ink); font-weight: 700; }
+
+/* --- the thank-you ------------------------------------------------- */
+.rv-done-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 16px;
+  border-radius: 50%;
+  background: #e8efe9;
+  color: var(--rv-moss);
+}
+.rv-done h1 { margin-top: 6px; }
+.rv-done-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.rv-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 46px;
+  padding: 0 20px;
+  border: 1px solid var(--rv-line);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  transition: border-color 0.18s ease-out, background 0.18s ease-out;
+}
+.rv-btn:hover { border-color: var(--rv-gold-deep); }
+.rv-btn-primary { border-color: var(--rv-gold); background: var(--rv-gold); }
+.rv-btn-primary:hover { background: #e0ad1f; border-color: #e0ad1f; }
+
+/* --- phone --------------------------------------------------------- */
+@media (max-width: 560px) {
+  .rv-root { padding: 20px 14px 60px; }
+  .rv-card { padding: 22px 18px; }
+  .rv-card h1 { font-size: 26px; }
+  .rv-star { width: 42px; height: 42px; }
+  .rv-top { flex-direction: column; align-items: flex-start; gap: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rv-root *,
+  .rv-root *::before,
+  .rv-root *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

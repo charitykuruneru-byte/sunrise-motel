@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Charcoal ground for the manager icon: instant separation from the guest
+         app's cream tile in a crowded launcher. -->
+    <color name="ic_launcher_background">#171513</color>
+</resources>

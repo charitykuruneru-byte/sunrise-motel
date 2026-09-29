@@ -1,0 +1,14 @@
+{
+  "latestVersionCode": 1,
+  "latestVersionName": "1.0",
+  "apkUrl": "https://github.com/charitykuruneru-byte/sunrise-motel/releases/latest/download/SunriseManager.apk",
+  "forceUpdate": false,
+  "whatsNew": [
+    "First release of the manager app — the portal, on the home screen",
+    "Opens straight at the signed-in portal: arrivals, room map, orders, issues and money",
+    "Photo proof and room pictures upload from the phone's own file picker",
+    "Pull to refresh the day board; the back button walks back through the portal",
+    "In-app update: Update Now downloads and installs inside the app"
+  ],
+  "releaseDate": "2026-09-28"
+}

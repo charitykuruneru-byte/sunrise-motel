@@ -13,6 +13,7 @@ export default function NotificationsAdminPage() {
   const [url, setUrl] = useState("/unwind");
   const [imageUrl, setImageUrl] = useState("");
   const [busy, setBusy] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [state, setState] = useState<SendState>({ tone: "idle", text: "" });
 
   const submit = async (e: FormEvent) => {
@@ -31,8 +32,9 @@ export default function NotificationsAdminPage() {
         reason?: string;
         successCount?: number;
         failureCount?: number;
+        detail?: string;
       };
-      if (!res.ok) throw new Error(data.error || "Send failed.");
+      if (!res.ok) throw new Error(data.detail || data.error || "Send failed.");
       if (data.delivered) {
         const n = typeof data.successCount === "number" ? ` Sent to ${data.successCount} device${data.successCount === 1 ? "" : "s"}.` : " Sent to all app users.";
         setState({ tone: "ok", text: n, count: data.successCount });
@@ -47,6 +49,36 @@ export default function NotificationsAdminPage() {
       setBusy(false);
     }
   };
+
+  // Dry run: proves the Firebase key + project work WITHOUT notifying anyone.
+  async function testConfig() {
+    setTesting(true);
+    setState({ tone: "idle", text: "" });
+    try {
+      const res = await fetch("/api/admin/send-notification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: title.trim() || "Configuration test", body: body.trim() || "Dry run - nobody is notified.", url, dryRun: true }),
+      });
+      const data = (await res.json().catch(function () { return {}; })) as {
+        error?: string;
+        detail?: string;
+        delivered?: boolean;
+        reason?: string;
+        messageId?: string;
+      };
+      if (!res.ok) throw new Error(data.detail || data.error || "Test failed.");
+      if (data.delivered) {
+        setState({ tone: "ok", text: "Firebase is configured - key valid, topic reachable. No notification was sent." + (data.messageId ? " " + data.messageId : "") });
+      } else {
+        setState({ tone: "warn", text: data.reason || "Firebase not configured - no test possible yet." });
+      }
+    } catch (err) {
+      setState({ tone: "err", text: err instanceof Error ? err.message : "Test failed." });
+    } finally {
+      setTesting(false);
+    }
+  }
 
   return (
     <div className="sunrise-app-root">
@@ -86,7 +118,10 @@ export default function NotificationsAdminPage() {
               {imageUrl && <img src={imageUrl} alt="" style={{ width: '100%', marginTop: 10, borderRadius: 8, maxHeight: 180, objectFit: 'cover' }} />}
             </div>
           )}
-          <button type="submit" className="btn-submit-booking-request" disabled={busy || !title.trim() || !body.trim()}>
+          <button type="button" className="admin-btn admin-btn-secondary" style={{ width: "100%", justifyContent: "center" }} onClick={testConfig} disabled={busy || testing}>
+            {testing ? "Testing..." : "Test configuration (no notification sent)"}
+          </button>
+          <button type="submit" className="btn-submit-booking-request" disabled={busy || testing || !title.trim() || !body.trim()}>
             {busy ? "Sending…" : "Send to All App Users"}
           </button>
         </form>

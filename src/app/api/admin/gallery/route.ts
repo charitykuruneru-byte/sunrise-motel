@@ -5,6 +5,7 @@ import { galleryImagesTable } from "@/db/schema";
 import { clientIp, logAudit } from "@/lib/audit";
 import { seedDatabaseIfEmpty } from "@/db/seed";
 import { readSession } from "@/lib/staff-auth";
+import { requireAdmin } from "@/lib/desk-auth";
 import { asc, eq } from "drizzle-orm";
 
 export async function GET() {
@@ -21,6 +22,10 @@ export async function GET() {
 export async function POST(request: Request) {
   const user = readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+  // ADDENDUM (authority matrix): gallery images are public content, so adding and removing one is
+  // admin-only. A staff session is the front desk — it reads the gallery, it does not write it.
+  const denied = requireAdmin(user);
+  if (denied) return denied;
   try {
     const body = (await request.json()) as {
       title: string;
@@ -63,6 +68,8 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   const user = readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+  const denied = requireAdmin(user);
+  if (denied) return denied;
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");

@@ -1,13 +1,14 @@
 {
-  "latestVersionCode": 3,
-  "latestVersionName": "1.2",
+  "latestVersionCode": 4,
+  "latestVersionName": "1.3",
   "apkUrl": "https://github.com/charitykuruneru-byte/sunrise-motel/releases/latest/download/SunriseMotel.apk",
   "forceUpdate": false,
   "whatsNew": [
-    "In-app update — Update Now downloads and installs inside the app, no file manager hunt",
-    "Update notice only appears when your app is actually outdated",
-    "Admin photo upload from laptop/phone straight to cloud storage",
-    "Push notification preview before sending to all app users"
+    "A rebuilt landing page: live availability in the hero, real photographs, published offers and guest reviews in one scroll",
+    "A mobile sticky bar that carries the dates you picked, and one tap to call the front desk",
+    "The guest account stays optional everywhere — reference plus phone number always tracks a booking",
+    "Faster first paint on a phone data bundle: the hero photograph loads first, everything else waits",
+    "In-app update: Update Now downloads and installs inside the app, no file manager hunt"
   ],
-  "releaseDate": "2026-09-27"
+  "releaseDate": "2026-09-28"
 }

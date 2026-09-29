@@ -124,7 +124,7 @@ class MainActivity : AppCompatActivity() {
         settings.useWideViewPort = true
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
-        webView.settings.userAgentString = webView.settings.userAgentString + " SunriseMotelApp/1.0"
+        webView.settings.userAgentString = webView.settings.userAgentString + " SunriseMotelApp/1.3"
 
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {

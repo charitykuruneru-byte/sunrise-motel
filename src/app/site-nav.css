@@ -1,0 +1,264 @@
+/* =====================================================================
+   SITE NAVIGATION — three tiers, never one flat row.
+   (addendum "navigation & image standards", Part 2)
+   Tier 1  utility bar      phone · get the app · manager portal
+   Tier 2  primary nav      Home · Stay · Dine · Unwind · Connect · Gallery
+   Tier 3  action cluster   Check availability (button) · Track booking (link)
+   Mobile: the same drawer, plus a sticky bar that keeps the booking
+   one tap away from anywhere on the page.
+   All links are relative — absolute localhost URLs break on every deploy.
+   ===================================================================== */
+
+/* ---- Tier 1: utility bar ---- */
+.utility-container { gap: 14px; }
+.utility-right { display: flex; align-items: center; gap: 14px; margin-left: auto; }
+.utility-link { color: inherit; text-decoration: none; }
+.utility-link:hover { color: var(--orange); }
+.utility-portal-link { color: rgba(255, 255, 255, 0.66); }
+.utility-portal-link:hover { color: var(--orange); }
+
+/* ---- Tier 2: primary navigation ---- */
+.site-header-inner { gap: 18px; }
+.site-primary-nav { gap: 20px; align-items: center; }
+.site-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 6px 0;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 12px;
+  min-height: 44px;
+  justify-content: center;
+  position: relative;
+}
+.site-nav-item .nav-item-main { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: rgba(255, 255, 255, 0.82); }
+.site-nav-item .nav-item-sub { display: block; font-size: 10px; font-weight: 500; letter-spacing: 0; text-transform: none; color: rgba(255, 255, 255, 0.48); }
+.site-nav-item:hover .nav-item-main { color: var(--orange); }
+.site-nav-item:hover .nav-item-sub { color: rgba(255, 255, 255, 0.7); }
+.site-nav-item.is-active .nav-item-main { color: var(--orange); }
+.site-nav-item.is-active .nav-item-sub { color: rgba(242, 140, 24, 0.8); }
+.site-nav-item.is-active::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--orange); border-radius: 2px; }
+
+/* Utility links only exist inside the mobile drawer */
+.nav-divider, .nav-utility-link, .nav-drawer-contact { display: none; }
+
+/* ---- Tier 3: the action cluster ---- */
+.header-right-actions { gap: 10px; }
+.btn-check-availability {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--orange);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+.btn-check-availability:hover { background: #ff9b21; transform: translateY(-1px); }
+.header-track-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.78);
+  text-decoration: none;
+}
+.header-track-link:hover { color: var(--orange); }
+
+/* ---- Mobile: sticky bar that carries the primary action everywhere ---- */
+.site-sticky-bar { display: none; }
+
+@media (max-width: 1050px) {
+  .site-primary-nav { gap: 14px; }
+
+@media (max-width: 900px) {
+  .utility-location { display: none; }
+  .btn-check-availability, .header-track-link { display: none; }
+
+  /* The drawer: every section, then the utilities, then contact. */
+  .site-primary-nav { flex-direction: column; align-items: stretch; gap: 0; margin-left: 0; }
+  .site-nav-item {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    padding: 14px 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .site-nav-item.is-active::after { display: none; }
+  .site-nav-item .nav-item-sub { display: block; font-size: 11px; text-align: right; }
+  .nav-divider { display: block; height: 1px; margin: 12px 0; background: rgba(255, 255, 255, 0.14); }
+  .nav-utility-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 46px;
+    padding: 0 4px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: normal;
+    text-transform: none;
+    color: rgba(255, 255, 255, 0.82);
+  }
+  .nav-utility-link:hover { color: var(--orange); }
+  .nav-drawer-contact { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .nav-drawer-contact a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 46px;
+    padding: 0 12px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: normal;
+    text-transform: none;
+  }
+  .nav-drawer-contact a:hover { border-color: var(--orange); color: var(--orange); }
+  .nav-drawer-contact .drawer-whatsapp { border-color: rgba(37, 211, 102, 0.5); color: #7ee2a8; }
+
+  .site-sticky-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 8px;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: rgba(18, 16, 14, 0.97);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  .site-sticky-bar a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 46px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    text-decoration: none;
+  }
+
+/* =====================================================================
+   THE GUEST APP — five bottom tabs (Home · Order · What's on · Messages ·
+   My stay), the room number pinned in the header, unread badges on exactly
+   two tabs. (addendum "navigation & image standards", Parts 3.1–3.2)
+   ===================================================================== */
+.app-tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 2px;
+  padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line);
+}
+.app-tab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 52px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.app-tab.is-active { background: #fdecd6; color: var(--orange-deep); }
+.app-tab-badge {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(10px);
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--orange-deep);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+}
+.app-room-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--orange);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+/* What's on cards — one image per post, the app's only image grid */
+.feed-cards { display: grid; gap: 12px; }
+.feed-card { overflow: hidden; border-radius: 14px; border: 1px solid var(--line); background: #fff; }
+.feed-card-img { position: relative; height: 168px; background: #f2ede6; }
+.feed-card-img img { width: 100%; height: 100%; object-fit: cover; }
+.feed-card-tag { position: absolute; top: 10px; left: 10px; background: var(--orange); color: var(--ink); font-size: 9px; font-weight: 800; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; }
+.feed-card-body { padding: 14px; display: flex; gap: 12px; }
+.feed-date-block { width: 46px; flex: 0 0 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-right: 1px solid var(--line); padding-right: 10px; }
+.feed-date-block small { color: var(--orange-deep); font-size: 9px; font-weight: 800; letter-spacing: 0.08em; }
+.feed-date-block strong { font-family: var(--serif); font-size: 22px; font-weight: 400; }
+.feed-price-pill { display: inline-block; margin-top: 8px; background: var(--ivory); color: var(--orange-deep); font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; }
+/* The fallback that never shows a broken-image icon (Part 5.9) */
+.img-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 120px;
+  background: repeating-linear-gradient(45deg, #f6f1ea, #f6f1ea 12px, #efe7dc 12px, #efe7dc 24px);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 10px;
+}
+
+  .site-sticky-primary { background: var(--orange); color: var(--ink); }
+  .site-sticky-whatsapp { background: #25d366; color: #ffffff; }
+}
+
+@media (max-width: 560px) {
+  .btn-whatsapp-header span { display: none; }
+  .utility-item, .utility-link { font-size: 10px; }
+  .site-sticky-bar a { font-size: 11px; }
+}
+
+  .site-nav-item .nav-item-sub { display: none; }
+}

@@ -1,0 +1,9 @@
+<resources>
+    <style name="Theme.SunriseManager" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#D4A017</item>
+        <item name="colorPrimaryVariant">#B78754</item>
+        <item name="colorOnPrimary">#171513</item>
+        <item name="android:statusBarColor">#171513</item>
+        <item name="android:windowBackground">#FBF7F0</item>
+    </style>
+</resources>

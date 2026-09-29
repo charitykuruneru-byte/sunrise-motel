@@ -1,0 +1,1266 @@
+/* =====================================================================
+   SUNRISE MOTEL — THE LANDING PAGE ("home-premium")
+   =====================================================================
+   This file owns the home page only. Every class is prefixed `hp-` (or
+   scoped to `.hp-root`) so nothing here can leak into an inner page or
+   the manager portal.
+
+   The rules that make this page feel expensive, applied everywhere below:
+     · never pure white (only cards that sit on cream may use #fff)
+     · never pure black (ink is #14110F, charcoal #241F1B)
+     · one accent rule under every section heading
+     · section padding 120px desktop / 64px mobile, column 1200px, 24px gutters
+     · radius: buttons 6px, cards 14px, pills 999px
+     · motion 150-250ms ease-out, and all of it off under prefers-reduced-motion
+   ===================================================================== */
+
+.hp-root {
+  /* --- tokens ------------------------------------------------------ */
+  --hp-ink: #14110f;
+  --hp-charcoal: #241f1b;
+  --hp-cream: #fbf7f0;
+  --hp-sand: #f1e8da;
+  --hp-gold: #d4a017;
+  --hp-gold-deep: #a8780c;
+  --hp-moss: #3f5d3a;
+  --hp-clay: #b4472f;
+  --hp-line: rgba(20, 17, 15, 0.12);
+  --hp-line-soft: rgba(20, 17, 15, 0.08);
+  --hp-muted: #6d635b;
+  --hp-shadow-1: 0 1px 2px rgba(20, 17, 15, 0.06);
+  --hp-shadow-2: 0 16px 40px rgba(20, 17, 15, 0.1);
+  --hp-shadow-3: 0 28px 70px rgba(20, 17, 15, 0.16);
+  --hp-radius-btn: 6px;
+  --hp-radius-card: 14px;
+  --hp-radius-pill: 999px;
+  --hp-wrap: 1200px;
+  --hp-gutter: 24px;
+
+  background: var(--hp-cream);
+  color: var(--hp-ink);
+  overflow-x: clip;
+}
+
+.hp-root main { display: block; }
+
+/* --- skip to content: the first focusable thing on the page -------- */
+.hp-skip {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 200;
+  background: var(--hp-gold);
+  color: var(--hp-ink);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 10px 16px;
+  border-radius: var(--hp-radius-btn);
+  transition: top 0.18s ease-out;
+}
+.hp-skip:focus-visible { top: 12px; outline: 2px solid var(--hp-ink); outline-offset: 2px; }
+
+/* --- focus rings: gold, 2px, always visible ------------------------ */
+.hp-root a:focus-visible,
+.hp-root button:focus-visible,
+.hp-root input:focus-visible,
+.hp-root select:focus-visible {
+  outline: 2px solid var(--hp-gold-deep);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* --- layout shell -------------------------------------------------- */
+.hp-wrap {
+  width: 100%;
+  max-width: var(--hp-wrap);
+  margin: 0 auto;
+  padding: 0 var(--hp-gutter);
+}
+
+.hp-section { padding: 120px 0; }
+.hp-section--sand { background: var(--hp-sand); }
+.hp-section--tight { padding: 72px 0; }
+
+.hp-head { max-width: 720px; }
+
+.hp-eyebrow {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hp-gold-deep);
+}
+
+.hp-h2 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(28px, 3.6vw, 40px);
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+  margin-top: 14px;
+}
+
+/* the 48px gold rule under every section heading */
+.hp-rule {
+  display: block;
+  width: 48px;
+  height: 2px;
+  background: var(--hp-gold);
+  margin-top: 18px;
+}
+
+.hp-sub {
+  margin-top: 16px;
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--hp-muted);
+  max-width: 62ch;
+}
+
+.hp-head-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+/* --- the quiet text link used at the end of a section -------------- */
+.hp-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--hp-gold-deep);
+  border-bottom: 1px solid rgba(168, 120, 12, 0.35);
+  padding-bottom: 2px;
+  transition: gap 0.18s ease-out, border-color 0.18s ease-out;
+}
+.hp-more:hover { gap: 12px; border-color: var(--hp-gold-deep); }
+
+/* =====================================================================
+   HERO — the photograph does the selling
+   ===================================================================== */
+.hp-hero {
+  position: relative;
+  isolation: isolate;
+  color: #fff;
+  padding: 104px 0 132px;
+  min-height: clamp(580px, 86vh, 780px);
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  background: var(--hp-charcoal);
+}
+.hp-hero-img {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 42%;
+}
+.hp-hero .img-placeholder {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  display: grid;
+  place-items: center;
+  background: var(--hp-charcoal);
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+/* Warm dark gradient — the text stays readable on every photograph. */
+.hp-hero-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(180deg, rgba(20, 17, 15, 0.72) 0%, rgba(20, 17, 15, 0.18) 38%, rgba(20, 17, 15, 0.88) 100%),
+    linear-gradient(90deg, rgba(20, 17, 15, 0.74) 0%, rgba(20, 17, 15, 0.1) 64%);
+}
+
+.hp-hero-inner { width: 100%; }
+.hp-hero-eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hp-gold);
+}
+.hp-h1 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(34px, 6vw, 64px);
+  line-height: 1.06;
+  letter-spacing: -0.015em;
+  margin-top: 20px;
+  max-width: 17ch;
+}
+.hp-tagline {
+  margin-top: 18px;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: clamp(19px, 2.4vw, 26px);
+  color: var(--hp-gold);
+}
+.hp-hero-sub {
+  margin-top: 18px;
+  font-size: clamp(15px, 1.4vw, 18px);
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.82);
+  max-width: 56ch;
+}
+.hp-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+  margin-top: 28px;
+}
+.hp-hero-jump,
+.hp-hero-call {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.32);
+  padding-bottom: 3px;
+  transition: color 0.18s ease-out, border-color 0.18s ease-out;
+}
+.hp-hero-jump:hover,
+.hp-hero-call:hover { color: #fff; border-color: var(--hp-gold); }
+
+/* =====================================================================
+   THE AVAILABILITY BAR — inside the hero, floating over its bottom edge
+   ===================================================================== */
+.hp-avail-float {
+  position: relative;
+  z-index: 6;
+  margin: -104px auto 0;
+  padding: 0 var(--hp-gutter);
+  max-width: var(--hp-wrap);
+}
+.hp-avail-bar {
+  background: #fff;
+  color: var(--hp-ink);
+  border-radius: var(--hp-radius-card);
+  box-shadow: var(--hp-shadow-3);
+  border: 1px solid var(--hp-line-soft);
+  padding: 22px 24px 20px;
+}
+.hp-avail-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.hp-avail-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.hp-avail-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--hp-moss);
+  background: rgba(63, 93, 58, 0.08);
+  border: 1px solid rgba(63, 93, 58, 0.22);
+  border-radius: var(--hp-radius-pill);
+  padding: 5px 12px;
+}
+.hp-avail-live.is-none { color: var(--hp-clay); background: rgba(180, 71, 47, 0.08); border-color: rgba(180, 71, 47, 0.24); }
+.hp-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.hp-avail-live .hp-dot { animation: hp-pulse 1.6s ease-in-out infinite alternate; }
+
+.hp-avail-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 14px;
+  align-items: end;
+}
+.hp-field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hp-muted);
+  margin-bottom: 7px;
+}
+.hp-field input,
+.hp-field select {
+  width: 100%;
+  height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--hp-line);
+  border-radius: var(--hp-radius-btn);
+  background: var(--hp-cream);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--hp-ink);
+  color-scheme: light;
+}
+.hp-field input:focus,
+.hp-field select:focus { background: #fff; border-color: var(--hp-gold); }
+
+/* --- THE NIGHTS STEPPER --------------------------------------------
+   A booking starts at ONE night, so the field that used to make the guest
+   hunt for a check-out date is two 48px taps instead: − takes a night off,
+   + adds one. Check-out is derived from this count and read out underneath,
+   never typed. Sized to sit level with the date and guest fields. */
+.hp-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 48px;
+  padding: 0 6px;
+  border: 1px solid var(--hp-line);
+  border-radius: var(--hp-radius-btn);
+  background: var(--hp-cream);
+}
+.hp-stepper button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--hp-line);
+  border-radius: var(--hp-radius-btn);
+  background: var(--hp-sand);
+  color: var(--hp-ink);
+  cursor: pointer;
+  transition: background 0.18s ease-out, border-color 0.18s ease-out;
+}
+.hp-stepper button:hover:not(:disabled) { background: #fff; border-color: var(--hp-gold); }
+.hp-stepper button:focus-visible { outline: 2px solid var(--hp-ink); outline-offset: 2px; }
+/* At the floor (one night) and at the ceiling the end button is inert rather
+   than silently swallowing the tap. */
+.hp-stepper button:disabled { opacity: 0.35; cursor: not-allowed; }
+.hp-stepper > span { font-size: 14px; font-weight: 600; color: var(--hp-ink); white-space: nowrap; }
+
+/* The departure date the stepper works out — read out, never typed. */
+.hp-field-note { display: block; margin-top: 7px; font-size: 12px; color: var(--hp-muted); }
+
+.hp-avail-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  height: 48px;
+  padding: 0 26px;
+  border-radius: var(--hp-radius-btn);
+  background: var(--hp-gold);
+  color: var(--hp-ink);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: var(--hp-shadow-1);
+  transition: background 0.18s ease-out, transform 0.18s ease-out;
+}
+.hp-avail-submit:hover { background: #e0ad1f; transform: translateY(-1px); }
+
+.hp-avail-readout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hp-line-soft);
+  font-size: 13px;
+  font-weight: 600;
+}
+.hp-avail-readout .hp-avail-count { color: var(--hp-moss); }
+.hp-avail-readout .hp-avail-count.is-none { color: var(--hp-clay); }
+.hp-avail-readout .hp-avail-dates { color: var(--hp-muted); font-weight: 500; }
+
+.hp-avail-trust {
+  margin-top: 12px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--hp-muted);
+  max-width: 78ch;
+}
+
+/* =====================================================================
+   THE THREE FACTS STRIP — icons, one line each, no cards
+   ===================================================================== */
+.hp-facts { padding: 64px 0 0; }
+.hp-facts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+  border-top: 1px solid var(--hp-line-soft);
+  padding-top: 34px;
+}
+.hp-fact { display: flex; align-items: flex-start; gap: 14px; }
+.hp-fact-icon {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(212, 160, 23, 0.14);
+  color: var(--hp-gold-deep);
+}
+.hp-fact strong { display: block; font-size: 15px; font-weight: 700; }
+.hp-fact small { display: block; margin-top: 3px; font-size: 13.5px; line-height: 1.55; color: var(--hp-muted); }
+
+/* =====================================================================
+   SUNRISE IN A MINUTE — the tour, right under the welcome.
+   `preload="none"` on the <video> is what makes this cost nothing: the
+   poster (36 KB) is the only byte a guest who scrolls past it pays for.
+   ===================================================================== */
+.hp-video { padding-top: 48px; }
+.hp-video-stage {
+  margin-top: 40px;
+  border-radius: var(--hp-radius-card);
+  overflow: hidden;
+  background: #100e0c;
+  border: 1px solid var(--hp-line-soft);
+  box-shadow: var(--hp-shadow-2);
+}
+.hp-video-stage video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  background: #000;
+}
+.hp-video-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 20px;
+  background: var(--hp-charcoal);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.hp-video-foot span { display: inline-flex; align-items: center; gap: 7px; }
+.hp-video-foot svg { flex: none; color: var(--hp-gold); }
+
+/* =====================================================================
+   FOUR WAYS TO SPEND YOUR TIME — image cards, ONE anchor per card
+   ===================================================================== */
+.hp-ways-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  margin-top: 46px;
+}
+.hp-way {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid var(--hp-line-soft);
+  border-radius: var(--hp-radius-card);
+  overflow: hidden;
+  box-shadow: var(--hp-shadow-1);
+  transition: transform 0.22s ease-out, box-shadow 0.22s ease-out;
+}
+.hp-way:hover { transform: translateY(-4px); box-shadow: var(--hp-shadow-2); }
+.hp-way-media {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  background: var(--hp-sand);
+}
+.hp-way-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease-out;
+}
+.hp-way:hover .hp-way-media img { transform: scale(1.03); }
+.hp-way-media .img-placeholder {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hp-muted);
+  background: var(--hp-sand);
+}
+.hp-way-num {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--hp-ink);
+  background: rgba(251, 247, 240, 0.92);
+  border-radius: var(--hp-radius-pill);
+  padding: 5px 11px;
+}
+.hp-way-body { padding: 22px 22px 24px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.hp-way-body h3 { font-family: var(--serif); font-weight: 400; font-size: 24px; }
+/* the icon sits in a warm disc beside the word — the card reads as a place, not
+   as a list item */
+.hp-way-title { display: flex; align-items: center; gap: 12px; }
+.hp-way-icon {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(212, 160, 23, 0.14);
+  color: var(--hp-gold-deep);
+}
+.hp-way-body p { font-size: 14.5px; line-height: 1.6; color: var(--hp-muted); flex: 1; }
+.hp-way-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--hp-gold-deep);
+  transition: gap 0.18s ease-out;
+}
+.hp-way:hover .hp-way-cta { gap: 12px; }
+
+/* =====================================================================
+   THE SHOWCASE SLIDESHOW — one photograph at a time, on its own.
+   Only the active frame is ever in the DOM, so the data cost of this
+   section is one photograph plus the one being fetched next.
+   ===================================================================== */
+.hp-showcase-filters { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 34px; }
+.hp-showcase-filter {
+  padding: 9px 16px;
+  border-radius: var(--hp-radius-pill);
+  border: 1px solid var(--hp-line);
+  background: transparent;
+  color: var(--hp-ink);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  transition: background 0.18s ease-out, border-color 0.18s ease-out, color 0.18s ease-out;
+}
+.hp-showcase-filter:hover { border-color: var(--hp-gold-deep); }
+.hp-showcase-filter.is-active { background: var(--hp-ink); border-color: var(--hp-ink); color: #fff; }
+.hp-showcase-filter:focus-visible { outline: 2px solid var(--hp-gold); outline-offset: 2px; }
+
+.hp-showcase {
+  margin-top: 22px;
+  border-radius: var(--hp-radius-card);
+  overflow: hidden;
+  background: var(--hp-charcoal);
+  box-shadow: var(--hp-shadow-2);
+}
+.hp-showcase:focus-visible { outline: 2px solid var(--hp-gold); outline-offset: 3px; }
+
+.hp-showcase-stage { position: relative; aspect-ratio: 16 / 10; background: #100e0c; }
+.hp-showcase-stage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: hp-slide-in 0.6s ease-out both;
+}
+.hp-showcase-stage .img-placeholder {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+  background: #100e0c;
+}
+@keyframes hp-slide-in {
+  from { opacity: 0; transform: scale(1.015); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* The gradient the caption sits on: dark at the bottom, nothing at the top,
+   so the photograph is never washed out by its own label. */
+.hp-showcase-scrim {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 64%;
+  background: linear-gradient(180deg, rgba(16, 14, 12, 0) 0%, rgba(16, 14, 12, 0.9) 82%);
+  pointer-events: none;
+}
+.hp-showcase-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 26px 28px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #fff;
+}
+.hp-showcase-chip {
+  align-self: flex-start;
+  padding: 5px 11px;
+  border-radius: var(--hp-radius-pill);
+  background: var(--hp-gold);
+  color: var(--hp-ink);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.hp-showcase-caption strong { font-family: var(--serif); font-weight: 400; font-size: clamp(20px, 2.4vw, 30px); line-height: 1.15; }
+.hp-showcase-caption p { max-width: 62ch; font-size: 14px; line-height: 1.55; color: rgba(255, 255, 255, 0.78); }
+
+.hp-showcase-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(16, 14, 12, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+  transition: background 0.18s ease-out, color 0.18s ease-out, border-color 0.18s ease-out;
+}
+.hp-showcase-nav:hover { background: var(--hp-gold); border-color: var(--hp-gold); color: var(--hp-ink); }
+.hp-showcase-nav.is-prev { left: 14px; }
+.hp-showcase-nav.is-next { right: 14px; }
+.hp-showcase-count {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  padding: 5px 11px;
+  border-radius: var(--hp-radius-pill);
+  background: rgba(16, 14, 12, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+/* The bar under the photograph: where you are, and how to stop it moving. */
+.hp-showcase-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  background: var(--hp-charcoal);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.hp-showcase-dots { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hp-showcase-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.28);
+  transition: background 0.18s ease-out, transform 0.18s ease-out;
+}
+.hp-showcase-dot:hover { background: rgba(255, 255, 255, 0.62); }
+.hp-showcase-dot.is-active { background: var(--hp-gold); transform: scale(1.35); }
+.hp-showcase-foot { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.hp-showcase-honest {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+.hp-showcase-honest svg { flex: none; color: var(--hp-gold); }
+.hp-showcase-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 15px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: var(--hp-radius-btn);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background 0.18s ease-out;
+}
+.hp-showcase-play:hover { background: rgba(255, 255, 255, 0.14); }
+
+/* =====================================================================
+   WHAT'S ON / PROMOTIONS — whatever the manager publishes appears here
+   ===================================================================== */
+.hp-promos-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 46px;
+}
+.hp-promo {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid var(--hp-line-soft);
+  border-radius: var(--hp-radius-card);
+  overflow: hidden;
+  box-shadow: var(--hp-shadow-1);
+  transition: transform 0.22s ease-out, box-shadow 0.22s ease-out;
+}
+.hp-promo:hover { transform: translateY(-4px); box-shadow: var(--hp-shadow-2); }
+.hp-promo-media {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: var(--hp-charcoal);
+  overflow: hidden;
+}
+.hp-promo-media img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease-out; }
+.hp-promo:hover .hp-promo-media img { transform: scale(1.03); }
+.hp-promo-media .img-placeholder {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: var(--hp-charcoal);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.hp-promo-cat {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  background: rgba(20, 17, 15, 0.82);
+  color: #fff;
+  border-radius: var(--hp-radius-pill);
+  padding: 5px 11px;
+}
+.hp-promo-price {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--hp-gold);
+  color: var(--hp-ink);
+  border-radius: var(--hp-radius-pill);
+  padding: 6px 13px;
+  box-shadow: var(--hp-shadow-1);
+}
+.hp-promo-body { padding: 20px 22px 22px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.hp-promo-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--hp-gold-deep);
+}
+.hp-promo-body h3 { font-family: var(--serif); font-weight: 400; font-size: 22px; line-height: 1.2; }
+.hp-promo-body p { font-size: 14.5px; line-height: 1.6; color: var(--hp-muted); flex: 1; }
+.hp-promo-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hp-line-soft);
+}
+.hp-promo-time { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--hp-muted); }
+
+/* An honest empty state — never a frame with nothing in it. */
+.hp-empty {
+  margin-top: 34px;
+  border: 1px dashed var(--hp-line);
+  border-radius: var(--hp-radius-card);
+  padding: 28px;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--hp-muted);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* The sold-out waitlist (§3.4) — a lead, handled as one, never a dead end. */
+.hp-waitlist {
+  margin-top: 40px;
+  padding: 28px;
+  border-radius: var(--hp-radius-card);
+  background: var(--hp-sand);
+  border: 1px solid rgba(20, 17, 15, 0.07);
+}
+.hp-waitlist h3 { font-family: var(--serif); font-weight: 400; font-size: 23px; line-height: 1.2; }
+.hp-waitlist-intro {
+  margin-top: 10px;
+  max-width: 70ch;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--hp-muted);
+}
+
+/* =====================================================================
+   ROOMS — refinements on top of the shared .room-card-structured
+   ===================================================================== */
+.hp-rooms .rooms-cards-list { margin-top: 46px; }
+.hp-root .room-card-structured {
+  border-color: var(--hp-line-soft);
+  box-shadow: var(--hp-shadow-1);
+  transition: transform 0.22s ease-out, box-shadow 0.22s ease-out;
+}
+.hp-root .room-card-structured:hover { transform: translateY(-4px); box-shadow: var(--hp-shadow-2); }
+.hp-root .room-card-structured h3 { font-family: var(--serif); font-weight: 400; font-size: 23px; }
+.hp-root .room-card-structured.card-sold-out .room-photo-header img { filter: grayscale(0.85) brightness(0.82); }
+.hp-root .room-card-structured .feature-pill { background: var(--hp-sand); border-color: transparent; }
+.hp-root .availability-chip.chip-available { background: rgba(63, 93, 58, 0.92); }
+.hp-root .availability-chip.chip-sold-out { background: rgba(180, 71, 47, 0.92); }
+.hp-root .photo-tag-overlay .badge-chip { background: rgba(212, 160, 23, 0.94); color: var(--hp-ink); }
+.hp-root .btn-book-room.btn-active-book { background: var(--hp-gold); color: var(--hp-ink); }
+.hp-root .btn-book-room.btn-active-book:hover { background: #e0ad1f; }
+.hp-root .btn-book-room.btn-disabled { background: var(--hp-sand); color: var(--hp-muted); }
+
+/* The add-ons line under the room grid — chosen inside the booking modal. */
+.hp-extras-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 30px;
+  padding: 20px 22px;
+  border-radius: var(--hp-radius-card);
+  background: var(--hp-sand);
+  border: 1px solid rgba(20, 17, 15, 0.06);
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--hp-ink);
+}
+.hp-extras-note span { color: var(--hp-muted); }
+
+/* =====================================================================
+   WHAT GUESTS SAY
+   ===================================================================== */
+.hp-reviews-top {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-top: 34px;
+  padding: 22px 24px;
+  background: #fff;
+  border: 1px solid var(--hp-line-soft);
+  border-radius: var(--hp-radius-card);
+  box-shadow: var(--hp-shadow-1);
+}
+.hp-score { display: flex; align-items: baseline; gap: 10px; }
+.hp-score strong { font-family: var(--serif); font-weight: 400; font-size: 40px; line-height: 1; }
+.hp-score small { display: block; margin-top: 4px; font-size: 13px; color: var(--hp-muted); }
+.hp-stars { display: inline-flex; gap: 2px; color: var(--hp-gold); }
+.hp-stars .hp-star-off { color: rgba(20, 17, 15, 0.18); }
+.hp-reviews-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+  margin-top: 26px;
+}
+.hp-review {
+  background: #fff;
+  border: 1px solid var(--hp-line-soft);
+  border-left: 3px solid var(--hp-gold);
+  border-radius: var(--hp-radius-card);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.hp-review blockquote { font-size: 15px; line-height: 1.7; color: var(--hp-ink); flex: 1; }
+.hp-review-by { font-size: 12.5px; font-weight: 600; color: var(--hp-muted); }
+.hp-review-via {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--hp-gold-deep);
+}
+/* the two buttons and the one line of encouragement under the reviews */
+.hp-reviews-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 26px; }
+.hp-reviews-note { font-size: 13px; line-height: 1.6; color: var(--hp-muted); max-width: 54ch; }
+
+/* =====================================================================
+   A LOOK AROUND — a strip that scrolls once and stops, no carousel
+   ===================================================================== */
+.hp-strip {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding: 4px 2px 18px;
+  margin-top: 40px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.hp-strip::-webkit-scrollbar { height: 6px; }
+.hp-strip::-webkit-scrollbar-thumb { background: rgba(20, 17, 15, 0.18); border-radius: 999px; }
+.hp-strip figure { flex: 0 0 auto; width: 300px; scroll-snap-align: start; }
+.hp-strip figure img,
+.hp-strip figure .img-placeholder {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: var(--hp-radius-card);
+  background: var(--hp-sand);
+}
+.hp-strip figure .img-placeholder {
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--hp-muted);
+}
+.hp-strip figcaption { margin-top: 10px; font-size: 12.5px; font-weight: 600; color: var(--hp-muted); }
+
+/* =====================================================================
+   FIND US, AND HOW TO PAY
+   ===================================================================== */
+.hp-find { display: grid; grid-template-columns: 1.05fr 1fr; gap: 32px; margin-top: 44px; }
+.hp-find-card {
+  background: #fff;
+  border: 1px solid var(--hp-line-soft);
+  border-radius: var(--hp-radius-card);
+  padding: 28px;
+  box-shadow: var(--hp-shadow-1);
+}
+.hp-find-card h3 { font-family: var(--serif); font-weight: 400; font-size: 22px; margin-bottom: 16px; }
+.hp-find-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--hp-line-soft);
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+.hp-find-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.hp-find-row svg { flex: none; margin-top: 3px; color: var(--hp-gold-deep); }
+.hp-find-row a { font-weight: 700; border-bottom: 1px solid rgba(168, 120, 12, 0.4); }
+.hp-find-row a:hover { border-color: var(--hp-gold-deep); }
+.hp-find-row small { display: block; margin-top: 3px; font-size: 13px; color: var(--hp-muted); }
+
+.hp-pay-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 18px; }
+.hp-pay-chip {
+  padding: 14px 16px;
+  border-radius: var(--hp-radius-btn);
+  background: var(--hp-sand);
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.hp-pay-chip span { font-weight: 500; color: var(--hp-muted); display: block; font-size: 12px; }
+.hp-pay-note { font-size: 13.5px; line-height: 1.65; color: var(--hp-muted); }
+
+/* =====================================================================
+   THE SLIM APP BANNER
+   ===================================================================== */
+.hp-app-banner {
+  background: var(--hp-charcoal);
+  color: #fff;
+  border-radius: var(--hp-radius-card);
+  padding: 22px 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  box-shadow: var(--hp-shadow-2);
+}
+.hp-app-banner p { flex: 1; min-width: 220px; font-size: 15px; line-height: 1.6; }
+.hp-app-banner-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.hp-app-banner-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--hp-gold);
+  color: var(--hp-ink);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 12px 22px;
+  border-radius: var(--hp-radius-btn);
+  transition: background 0.18s ease-out;
+  /* It is a <button> now (it opens the install popup) rather than a link to
+     /download, so the native button chrome has to go. */
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+.hp-app-banner-cta:hover { background: #e0ad1f; }
+.hp-app-banner-close {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.hp-app-banner-close:hover { background: rgba(255, 255, 255, 0.22); }
+/* the quiet link inside the dark banner needs the light gold, not the deep one */
+.hp-app-banner .hp-more { color: var(--hp-gold); border-bottom-color: rgba(212, 160, 23, 0.45); }
+
+/* =====================================================================
+   FOOTER — four columns, then the tagline
+   ===================================================================== */
+.hp-footer { background: #0e0c0a; color: #fff; padding: 88px 0 40px; }
+.hp-footer-top { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 32px; }
+.hp-footer-brand p { margin-top: 18px; font-size: 14px; line-height: 1.7; color: rgba(255, 255, 255, 0.6); max-width: 34ch; }
+.hp-footer-col strong {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hp-gold);
+  margin-bottom: 14px;
+}
+.hp-footer-col a,
+.hp-footer-col p {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 10px;
+}
+.hp-footer-col a:hover { color: var(--hp-gold); }
+.hp-footer-col a svg, .hp-footer-col p svg { flex: none; margin-top: 2px; }
+.hp-footer-tagline {
+  margin-top: 56px;
+  padding-top: 26px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.hp-footer-tagline em { font-family: var(--serif); font-size: 19px; color: var(--hp-gold); }
+.hp-footer-legal { font-size: 12px; color: rgba(255, 255, 255, 0.45); display: flex; gap: 16px; flex-wrap: wrap; }
+.hp-footer-legal a:hover { color: var(--hp-gold); }
+
+/* =====================================================================
+   MOBILE ONLY — the sticky bar carrying the dates already chosen
+   ===================================================================== */
+.hp-sticky-stay {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 70;
+  background: rgba(20, 17, 15, 0.97);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+  align-items: center;
+  gap: 12px;
+  transform: translateY(110%);
+  transition: transform 0.22s ease-out;
+}
+.hp-sticky-stay.is-visible { transform: translateY(0); }
+.hp-sticky-stay.is-typing { transform: translateY(110%); }
+.hp-sticky-dates {
+  flex: 1;
+  min-width: 0;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.hp-sticky-dates small { display: block; font-weight: 500; color: rgba(255, 255, 255, 0.6); font-size: 11.5px; }
+.hp-sticky-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--hp-gold);
+  color: var(--hp-ink);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 12px 18px;
+  border-radius: var(--hp-radius-btn);
+  white-space: nowrap;
+}
+
+/* =====================================================================
+   MOTION — 150-250ms ease-out, staggered, and all of it optional
+   ===================================================================== */
+@keyframes hp-pulse {
+  from { opacity: 0.35; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1.15); }
+}
+@keyframes hp-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.hp-anim { animation: hp-rise 0.5s ease-out both; }
+.hp-anim-1 { animation-delay: 0.04s; }
+.hp-anim-2 { animation-delay: 0.1s; }
+.hp-anim-3 { animation-delay: 0.16s; }
+.hp-anim-4 { animation-delay: 0.22s; }
+.hp-anim-5 { animation-delay: 0.28s; }
+.hp-root .reveal { transition-duration: 0.5s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hp-root *,
+  .hp-root *::before,
+  .hp-root *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .hp-anim { animation: none; opacity: 1; transform: none; }
+  .hp-sticky-stay { transition: none; }
+}
+
+/* =====================================================================
+   RESPONSIVE — laptop, tablet, phone, small phone, and the very small
+   ===================================================================== */
+
+/* --- large desktop: a little more air, never a wider column -------- */
+@media (min-width: 1440px) {
+  .hp-wrap, .hp-avail-float { --hp-wrap: 1240px; }
+  .hp-section { padding: 132px 0; }
+}
+
+/* --- laptop / small desktop --------------------------------------- */
+@media (max-width: 1100px) {
+  .hp-ways-grid { grid-template-columns: repeat(2, 1fr); }
+  .hp-promos-grid { grid-template-columns: repeat(2, 1fr); }
+  .hp-reviews-grid { grid-template-columns: repeat(2, 1fr); }
+  .hp-find { grid-template-columns: 1fr; }
+  .hp-footer-top { grid-template-columns: 1fr 1fr; gap: 36px; }
+  .hp-root .rooms-cards-list { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* --- tablet -------------------------------------------------------- */
+@media (max-width: 900px) {
+  .hp-section { padding: 88px 0; }
+  .hp-section--tight { padding: 64px 0; }
+  .hp-hero { padding: 88px 0 112px; min-height: clamp(520px, 78vh, 680px); }
+  .hp-avail-float { margin-top: -88px; }
+  .hp-avail-fields { grid-template-columns: 1fr 1fr; }
+  .hp-avail-submit { width: 100%; }
+  .hp-facts { padding-top: 52px; }
+  .hp-facts-grid { grid-template-columns: 1fr; gap: 20px; }
+  .hp-video { padding-top: 40px; }
+  .hp-video-stage { margin-top: 30px; }
+  .hp-showcase-stage { aspect-ratio: 4 / 3; }
+  .hp-showcase-caption { padding: 20px; }
+  .hp-find-card { padding: 24px; }
+  .hp-strip figure { width: 260px; }
+  .hp-footer { padding: 72px 0 40px; }
+
+  /* The sticky bar lives on tablet and phone only, and the footer keeps
+     room for it so the last row is never covered. */
+  .hp-sticky-stay { display: flex; }
+  .hp-footer { padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* --- phone --------------------------------------------------------- */
+@media (max-width: 640px) {
+  .hp-wrap { --hp-gutter: 18px; }
+  .hp-avail-float { padding: 0 18px; margin-top: -72px; }
+  .hp-section { padding: 64px 0; }
+  .hp-section--tight { padding: 52px 0; }
+  .hp-hero { padding: 76px 0 96px; min-height: 0; }
+  .hp-hero-img { object-position: center 38%; }
+  .hp-h1 { font-size: clamp(30px, 9vw, 42px); max-width: 100%; }
+  .hp-hero-sub { font-size: 15px; }
+  .hp-hero-actions { gap: 16px; margin-top: 22px; }
+  .hp-avail-bar { padding: 18px 16px 16px; border-radius: 12px; }
+  .hp-avail-fields { grid-template-columns: 1fr; gap: 12px; }
+  .hp-avail-top { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .hp-avail-readout { font-size: 12.5px; }
+  .hp-ways-grid, .hp-promos-grid, .hp-reviews-grid { grid-template-columns: 1fr; gap: 18px; }
+  .hp-way-media { aspect-ratio: 16 / 10; }
+  .hp-video-stage { margin-top: 24px; }
+  .hp-video-foot { padding: 12px 16px; font-size: 12px; }
+  .hp-showcase-filters { gap: 8px; margin-top: 26px; }
+  .hp-showcase-filter { padding: 8px 13px; font-size: 12px; }
+  .hp-showcase-caption { padding: 16px 16px 14px; gap: 6px; }
+  .hp-showcase-caption p { font-size: 13px; }
+  .hp-showcase-nav { width: 40px; height: 40px; }
+  .hp-showcase-nav.is-prev { left: 8px; }
+  .hp-showcase-nav.is-next { right: 8px; }
+  .hp-showcase-count { top: 12px; right: 12px; font-size: 11px; }
+  .hp-showcase-bar { padding: 14px 16px; }
+  .hp-root .rooms-cards-list { grid-template-columns: 1fr; }
+  .hp-pay-grid { grid-template-columns: 1fr; }
+  .hp-reviews-top { padding: 18px; gap: 12px; }
+  .hp-score strong { font-size: 34px; }
+  .hp-strip figure { width: 78vw; max-width: 300px; }
+  .hp-app-banner { padding: 20px 18px; }
+  .hp-app-banner-cta { width: 100%; justify-content: center; }
+  .hp-footer-top { grid-template-columns: 1fr; gap: 30px; }
+  .hp-footer { padding: 56px 0 calc(96px + env(safe-area-inset-bottom, 0px)); }
+  .hp-footer-tagline { margin-top: 40px; }
+  .hp-root .section-head h2, .hp-root .hp-h2 { font-size: clamp(26px, 7.4vw, 32px); }
+  .hp-root .room-photo-header { height: 200px; }
+  .hp-root .room-title-rate-row { flex-direction: column; gap: 14px; }
+  .hp-root .room-pricing-box { align-items: flex-start; }
+  .hp-root .booking-modal-sheet { padding: 20px 16px; }
+  .hp-root .slideshow-modal-card { padding: 18px 14px; }
+  .hp-root .slideshow-thumbnails-row { flex-wrap: nowrap; overflow-x: auto; }
+}
+
+/* --- small phone (iPhone SE, older Androids) ----------------------- */
+@media (max-width: 420px) {
+  .hp-wrap { --hp-gutter: 14px; }
+  .hp-avail-float { padding: 0 14px; margin-top: -60px; }
+  .hp-avail-trust { font-size: 12px; }
+  .hp-fact-icon { width: 36px; height: 36px; }
+  .hp-h1 { font-size: clamp(27px, 9.4vw, 36px); }
+  .hp-tagline { font-size: 18px; }
+  .hp-strip figure { width: 84vw; }
+  .hp-sticky-go { padding: 11px 14px; font-size: 12px; }
+  .hp-sticky-dates { font-size: 12px; }
+}
+
+/* --- landscape phones: the hero must not eat the whole viewport ---- */
+@media (max-height: 520px) and (orientation: landscape) {
+  .hp-hero { min-height: 0; padding: 64px 0 96px; }
+  .hp-h1 { font-size: clamp(28px, 5vw, 40px); }
+  .hp-avail-float { margin-top: -72px; }
+}
+
+/* --- tablets and phones held in portrait: no side-to-side creep ---- */
+@media (max-width: 900px) {
+  .hp-root { overflow-x: clip; }
+  .hp-strip { margin-left: calc(var(--hp-gutter) * -1); margin-right: calc(var(--hp-gutter) * -1); padding-left: var(--hp-gutter); padding-right: var(--hp-gutter); }
+}

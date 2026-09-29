@@ -121,6 +121,29 @@
 .menu-page-card-bottom > strong { font-size: 12px; }
 .menu-page-card .mini-stepper { min-height: 32px; width: 84px; padding: 0 4px; }
 .menu-page-card .mini-stepper button { width: 22px; height: 22px; }
+/* The dish photo is wrapped in `.sell-photo`, so the text-column rule above
+   (`.menu-page-card > div`) was also hitting the photo box and insetting the
+   picture by 20px. `.sell-dish` already stacks the card, which is the intent. */
+.menu-page-card > .sell-photo { display: block; padding: 0; }
+/* A dish the kitchen has closed: dimmed and not shoppable, so the guest can see
+   at a glance what is off — the class existed in the markup with no rule behind it. */
+.menu-page-card.is-sold-out { opacity: 0.72; }
+.menu-page-card.is-sold-out h3,
+.menu-page-card.is-sold-out p { color: var(--muted); }
+.menu-page-card.is-sold-out .menu-page-card-bottom > strong { text-decoration: line-through; color: var(--muted); }
+
+/* ================= THE CARD SUMMARY THAT OPENS A FORM POPUP =================
+   /dine, /unwind and /connect all keep the form itself in a popup (`booking-modal-sheet`)
+   and leave a one-line invitation plus a button on the page. */
+.dine-order-hint { margin: 4px 0 14px; color: var(--muted); font-size: 13px; line-height: 1.6; max-width: 62ch; }
+
+/* The order lines inside the order popup — the order itself, editable in place. */
+.dine-order-lines { display: flex; flex-direction: column; gap: 10px; margin: 18px 0; padding: 14px; background: var(--ivory); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.dine-order-line { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.dine-order-line strong { display: block; font-size: 13px; }
+.dine-order-line small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
+.dine-order-line .mini-stepper { width: 96px; flex: none; }
+.dine-order-empty { color: var(--muted); font-size: 12.5px; line-height: 1.6; }
 .order-section { padding: 105px 0; background: var(--espresso); color: #fff; }
 .order-grid { display: grid; grid-template-columns: .76fr 1.24fr; gap: 85px; align-items: start; }
 .order-copy h2 { margin-top: 19px; font-size: 65px; }
@@ -288,6 +311,68 @@
   .inner-gallery { width: 100%; padding: 22px 16px 25px; }
   .inner-gallery h2 { font-size: 36px; }
   .inner-gallery-image { height: 62vh; }
+}
+
+/* ================= /unwind & /connect: THE LONG-FORM SECTIONS =================
+   Both pages are framed by the shared `mobile-rooms-section` /
+   `mobile-events-section` wrappers (max-width 1200px, the site's own padding),
+   so this block adds only the four pieces those two pages need and that no
+   other page renders: a two-column story row, a fact-card grid, a rail for the
+   team's designed posters, and the video stage. Everything is namespaced `exp-`
+   — change a rule here and only /unwind and /connect move. The two media
+   queries sit at the bottom of the block, with the rules they change. */
+
+.exp-split { display: grid; grid-template-columns: 1fr 1fr; gap: 44px; align-items: center; margin-top: 60px; }
+.exp-split:first-child { margin-top: 0; }
+.exp-split--flip > .exp-split-media { order: 2; }
+.exp-split-media { position: relative; overflow: hidden; border-radius: var(--radius-lg); background: #222; }
+.exp-split-media > img { display: block; width: 100%; height: clamp(230px, 30vw, 405px); object-fit: cover; }
+.exp-split-tag { position: absolute; left: 12px; bottom: 12px; right: 12px; display: inline-flex; align-items: center; gap: 6px; width: fit-content; padding: 6px 11px; border-radius: 20px; background: rgba(18, 16, 14, 0.86); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.exp-split-tag svg { color: var(--orange); }
+
+.exp-copy h3 { margin: 10px 0 0; font-family: var(--serif); font-size: clamp(26px, 3.1vw, 37px); font-weight: 400; line-height: 1.08; }
+.exp-copy h3 em { color: var(--orange-deep); font-style: italic; }
+.exp-copy > p { max-width: 540px; margin: 14px 0 0; color: var(--muted); font-size: 14px; line-height: 1.75; }
+.exp-list { display: grid; gap: 10px; margin: 20px 0 0; padding: 0; list-style: none; }
+.exp-list li { display: flex; align-items: flex-start; gap: 9px; color: var(--espresso); font-size: 13px; line-height: 1.5; }
+.exp-list li svg { flex: 0 0 auto; margin-top: 2px; color: var(--sage); }
+.exp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 11px; margin-top: 24px; }
+.exp-actions .btn-submit-booking-request { width: auto; }
+
+.exp-facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 30px; }
+.exp-facts:first-child { margin-top: 0; }
+.exp-fact { padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--ivory); }
+.exp-fact-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%; background: var(--sand); color: var(--orange-deep); }
+.exp-fact strong { display: block; margin-top: 16px; font-family: var(--serif); font-size: 19px; font-weight: 400; }
+.exp-fact small { display: block; margin-top: 7px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+
+.exp-posters { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+.exp-poster { display: block; margin: 0; border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; background: #fff; transition: transform 0.2s, box-shadow 0.2s; }
+.exp-poster:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08); }
+.exp-poster img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: contain; background: var(--ivory); }
+.exp-poster figcaption { padding: 12px 14px 14px; border-top: 1px solid var(--line); }
+.exp-poster figcaption strong { display: block; font-family: var(--serif); font-size: 17px; font-weight: 400; }
+.exp-poster figcaption small { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.55; }
+
+.exp-stage { position: relative; border-radius: var(--radius-lg); overflow: hidden; background: #0f0e0d; box-shadow: 0 18px 44px rgba(0, 0, 0, 0.2); }
+.exp-stage video { display: block; width: 100%; aspect-ratio: 16 / 9; background: #0f0e0d; object-fit: cover; }
+.exp-stage-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 13px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.exp-stage-foot span { display: inline-flex; align-items: center; gap: 6px; }
+
+@media (max-width: 1024px) {
+  .exp-facts { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .exp-split { grid-template-columns: 1fr; gap: 26px; margin-top: 46px; }
+  /* Stacked, the picture leads every time — reading order is picture, then words. */
+  .exp-split--flip > .exp-split-media { order: 0; }
+  .exp-stage video { aspect-ratio: 4 / 3; }
+}
+
+@media (max-width: 520px) {
+  .exp-facts { grid-template-columns: 1fr; }
+  .exp-posters { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 }
 
 /* Homepage room gallery overlay */

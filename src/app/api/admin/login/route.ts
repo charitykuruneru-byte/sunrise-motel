@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { staffTable } from "@/db/schema";
 import { clientIp, logAudit } from "@/lib/audit";
-import { cookieValue, getStaffByEmail, readSession, verifyPassword } from "@/lib/staff-auth";
+import { cookieValue, getStaffByEmail, legacyAdminCookieValue, readSession, verifyPassword } from "@/lib/staff-auth";
+import type { SessionRole } from "@/lib/staff-auth";
 import { nowDate } from "@/lib/time";
 import { eq } from "drizzle-orm";
 
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
       });
       res.cookies.set(
         "sunrise_session",
-        cookieValue({ id: staff.id, staffCode: staff.staffCode, name: staff.name, email: staff.email, role: staff.role as "admin" | "staff" }),
+        cookieValue({ id: staff.id, staffCode: staff.staffCode, name: staff.name, email: staff.email, role: staff.role as SessionRole }),
         { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 12 },
       );
       await logAudit({
@@ -78,8 +79,8 @@ export async function POST(request: Request) {
       path: "/",
       maxAge: 60 * 60 * 12,
     });
-    // keep legacy cookie too so old sessions keep working
-    res.cookies.set("sunrise_admin", "1", { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 12 });
+    // keep legacy cookie too so old sessions keep working — signed, so "=1" cannot be typed by hand
+    res.cookies.set("sunrise_admin", legacyAdminCookieValue(), { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 12 });
     await logAudit({
       action: "auth.login", entity: "auth",
       summary: "Manager signed in to the portal.", actor: "manager", ip: clientIp(request),

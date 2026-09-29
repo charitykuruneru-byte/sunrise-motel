@@ -29,6 +29,27 @@
       "when": 1790433068060,
       "tag": "0003_little_kronos",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790578126030,
+      "tag": "0004_fair_johnny_storm",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790581165661,
+      "tag": "0005_dry_songbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790582890205,
+      "tag": "0006_guest_path_channels",
+      "breakpoints": true
     }
   ]
 }

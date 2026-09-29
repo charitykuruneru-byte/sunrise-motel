@@ -12,8 +12,8 @@ android {
         applicationId = "com.sunrisemotel.app" // LOCKED FOREVER — never change, or users get duplicate icons
         minSdk = 21
         targetSdk = 34
-        versionCode = 3 // +1 for EVERY release: 1 -> 2 -> 3 …
-        versionName = "1.2"
+        versionCode = 4 // +1 for EVERY release: 1 -> 2 -> 3 -> 4 …
+        versionName = "1.3"
         // Single place to change the website URL. Debug and release both read it.
         buildConfigField("String", "BASE_URL", "\"https://sunrise-motel.vercel.app\"")
     }

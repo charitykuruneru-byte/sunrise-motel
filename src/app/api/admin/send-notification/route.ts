@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { readSession } from "@/lib/staff-auth";
+import { clientIp, logAudit } from "@/lib/audit";
+import { readSession, sessionLabel } from "@/lib/staff-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +9,8 @@ type Payload = {
   body?: string;
   url?: string;
   imageUrl?: string;
+  /** Validate the Firebase setup without sending anything to real phones. */
+  dryRun?: boolean;
 };
 
 // Sends a broadcast push to ALL installed apps via FCM topic "all_users".
@@ -30,6 +33,7 @@ export async function POST(request: Request) {
   if (!title || !body) return NextResponse.json({ error: "Title and message are required." }, { status: 400 });
   const url = (payload.url ?? "/").trim() || "/";
   const imageUrl = (payload.imageUrl ?? "").trim();
+  const dryRun = payload.dryRun === true;
 
   const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   const projectId =
@@ -56,14 +60,51 @@ export async function POST(request: Request) {
   try {
     const { getAccessToken, sendToTopic } = await import("@/lib/fcm");
     const token = await getAccessToken(serviceAccount);
-    const result = await sendToTopic({ projectId, accessToken: token, topic: "all_users", title, body, url, imageUrl });
+    const result = await sendToTopic({
+      projectId,
+      accessToken: token,
+      topic: "all_users",
+      title,
+      body,
+      url,
+      imageUrl,
+      validateOnly: dryRun,
+    });
     const successCount =
       typeof (result as { successCount?: unknown }).successCount === "number"
         ? ((result as { successCount?: number }).successCount as number)
         : undefined;
-    return NextResponse.json({ queued: true, delivered: true, messageId: result.name ?? null, successCount });
+    const messageId = result.name ?? null;
+    await logAudit({
+      action: dryRun ? "notification.test" : "notification.broadcast",
+      entity: "notification",
+      entityId: messageId,
+      summary: (dryRun ? "Firebase dry run OK (no notification sent): " : "Broadcast push sent to topic all_users: ") + JSON.stringify(title),
+      actor: "manager",
+      actorLabel: sessionLabel(user),
+      ip: clientIp(request),
+      metadata: { topic: "all_users", dryRun, messageId, url, imageUrl: imageUrl || null },
+    });
+    return NextResponse.json({ queued: true, delivered: true, dryRun, messageId, successCount });
   } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
     console.error("FCM send failed", err);
-    return NextResponse.json({ error: "Push failed. Check Firebase keys and try again." }, { status: 500 });
+    await logAudit({
+      action: "notification.failed",
+      entity: "notification",
+      summary: "Push send failed: " + detail.slice(0, 300),
+      actor: "manager",
+      actorLabel: sessionLabel(user),
+      ip: clientIp(request),
+      metadata: { topic: "all_users", dryRun },
+    });
+    return NextResponse.json(
+      {
+        error: dryRun ? "Firebase test failed. Check the key, project id and that the Cloud Messaging API is enabled." : "Push failed. Check Firebase keys and try again.",
+        detail: detail.slice(0, 300),
+        dryRun,
+      },
+      { status: 500 },
+    );
   }
 }

@@ -3,14 +3,23 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { clientIp, logAudit } from "@/lib/audit";
+import { readSession } from "@/lib/staff-auth";
 
 export const dynamic = "force-dynamic";
 
 const ALLOWED: Record<string, string> = { "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif" };
 const MAX_BYTES = 8 * 1024 * 1024;
 
-/** Managers upload pictures straight from a phone; files are stored in ./uploads and served via /api/uploads/[file]. */
+/**
+ * LEGACY image path. The admin Pictures tab uses `POST /api/upload` instead, which stores in
+ * Vercel Blob or in Postgres — anything written to `./uploads` here is wiped on every Vercel
+ * deploy (Part 26 §2.6). It is kept only for local use, and is now admin-only: an anonymous
+ * caller can no longer write files into the server.
+ */
 export async function POST(request: Request) {
+  const user = readSession(request);
+  if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+  if (user.role !== "admin") return NextResponse.json({ error: "Admins only." }, { status: 403 });
   try {
     const form = await request.formData();
     const file = form.get("file");

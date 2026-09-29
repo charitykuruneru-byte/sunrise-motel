@@ -15,9 +15,16 @@ function nightsBetween(a: string, b: string) {
 }
 
 // Extend a stay: new check-out -> extra nights x rate added to extensionFee + total.
+//
+// ADDENDUM (Part 6 + Part 27 §D3): extending a stay is an admin act — it changes money and the
+// room's availability for the nights it now holds. Part A gap #6 left this open to any signed-in
+// staff account; it is now enforced on the server.
 export async function POST(request: Request) {
   const user = readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+  if (user.role !== "admin") {
+    return NextResponse.json({ error: "Only an admin can extend a stay." }, { status: 403 });
+  }
   try {
     const body = (await request.json()) as { id?: string; newCheckOut?: string };
     if (!body.id || !body.newCheckOut) return NextResponse.json({ error: "Booking and new check-out date are required." }, { status: 400 });

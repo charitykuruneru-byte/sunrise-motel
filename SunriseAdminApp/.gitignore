@@ -1,0 +1,8 @@
+# SunriseAdminApp local files (cloud builds on GitHub Actions instead)
+SunriseAdminApp/local.properties
+# The release keystore lives in SunriseMotelApp/ (one identity for both apps) —
+# it is gitignored there too, and restored by CI from KEYSTORE_BASE64.
+SunriseAdminApp/**/*.jks
+SunriseAdminApp/**/*.keystore
+# No Firebase app config here: the manager app carries no push at all.
+SunriseAdminApp/app/google-services.json

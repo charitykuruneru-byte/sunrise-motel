@@ -4,9 +4,14 @@ import { db } from "@/db";
 import { invoicesTable } from "@/db/schema";
 import { clientIp, logAudit } from "@/lib/audit";
 import { malawiYear, nowDate } from "@/lib/time";
+import { readSession } from "@/lib/staff-auth";
 import { desc, eq } from "drizzle-orm";
 
-export async function GET() {
+// ADDENDUM (Part 27 §B5): a manual invoice is an admin act — it issues a numbered document
+// that is not tied to a booking (a day workspace, a function deposit, a corporate charge).
+export async function GET(request: Request) {
+  const user = readSession(request);
+  if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   try {
     const invoices = await db.select().from(invoicesTable).orderBy(desc(invoicesTable.createdAt));
     return NextResponse.json({ invoices });
@@ -17,6 +22,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const user = readSession(request);
+  if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+  if (user.role !== "admin") {
+    return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  }
   try {
     const body = (await request.json()) as {
       bookingRef: string;

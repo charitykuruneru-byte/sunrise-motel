@@ -7,6 +7,8 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "verify:media": "node scripts/verify-media-flow.mjs",
+    "verify:sw": "node scripts/verify-service-worker.mjs",
     "staff:invite": "node --no-warnings scripts/staff-invite.mjs",
     "vercel-build": "npx drizzle-kit migrate --config=drizzle.config.ts && next build"
   },

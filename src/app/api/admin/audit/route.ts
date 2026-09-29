@@ -2,12 +2,18 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { auditLogTable } from "@/db/schema";
 import { and, desc, eq, ilike, or, type SQL } from "drizzle-orm";
+import { readSession } from "@/lib/staff-auth";
 
 export const dynamic = "force-dynamic";
 
 // Read-only audit trail for the manager portal.
 // Append-only by design: there is no UPDATE or DELETE here on purpose.
+//
+// ADDENDUM (authority matrix): the audit trail is readable by staff, admin and auditor — but
+// never by an anonymous caller. A signed-in session is required, and nobody can edit or delete.
 export async function GET(request: Request) {
+  const user = readSession(request);
+  if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   try {
     const { searchParams } = new URL(request.url);
     const q = searchParams.get("q")?.trim() ?? "";

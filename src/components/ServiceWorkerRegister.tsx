@@ -1,5 +1,6 @@
 'use client'
-import { useEffect } from 'react'
+import { Check, RefreshCw, X } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 const APP_VERSION = '1.4.0';
 export const APP_CHANGELOG: string[] = [
@@ -10,31 +11,40 @@ export const APP_CHANGELOG: string[] = [
 ];
 
 // Registers /sw.js so Chrome treats the site as installable (PWA direct install).
-// Also listens for a newly deployed service worker and shows an "Update
-// available" banner listing APP_CHANGELOG with a one-tap refresh button.
+// Also listens for a newly deployed service worker and offers the update as a
+// designed card (`sw-update` in globals.css) listing APP_CHANGELOG with a one-tap
+// refresh.
+//
+// Two rules kept from the first version, because both of them are the point:
+//
+//   1. Nothing here ever blocks the page. The card is anchored to the bottom and
+//      the guest can ignore it; an update is not worth interrupting a booking.
+//   2. "Update now" is the only thing that reloads. It hands the new worker
+//      SKIP_WAITING and refreshes, which is what actually activates the deploy.
+//
+// The card is real JSX now instead of an `innerHTML` string with inline styles, so
+// it uses the same cream/gold sheet as the install popup and cannot drift from it.
 export default function ServiceWorkerRegister() {
+  const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
+  const shownRef = useRef(false);
+  const workerRef = useRef<ServiceWorker | null>(null);
+
+  const apply = useCallback(() => {
+    try {
+      workerRef.current?.postMessage({ type: 'SKIP_WAITING' });
+    } catch {
+      /* ignore — the reload below still picks up the new worker */
+    }
+    window.location.reload();
+  }, []);
+
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
-    let shown = false;
     const showUpdate = (worker: ServiceWorker | null) => {
-      if (shown) return;
-      shown = true;
-      const id = 'sw-update-banner';
-      if (document.getElementById(id)) return;
-      const bar = document.createElement('div');
-      bar.id = id;
-      bar.setAttribute('role', 'status');
-      bar.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:10000;background:#171513;color:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 12px 40px rgba(0,0,0,.35);font-size:13px;line-height:1.5';
-      const items = APP_CHANGELOG.map((c) => `<li style="margin:2px 0">${c}</li>`).join('');
-      bar.innerHTML = `<strong>Update available — v${APP_VERSION}</strong><ul style="margin:8px 0 12px 18px;padding:0">${items}</ul><div style="display:flex;gap:8px"><button id="sw-update-now" style="flex:1;background:#D4A017;color:#171513;font-weight:800;border:0;border-radius:8px;padding:10px;cursor:pointer">Update now</button><button id="sw-update-later" style="background:none;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;padding:10px 14px;cursor:pointer">Later</button></div>`;
-      document.body.appendChild(bar);
-      document.getElementById('sw-update-later')?.addEventListener('click', () => bar.remove());
-      document.getElementById('sw-update-now')?.addEventListener('click', () => {
-        try {
-          worker?.postMessage({ type: 'SKIP_WAITING' });
-        } catch { /* ignore */ }
-        window.location.reload();
-      });
+      if (shownRef.current || document.getElementById('sw-update-banner')) return;
+      shownRef.current = true;
+      workerRef.current = worker;
+      setWaiting(worker);
     };
     navigator.serviceWorker.register('/sw.js').then((reg) => {
       if (reg.waiting) {
@@ -55,8 +65,50 @@ export default function ServiceWorkerRegister() {
     });
     // If the new worker already took over, a fresh reload picks it up.
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (shown) window.location.reload();
+      if (shownRef.current) window.location.reload();
     });
   }, []);
-  return null;
+
+  if (!waiting) return null;
+
+  return (
+    <div className="sw-update" id="sw-update-banner" role="status" aria-live="polite">
+      <span className="sw-update-rule" aria-hidden="true" />
+      <div className="sw-update-body">
+        <div className="sw-update-head">
+          <span className="sw-update-badge">v{APP_VERSION}</span>
+          <div>
+            <strong>A newer version is ready</strong>
+            <span className="sw-update-sub">
+              Nothing you are doing is lost — refresh whenever it suits you.
+            </span>
+          </div>
+        </div>
+        <ul className="sw-update-list">
+          {APP_CHANGELOG.map((change) => (
+            <li key={change}>
+              <Check size={13} aria-hidden="true" />
+              {change}
+            </li>
+          ))}
+        </ul>
+        <div className="sw-update-actions">
+          <button type="button" className="sw-update-now" onClick={apply}>
+            <RefreshCw size={14} aria-hidden="true" /> Update now
+          </button>
+          <button type="button" className="sw-update-later" onClick={() => setWaiting(null)}>
+            Later
+          </button>
+        </div>
+      </div>
+      <button
+        type="button"
+        className="sw-update-close"
+        aria-label="Close the update notice"
+        onClick={() => setWaiting(null)}
+      >
+        <X size={16} aria-hidden="true" />
+      </button>
+    </div>
+  );
 }

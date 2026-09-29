@@ -1,0 +1,16 @@
+{
+  "name": "Sunrise Manager",
+  "short_name": "Manager",
+  "description": "The Sunrise Motel manager portal — arrivals, room map, orders, guest issues, payments and folios, in Area 5, Lilongwe.",
+  "start_url": "/admin",
+  "scope": "/admin",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#171513",
+  "theme_color": "#D4A017",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

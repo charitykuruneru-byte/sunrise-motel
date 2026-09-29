@@ -50,6 +50,8 @@ export async function sendToTopic(opts: {
   body: string;
   url: string;
   imageUrl?: string;
+  /** FCM dry run: validates the key, project and message WITHOUT delivering anything. */
+  validateOnly?: boolean;
 }) {
   const message: Record<string, unknown> = {
     topic: opts.topic,
@@ -65,7 +67,7 @@ export async function sendToTopic(opts: {
     {
       method: "POST",
       headers: { Authorization: `Bearer ${opts.accessToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, ...(opts.validateOnly ? { validate_only: true } : {}) }),
     },
   );
   if (!res.ok) {

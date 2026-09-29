@@ -29,6 +29,7 @@ import {
   X,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import ImageUploader from "@/components/ImageUploader";
 import { SunriseLogo } from "@/components/sunrise-logo";
 import { formatMalawi } from "@/lib/time";
@@ -146,9 +147,9 @@ export default function AdminPage() {
   const [showAddImage, setShowAddImage] = useState(false);
   const [imgTitle, setImgTitle] = useState("");
   const [imgUrl, setImgUrl] = useState("");
+  const [imgAlt, setImgAlt] = useState("");
   const [imgCategory, setImgCategory] = useState("Rooms");
   const [imgCaption, setImgCaption] = useState("");
-  const [uploading, setUploading] = useState(false);
 
   const [showAddPost, setShowAddPost] = useState(false);
   const [post, setPost] = useState({ title: "", category: "Event", day: "SAT", date: "26", time: "12:00 — 20:00", detail: "", priceTag: "", imageUrl: "" });
@@ -369,33 +370,16 @@ export default function AdminPage() {
     loadAll();
   };
 
-  const uploadFile = async (file: File) => {
-    setUploading(true);
-    try {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch("/api/admin/upload", { method: "POST", body: form });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Upload failed");
-      setImgUrl(data.url);
-      if (!imgTitle) setImgTitle(file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " "));
-      notify("Photo uploaded — add a title and save");
-    } catch (e) {
-      notify(e instanceof Error ? e.message : "Upload failed");
-    } finally {
-      setUploading(false);
-    }
-  };
-
   const addImage = async (e: FormEvent) => {
     e.preventDefault();
-    const res = await fetch("/api/admin/gallery", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: imgTitle, imageUrl: imgUrl, category: imgCategory, caption: imgCaption }) });
+    const res = await fetch("/api/admin/gallery", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: imgTitle, imageUrl: imgUrl, category: imgCategory, caption: imgCaption, altText: imgAlt }) });
     const data = await res.json();
     if (data.image) {
       setGallery((prev) => [data.image, ...prev]);
       setShowAddImage(false);
       setImgTitle("");
       setImgUrl("");
+      setImgAlt("");
       setImgCaption("");
       notify("Picture added to the gallery");
     } else notify(data.error || "Could not add picture");
@@ -548,7 +532,7 @@ export default function AdminPage() {
     <div className="admin-portal">
       <header className="admin-header">
         <div className="admin-header-left">
-          <a href="/" className="back-link"><ArrowLeft size={15} /> Site</a>
+          <Link href="/" className="back-link"><ArrowLeft size={15} /> Site</Link>
           <div className="admin-brand">
             <SunriseLogo size="small" animated={false} theme="dark" showTagline={false} />
             <div className="admin-title">
@@ -739,7 +723,9 @@ export default function AdminPage() {
         <section className="admin-content-section">
           <div className="section-toolbar">
             <div className="toolbar-info"><h2>Pictures & gallery</h2><p>Upload photos from your phone or paste an image link. Remove anything outdated — changes are live immediately.</p></div>
-            <button className="admin-btn admin-btn-primary" onClick={() => setShowAddImage(true)}><Plus size={15} /> Add picture</button>
+            {isAdmin
+              ? <button className="admin-btn admin-btn-primary" onClick={() => setShowAddImage(true)}><Plus size={15} /> Add picture</button>
+              : <small className="hint">Admins only — staff can view the gallery here.</small>}
           </div>
           <div className="gallery-admin-grid">
             {gallery.map((img) => (
@@ -748,7 +734,7 @@ export default function AdminPage() {
                 <div className="card-body">
                   <strong>{img.title}</strong>
                   {img.caption && <p>{img.caption}</p>}
-                  <div className="card-actions"><button className="btn-delete" onClick={() => removeImage(img.id)}><Trash2 size={13} /> Remove</button></div>
+                  {isAdmin && <div className="card-actions"><button className="btn-delete" onClick={() => removeImage(img.id)}><Trash2 size={13} /> Remove</button></div>}
                 </div>
               </div>
             ))}
@@ -761,7 +747,9 @@ export default function AdminPage() {
         <section className="admin-content-section">
           <div className="section-toolbar">
             <div className="toolbar-info"><h2>Posts, events & offers</h2><p>Publish braai days, happy hour, match days and offers. Pause or delete anything that has passed.</p></div>
-            <button className="admin-btn admin-btn-primary" onClick={() => setShowAddPost(true)}><Plus size={15} /> New post</button>
+            {isAdmin
+              ? <button className="admin-btn admin-btn-primary" onClick={() => setShowAddPost(true)}><Plus size={15} /> New post</button>
+              : <small className="hint">Admins only — staff can view posts here.</small>}
           </div>
           <div className="posts-admin-grid">
             {posts.map((p) => (
@@ -776,10 +764,12 @@ export default function AdminPage() {
                     {p.priceTag && <strong className="price-tag-badge">{p.priceTag}</strong>}
                   </div>
                 </div>
-                <div className="post-admin-actions">
-                  <button className={`btn-toggle ${p.isActive ? "btn-active" : "btn-paused"}`} onClick={() => togglePost(p)}>{p.isActive ? "Live" : "Paused"}</button>
-                  <button className="btn-delete-post" onClick={() => removePost(p.id)}><Trash2 size={13} /> Delete</button>
-                </div>
+                {isAdmin && (
+                  <div className="post-admin-actions">
+                    <button className={`btn-toggle ${p.isActive ? "btn-active" : "btn-paused"}`} onClick={() => togglePost(p)}>{p.isActive ? "Live" : "Paused"}</button>
+                    <button className="btn-delete-post" onClick={() => removePost(p.id)}><Trash2 size={13} /> Delete</button>
+                  </div>
+                )}
               </article>
             ))}
           </div>
@@ -906,13 +896,33 @@ export default function AdminPage() {
             <div className="modal-head"><span className="eyebrow"><span className="eyebrow-line" /> PICTURES</span><h2>Add a picture</h2><p>Pick from your laptop or phone — it uploads to permanent cloud storage.</p></div>
             <form onSubmit={addImage} className="admin-modal-form">
               <ImageUploader currentImage={imgUrl} onUploadComplete={(url) => { setImgUrl(url); if (!imgTitle) setImgTitle("Gallery photo"); notify("Photo uploaded — add a title and save"); }} />
-              {imgUrl && <img className="upload-preview" src={imgUrl} alt="Preview" />}
+              {imgUrl && <img className="upload-preview" src={imgUrl} alt="Preview of the picture being added" />}
+              <p className="hint" style={{ marginTop: 6 }}>
+                Gallery standard: 1000 × 750 (4:3), WebP or JPEG, under about 120 KB. A 6 MB phone photo costs every
+                guest data money — compress before uploading. Real photographs of this motel only, and empty the room
+                first.
+              </p>
               <label><span>Title</span><input required value={imgTitle} onChange={(e) => setImgTitle(e.target.value)} placeholder="e.g. Deluxe room — new curtains" /></label>
+              {/* Alt text describes the SCENE, never the file. It is what a screen
+                  reader reads out and what Google Images indexes (Part 5.6), so it is
+                  asked for here rather than silently copied from the title. */}
+              <label>
+                <span>Alt text — describe the scene</span>
+                <input
+                  value={imgAlt}
+                  onChange={(e) => setImgAlt(e.target.value)}
+                  placeholder="e.g. Deluxe room with a king bed, work desk and a window onto the garden"
+                />
+                <small className="hint">
+                  Never start with &quot;image of&quot; — the screen reader already says it is an image. Leave blank and the
+                  title is used.
+                </small>
+              </label>
               <div className="form-grid-2">
                 <label><span>Category</span><select value={imgCategory} onChange={(e) => setImgCategory(e.target.value)}><option>Rooms</option><option>Property</option><option>Dining</option><option>Events</option><option>Work</option></select></label>
                 <label><span>Caption (optional)</span><input value={imgCaption} onChange={(e) => setImgCaption(e.target.value)} placeholder="Short caption" /></label>
               </div>
-              <button type="submit" className="admin-btn admin-btn-primary admin-btn-wide" disabled={!imgUrl || uploading}><Plus size={15} /> Save to gallery</button>
+              <button type="submit" className="admin-btn admin-btn-primary admin-btn-wide" disabled={!imgUrl}><Plus size={15} /> Save to gallery</button>
             </form>
           </div>
         </div>

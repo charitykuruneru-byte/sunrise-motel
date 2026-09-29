@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "SunriseMotelApp/**"
+      - "SunriseAdminApp/**"
       - ".github/workflows/build-apk.yml"
   workflow_dispatch:
 
@@ -38,6 +39,8 @@ jobs:
       # google-services.json is gitignored — restore it from the
       # GOOGLE_SERVICES_JSON repo secret (raw file contents). Without this,
       # processReleaseGoogleServices fails with "File google-services.json is missing".
+      # The manager app needs no Firebase at all — it has no push — so this is
+      # written once, for the guest app only.
       - name: Restore google-services.json
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
@@ -50,7 +53,8 @@ jobs:
 
       # Release keystore is gitignored — restore from KEYSTORE_BASE64 secret.
       # Same keystore on every build = same signature = Android UPDATES the app
-      # instead of installing a duplicate icon.
+      # instead of installing a duplicate icon. SunriseAdminApp references the
+      # same file by relative path (../SunriseMotelApp/…), so one restore signs both.
       - name: Restore release keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -61,28 +65,44 @@ jobs:
           fi
           echo "$KEYSTORE_BASE64" | base64 -d > SunriseMotelApp/sunrise-motel-release.jks
 
-      - name: Build release APK
+      - name: Build guest release APK (SunriseMotelApp)
         run: |
           cd SunriseMotelApp
           gradle assembleRelease --no-daemon
 
-      # Gradle outputs app-release.apk — rename so the /download page and
-      # popup URL (.../releases/latest/download/SunriseMotel.apk) resolve.
-      - name: Rename APK
+      - name: Build manager release APK (SunriseAdminApp)
         run: |
-          mv SunriseMotelApp/app/build/outputs/apk/release/app-release.apk SunriseMotelApp/app/build/outputs/apk/release/SunriseMotel.apk
+          cd SunriseAdminApp
+          gradle assembleRelease --no-daemon
 
-      - name: Upload APK artifact
+      # Gradle outputs app-release.apk — rename so the /download page and the
+      # popup URLs (.../releases/latest/download/<name>.apk) resolve.
+      - name: Rename APKs
+        run: |
+          mv SunriseMotelApp/app/build/outputs/apk/release/app-release.apk \
+             SunriseMotelApp/app/build/outputs/apk/release/SunriseMotel.apk
+          mv SunriseAdminApp/app/build/outputs/apk/release/app-release.apk \
+             SunriseAdminApp/app/build/outputs/apk/release/SunriseManager.apk
+
+      - name: Upload guest APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: SunriseMotel-apk
           path: SunriseMotelApp/app/build/outputs/apk/release/SunriseMotel.apk
 
-      - name: Attach APK to GitHub Release
+      - name: Upload manager APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SunriseManager-apk
+          path: SunriseAdminApp/app/build/outputs/apk/release/SunriseManager.apk
+
+      - name: Attach APKs to GitHub Release
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v1
         with:
-          files: SunriseMotelApp/app/build/outputs/apk/release/SunriseMotel.apk
+          files: |
+            SunriseMotelApp/app/build/outputs/apk/release/SunriseMotel.apk
+            SunriseAdminApp/app/build/outputs/apk/release/SunriseManager.apk
           tag_name: v1.0.${{ github.run_number }}
           generate_release_notes: true
 

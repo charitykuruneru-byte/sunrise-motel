@@ -149,6 +149,7 @@ img { display: block; max-width: 100%; height: auto; }
 .input-icon-wrap input { width: 100%; height: 44px; padding: 0 8px 0 34px; border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: 13px; color-scheme: light; }
 .stepper-box { height: 44px; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0 6px; font-size: 13px; font-weight: 600; }
 .stepper-box button { width: 30px; height: 30px; display: grid; place-items: center; border-radius: var(--radius-sm); background: var(--ivory-deep); }
+.stepper-box button:disabled { opacity: 0.35; cursor: not-allowed; }
 
 .search-summary-strip { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12px; }
 .nights-badge strong { color: var(--orange-deep); font-size: 13px; }
@@ -296,6 +297,132 @@ img { display: block; max-width: 100%; height: auto; }
 
 .modal-sheet-header h2 { font-family: var(--serif); font-size: 30px; font-weight: 400; margin-top: 4px; }
 .modal-sheet-header p { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+/* ================= THE APP INSTALL POPUP =================
+   One popup for /app, /room and the landing page (`components/install-app.tsx`).
+   It asks its question immediately and it never navigates away: "Install now" runs
+   the browser's own install sheet, and a browser that has no install event gets the
+   two taps explained in this same sheet instead of being sent to /download. */
+.install-sheet { text-align: center; }
+.install-icon { width: 64px; height: 64px; border-radius: 16px; margin: 0 auto 12px; box-shadow: 0 10px 26px rgba(23, 21, 19, 0.18); }
+.install-head h2 { font-family: var(--serif); font-size: 26px; font-weight: 400; margin-top: 6px; }
+.install-head p { max-width: 44ch; margin: 8px auto 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.install-actions { display: grid; gap: 10px; margin-top: 20px; }
+.install-actions .btn-submit-booking-request { font-size: 14px; text-transform: none; letter-spacing: 0; }
+.install-actions .btn-open-slideshow-secondary { font-size: 13px; }
+.install-not-now { width: 100%; }
+.install-steps { display: grid; gap: 10px; margin-top: 18px; padding: 14px 16px; background: var(--ivory); border: 1px solid var(--line); border-radius: var(--radius-md); list-style: none; text-align: left; font-size: 12.5px; line-height: 1.6; }
+.install-steps li { display: flex; align-items: flex-start; gap: 9px; }
+.install-steps li svg { flex: none; margin-top: 2px; color: var(--orange-deep); }
+.install-note { margin-top: 14px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.install-stage { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 20px; font-size: 13px; font-weight: 600; }
+.install-stage > svg { color: var(--orange-deep); }
+.install-stage-done > svg { color: var(--sage); }
+.install-stage-done span { max-width: 40ch; color: var(--muted); font-weight: 400; line-height: 1.6; }
+.install-stage-done button { margin-top: 12px; }
+
+/* ================= THE UPDATE NOTICE =================
+   The service worker in `components/ServiceWorkerRegister.tsx` tells the guest when a
+   newer version of the site is ready. It used to be a raw innerHTML black bar with the
+   changelog in an unstyled list — the one surface on the site that ignored the rest of
+   the design. It is now the same cream card, gold accent and Georgia headline as every
+   other sheet in this file, built in JSX instead of an inline-styled string.
+
+   It stays anchored to the bottom rather than becoming a modal: an update is never
+   worth blocking a page for. A guest halfway through a booking gets a notice they can
+   ignore, and "Later" means later. */
+.sw-update {
+  position: fixed;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: grid;
+  grid-template-columns: 4px minmax(0, 1fr) auto;
+  width: min(calc(100% - 24px), 460px);
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 18px 44px rgba(23, 21, 19, 0.24);
+  overflow: hidden;
+  animation: sw-update-rise 0.28s ease-out;
+}
+@keyframes sw-update-rise {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.sw-update-rule { background: linear-gradient(180deg, var(--orange), var(--orange-deep)); }
+.sw-update-body { padding: 15px 14px 14px 16px; }
+.sw-update-head { display: flex; align-items: flex-start; gap: 10px; }
+.sw-update-badge {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--ivory);
+  border: 1px solid var(--line);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--orange-deep);
+}
+.sw-update-head strong { display: block; font-family: var(--serif); font-size: 17px; font-weight: 400; line-height: 1.25; }
+.sw-update-sub { display: block; margin-top: 3px; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+.sw-update-list {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sw-update-list li { display: flex; align-items: flex-start; gap: 7px; }
+.sw-update-list li svg { flex: none; margin-top: 3px; color: var(--sage); }
+.sw-update-actions { display: flex; gap: 8px; margin-top: 14px; }
+.sw-update-now {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--orange);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.sw-update-now:hover { background: #e0ad1f; }
+.sw-update-later {
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 700;
+}
+.sw-update-later:hover { border-color: var(--orange-deep); }
+.sw-update-close {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin: 8px 6px 0 0;
+  border-radius: 50%;
+  color: var(--muted);
+}
+.sw-update-close:hover { background: var(--ivory); color: var(--ink); }
+
+@media (max-width: 420px) {
+  .sw-update-actions { flex-direction: column; }
+  .sw-update-later { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sw-update { animation: none; }
+}
 
 .booking-stay-card { display: flex; align-items: center; gap: 14px; background: var(--ivory); border-radius: var(--radius-md); padding: 12px; margin: 18px 0; border: 1px solid var(--line); }
 .booking-stay-card img { width: 70px; height: 60px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
@@ -506,6 +633,15 @@ input:checked + .toggle-slider:before { transform: translateX(20px); }
 .admin-modal-form input, .admin-modal-form select, .admin-modal-form textarea { width: 100%; height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: 4px; font-size: 13px; }
 .admin-modal-form textarea { height: auto; padding: 8px 10px; }
 .mini-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* An empty state that says something instead of leaving a blank frame — the same
+   honest-placeholder treatment the landing page gives `.hp-empty`. This rule was
+   missing: `empty-state` is rendered by the rooms list, the gallery, the stay page
+   and the portal, and until now it matched no stylesheet at all, so those blocks
+   fell back to unstyled body text. */
+.empty-state { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 30px 22px; text-align: center; background: #fff; border: 1px dashed var(--line); border-radius: var(--radius-md); color: var(--muted); }
+.empty-state svg { color: var(--bronze); }
+.empty-state p { font-size: 13.5px; line-height: 1.6; max-width: 46ch; }
 
 /* ================= RESPONSIVE MOBILE BREAKPOINTS ================= */
 @media (max-width: 900px) {

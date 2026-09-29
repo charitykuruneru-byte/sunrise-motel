@@ -1,8 +1,16 @@
 /* Sunrise Motel service worker — makes the site installable (PWA direct install).
  * Strategy: precache the app shell; navigations are network-first with cache
- * fallback so the installed icon always opens, even briefly offline. */
+ * fallback so the installed icon always opens, even briefly offline.
+ *
+ * LIVE DATA IS NEVER CACHED. `/api/` is handed straight back to the browser,
+ * because a cached availability answer is a wrong answer: it shows a room as
+ * taken long after it is free again, and — since the query string is the cache
+ * key — it survives every deploy. This is what made the landing page say
+ * "Rooms are loading…" forever: one failed call had been stored, and was then
+ * served back on every reload for those same dates. The version was bumped so
+ * those stored answers are deleted the moment this worker activates. */
 
-const CACHE = "sunrise-motel-v2";
+const CACHE = "sunrise-motel-v3";
 const CORE = ["/", "/manifest.json", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -29,13 +37,22 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
+  // Live data first: /api/ always reaches the server. Returning without calling
+  // respondWith() hands the request back to the browser's own stack, so nothing
+  // in this file can answer a question about tonight's rooms.
+  if (url.pathname.startsWith("/api/")) return;
+
   // Page navigations: try network first, fall back to cached home shell.
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((cache) => cache.put(request, copy));
+          // Only a good page is worth keeping: an error page stored as the shell
+          // would be handed to the next offline visitor as if it were the site.
+          if (res.ok && res.type === "basic") {
+            const copy = res.clone();
+            caches.open(CACHE).then((cache) => cache.put(request, copy));
+          }
           return res;
         })
         .catch(() => caches.match("/"))
@@ -49,8 +66,12 @@ self.addEventListener("fetch", (event) => {
       (hit) =>
         hit ||
         fetch(request).then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((cache) => cache.put(request, copy));
+          // Same rule for assets: one failed fetch must not turn into a
+          // permanently broken image or stylesheet.
+          if (res.ok && res.type === "basic") {
+            const copy = res.clone();
+            caches.open(CACHE).then((cache) => cache.put(request, copy));
+          }
           return res;
         })
     )

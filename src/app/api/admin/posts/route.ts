@@ -5,6 +5,7 @@ import { postsTable } from "@/db/schema";
 import { clientIp, logAudit } from "@/lib/audit";
 import { seedDatabaseIfEmpty } from "@/db/seed";
 import { readSession } from "@/lib/staff-auth";
+import { requireAdmin } from "@/lib/desk-auth";
 import { desc, eq } from "drizzle-orm";
 
 export async function GET() {
@@ -21,6 +22,10 @@ export async function GET() {
 export async function POST(request: Request) {
   const user = readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+  // ADDENDUM (authority matrix): posts are public content, so publishing, pausing and deleting one
+  // is admin-only. A staff session is the front desk — it reads posts, it does not write them.
+  const denied = requireAdmin(user);
+  if (denied) return denied;
   try {
     const body = (await request.json()) as {
       title: string;
@@ -69,6 +74,8 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   const user = readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+  const denied = requireAdmin(user);
+  if (denied) return denied;
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
@@ -91,6 +98,8 @@ export async function DELETE(request: Request) {
 export async function PATCH(request: Request) {
   const user = readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+  const denied = requireAdmin(user);
+  if (denied) return denied;
   try {
     const body = (await request.json()) as { id: string; isActive: boolean };
     if (!body.id) {
