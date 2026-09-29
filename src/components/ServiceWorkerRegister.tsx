@@ -28,14 +28,21 @@ export default function ServiceWorkerRegister() {
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
   const shownRef = useRef(false);
   const workerRef = useRef<ServiceWorker | null>(null);
+  /** True only while the guest's own "Update now" tap is being applied. */
+  const applyingRef = useRef(false);
 
+  // "Update now" is the only thing that reloads. `sw.js` deliberately leaves the
+  // new worker WAITING, so this hands it SKIP_WAITING and lets the reload happen
+  // on `controllerchange` — after the new worker has actually taken control.
+  // The timer is the backstop for the case where it had already gone.
   const apply = useCallback(() => {
+    applyingRef.current = true;
     try {
       workerRef.current?.postMessage({ type: 'SKIP_WAITING' });
     } catch {
       /* ignore — the reload below still picks up the new worker */
     }
-    window.location.reload();
+    window.setTimeout(() => window.location.reload(), 800);
   }, []);
 
   useEffect(() => {
@@ -63,9 +70,11 @@ export default function ServiceWorkerRegister() {
     }).catch(() => {
       // Older browsers simply skip PWA install — site still works.
     });
-    // If the new worker already took over, a fresh reload picks it up.
+    // Only the guest's own tap reloads. If the browser promotes a waiting worker
+    // while they are mid-booking, the page keeps running the code it started with
+    // until they refresh — which is the promise printed on the card.
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (shownRef.current) window.location.reload();
+      if (applyingRef.current) window.location.reload();
     });
   }, []);
 

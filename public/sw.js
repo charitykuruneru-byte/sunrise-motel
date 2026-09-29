@@ -14,9 +14,14 @@ const CACHE = "sunrise-motel-v3";
 const CORE = ["/", "/manifest.json", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(CORE)).then(() => self.skipWaiting())
-  );
+  // NO skipWaiting() here, on purpose. A freshly deployed worker WAITS until the
+  // guest says so — that is what the "A newer version is ready" card is for.
+  // Activating it immediately (`skipWaiting`) claims the page and fires
+  // `controllerchange`, which reloads the page under the guest's hands mid-booking.
+  // That reload was measured to land ~1.5 s after the deploy was noticed, and it
+  // replaced the document before the update card could paint. The `SKIP_WAITING`
+  // message below is what the card's "Update now" button sends.
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(CORE)));
 });
 
 self.addEventListener("activate", (event) => {

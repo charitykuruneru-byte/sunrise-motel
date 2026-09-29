@@ -102,6 +102,22 @@ check("nav 200 -> entries stored", await storedBy(request("/", "GET", "navigate"
 check("asset 503 -> entries stored", await storedBy(request("/_next/static/x.js"), { ok: false, type: "basic", status: 503 }), 0);
 check("asset 200 -> entries stored", await storedBy(request("/_next/static/x.js"), { ok: true, type: "basic", status: 200 }), 1);
 
+console.log("=== a deployed worker WAITS for the guest (what makes the update card usable) ===");
+// The card can only ever appear if a NEW worker is left waiting. An install that
+// calls skipWaiting() activates immediately, claims the page and fires
+// controllerchange — and the page reloads under the guest's hands. That was a real
+// bug: `npm run verify:update-card` measured the card never reaching the document
+// and a self-inflicted reload ~1.5 s after the deploy. This keeps the rule honest
+// without needing a browser; the browser check proves the visible half.
+let skipWaitingCalls = 0;
+self.skipWaiting = () => { skipWaitingCalls += 1; };
+await new Promise((resolve) => {
+  handlers.install({ waitUntil: (promise) => Promise.resolve(promise).then(resolve, resolve) });
+});
+check("install does NOT skipWaiting", skipWaitingCalls, 0);
+handlers.message({ data: { type: "SKIP_WAITING" } });
+check("the SKIP_WAITING message still activates", skipWaitingCalls, 1);
+
 const version = src.match(/const CACHE = "([^"]+)"/)?.[1] ?? "(not found)";
 console.log(`\ncache version: ${version}`);
 console.log(failures === 0 ? "ALL CHECKS PASSED" : `${failures} CHECK(S) FAILED`);

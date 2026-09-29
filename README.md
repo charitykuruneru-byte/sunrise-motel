@@ -844,6 +844,15 @@ PASS  Feed is clean again
   browser: it loads the shipped `sw.js` with stubbed `self` / `caches` / `fetch` and prints one
   PASS/FAIL line per case — `/api/` is *not* claimed, the shell and immutable assets *are*, and a
   500 or an opaque response is never stored. Re-run it after any change to `public/sw.js`.
+* **`npm run verify:update-card`** (→ `scripts/verify-update-card.mjs`) is the browser half of the same
+  check, because the update card only exists *after* a worker is deployed — it is never in the server
+  HTML, so no static check can see it. It drives the installed Chrome/Edge over the DevTools Protocol
+  (no Playwright, no new dependency), appends one comment to `public/sw.js` to simulate a deploy, and
+  measures what a guest sees: the card appears, stays ≥ 4 s, is hit-tested where it says it is, offers
+  four changelog lines plus **Update now / Later**, defers without reloading, comes back on the next
+  visit, and applies on tap. Screenshots land in `docs/evidence/`. It found and now guards a real bug:
+  `install` must **not** call `skipWaiting()`, or the new worker claims the page and the page reloads
+  itself mid-booking before the card can paint (measured at 1,544 ms).
 * `InstallAppPopup` — appears ~3 s after load only when the browser fires `beforeinstallprompt`
   (and never inside either Android wrapper or when already installed). *Install Now* calls the
   native prompt; "Not now" suppresses it for 7 days; `?install=1` forces it for testing.

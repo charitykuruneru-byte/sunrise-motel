@@ -727,6 +727,58 @@ string that can disagree with the rest of the CSS.
 reports `installed`), so it is never in the server-rendered HTML — the CSS it needs and the JS that
 builds it both provably ship, but the pixels themselves were not seen in a browser in this pass.
 
+> **Retired in *follow-up pass 5*.** A real browser was pointed at this, and it found more than a
+> missing screenshot: the card never appeared at all. See the next section.
+
+### Follow-up pass 5 — the update card is measured in a real browser, and the reload it exposed
+
+Pass 4 shipped the card and said plainly what it could not show: the pixels. This pass gets them — and
+the browser immediately found the reason nobody had ever seen them. The card was not merely
+state-gated. It was **unreachable**.
+
+**The two halves of the update story contradicted each other.** `public/sw.js` called
+`self.skipWaiting()` inside `install`, so a newly deployed worker activated the instant it finished
+installing, and `activate` handed it `clients.claim()`. `ServiceWorkerRegister.tsx` meanwhile stated
+the opposite rule in its own comment (*"Update now is the only thing that reloads"*) and reloaded on
+`controllerchange` — which that self-activation fired. Measured at 390×844:
+
+| Moment | What the browser actually did |
+|---|---|
+| 0 ms | a deploy is noticed (`registration.update()`); the new worker installs |
+| **never** | the card reaches the document — **0 of 157 samples** contained `#sw-update-banner` |
+| **1,544 ms** | the page reloads **by itself**, mid-booking, and the card is gone for good |
+
+**The fix is one line per side.** `public/sw.js` no longer calls `skipWaiting()` in `install`, so a
+deployed worker now **waits** — the only state in which an update can be offered at all. And
+`ServiceWorkerRegister.tsx` reloads on `controllerchange` *only* while the guest's own **Update now**
+tap is being applied (`applyingRef`), with the reload landing after the new worker takes control and
+an 800 ms backstop if it has already gone. So the promise printed on the card — *"Nothing you are doing
+is lost — refresh whenever it suits you"* — is now true even when the browser promotes a waiting worker
+while a booking form is half-filled.
+
+**How it is verified from here on — in a browser, repeatably.** `npm run verify:update-card`
+(→ `scripts/verify-update-card.mjs`) starts `next start` if nothing is answering, drives the installed
+Chrome/Edge over the **DevTools Protocol** (no Playwright, no Puppeteer, no new dependency — Node's own
+`WebSocket` and `fetch`), appends one comment to `public/sw.js` to simulate a deploy, and watches what a
+guest sees. It restores `sw.js` byte-for-byte before exiting, and checks that it did.
+
+| Assertion | Evidence |
+|---|---|
+| the page is controlled by the worker | `navigator.serviceWorker.controller` = `/sw.js` |
+| the card appears after a deploy | first seen **116 ms** after the check |
+| it stays long enough to read | present for **≥ 4,002 ms** |
+| no reload the guest did not ask for | `never` — this was **1,544 ms** before the fix |
+| it is really painted | hit-test at its own centre returns the card |
+| the pixels, measured | **366×344 at (12, 488)** in 390×844 · `rgb(255,255,255)` on `rgb(23,21,19)` · radius **14px** · `fixed` z1000 · buttons `UPDATE NOW` / `Later` · **4** changelog bullets |
+| **Later** defers it | card gone, page **not** reloaded, new worker **still waiting** |
+| a later visit offers it again | the card returns from `reg.waiting` |
+| **Update now** applies it | one reload, the new worker takes over, nothing left waiting |
+| the screenshots | `docs/evidence/service-worker-update-card.png` (+ `-detail`) |
+
+`npm run verify:sw` grew the matching rule so this cannot regress unnoticed — **install must not
+`skipWaiting`; the `SKIP_WAITING` message must** (17 cases, all passing). The two checks are a pair on
+purpose: the browser script proves the card is visible, the stub script proves *why* it can be.
+
 ### Deliberately not built
 
 **No Firebase in the manager app.** The portal already has `/admin/notifications` for broadcasts, and
