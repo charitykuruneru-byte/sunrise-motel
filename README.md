@@ -730,6 +730,35 @@ missing mailbox **never** breaks a booking. Templates in the same file:
 `publicBaseUrl()` decides which domain goes into links: `PUBLIC_APP_URL` → `NEXT_PUBLIC_APP_URL` →
 the request host — and it never emits `localhost` on Vercel, so guests never receive dead links.
 
+#### Which mailbox it sends from
+
+`.env` ships the Gmail recipe — the one setup that needs no domain of your own:
+
+```
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=gracekuruneru@gmail.com
+SMTP_PASS=<16-character Google App Password, display spaces REMOVED>
+SMTP_FROM="Sunrise Motel <gracekuruneru@gmail.com>"
+ADMIN_EMAIL=gracekuruneru@gmail.com
+```
+
+An App Password requires 2-Step Verification on that Google account, and SMTP AUTH **rejects** the
+`abcd efgh ijkl mnop` form Google shows you — paste the 16 characters with no spaces. `SMTP_FROM`
+must be the same address as `SMTP_USER` (or a verified alias in Gmail), otherwise Gmail rewrites
+the sender.
+
+Check it any time with `node scripts/verify-email-smtp.mjs`: it reads `.env`, prints the settings
+with the password masked, then sends four real emails through the app's own `src/lib/mail.ts` —
+plain `sendMail`, the guest template, an invoice **with a PDF attachment**, and the
+staff-credentials template. `--dry` checks the configuration without sending anything. In the
+portal the equivalent is **Admin → Send test email** (`POST /api/admin/email-test`), which mails
+the signed-in account's own address.
+
+Production needs the same values in Vercel → Project → Settings → Environment Variables; without
+them `sendMail()` honestly reports "Email is not configured" and no mail leaves the site.
+
 ### 10.2 WhatsApp
 
 There is **no WhatsApp API integration**. The system uses `wa.me` deep links with pre-written

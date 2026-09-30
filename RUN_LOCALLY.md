@@ -26,14 +26,24 @@ $env:PGPASSWORD='postgres'; $env:PAGER='cat'
 ```
 DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/sunrise_db
 ```
-Optional email (only for Admin → "email invoice" button):
+Email — Gmail SMTP (already configured in `.env`, so booking mail, invoices and staff
+invitations send):
 ```
-SMTP_HOST=...
+SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_SECURE=false
-SMTP_USER=...
-SMTP_PASS=...
-SMTP_FROM="Sunrise Motel <you@domain>"
+SMTP_USER=gracekuruneru@gmail.com
+SMTP_PASS=<16-char Google App Password, display spaces stripped>
+SMTP_FROM="Sunrise Motel <gracekuruneru@gmail.com>"
+ADMIN_EMAIL=gracekuruneru@gmail.com
+```
+Gmail gotchas: the App Password needs 2-Step Verification on the account and must be pasted
+**without** the `abcd efgh ijkl mnop` display spaces — SMTP AUTH rejects the spaced form.
+`SMTP_FROM` must be the same address as `SMTP_USER`, or Gmail rewrites the sender.
+
+Check it any time (sends four real emails through the app's own `src/lib/mail.ts`):
+```powershell
+node scripts/verify-email-smtp.mjs          # --dry = check the config, send nothing
 ```
 
 ## Install + migrate (done once)

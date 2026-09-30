@@ -68,31 +68,84 @@ export async function sendMail(opts: {
         "Email is not configured (set RESEND_API_KEY or SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM).",
     };
   }
-  const mod = (await import("nodemailer")) as unknown as {
-    default?: { createTransport: (...args: unknown[]) => { sendMail: (msg: unknown) => Promise<unknown> } };
-    createTransport: (...args: unknown[]) => { sendMail: (msg: unknown) => Promise<unknown> };
-  };
-  const nodemailer = mod.default ?? mod;
-  const transporter = nodemailer.createTransport({
-    host,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_SECURE === "true",
-    auth: { user, pass },
-  });
+  const transporter = await smtpTransport(host, user, pass);
   const from =
     process.env.SMTP_FROM ||
     (process.env.FROM_NAME && process.env.FROM_EMAIL
       ? `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`
       : `Sunrise Motel <${user}>`);
-  await transporter.sendMail({
-    from,
-    to: Array.isArray(opts.to) ? opts.to.join(", ") : opts.to,
-    subject: opts.subject,
-    html: opts.html,
-    text: opts.text,
-    attachments: opts.attachments,
-  });
+  try {
+    await sendWithRetry(transporter, {
+      from,
+      to: Array.isArray(opts.to) ? opts.to.join(", ") : opts.to,
+      subject: opts.subject,
+      html: opts.html,
+      text: opts.text,
+      attachments: opts.attachments,
+    });
+  } catch (error) {
+    // A delivery hiccup must never break a booking, an invoice email or a
+    // manager action — the failure comes back in the same { sent:false, reason }
+    // shape as an unconfigured mailbox, and every caller already shows `reason`.
+    const code = (error as { code?: string }).code ?? "";
+    const response = (error as { response?: string }).response ?? "";
+    return {
+      sent: false as const,
+      reason: `SMTP delivery failed${code ? ` (${code})` : ""}${response ? `: ${response}` : ""}. Check SMTP_USER / SMTP_PASS and the account's sending limits.`,
+    };
+  }
   return { sent: true as const };
+}
+
+type SmtpSender = { sendMail: (message: unknown) => Promise<unknown> };
+
+// One pooled SMTP session per process. A single booking sends the guest
+// confirmation AND the staff alert back to back, and Gmail resets the
+// connection when a fresh TLS session is opened for every message — which is
+// how an email that the app believed it sent can silently vanish. Pooling keeps
+// the burst on one connection; the retry covers a connection the server dropped
+// while it sat idle.
+let smtpTransportCache: { fingerprint: string; transport: SmtpSender } | null = null;
+
+const RETRYABLE_SMTP_CODES = new Set(["ECONNRESET", "ETIMEDOUT", "ESOCKET", "ECONNECTION", "EPIPE", "EAI_AGAIN"]);
+
+async function smtpTransport(host: string, user: string, pass: string): Promise<SmtpSender> {
+  const port = Number(process.env.SMTP_PORT || 587);
+  const secure = process.env.SMTP_SECURE === "true";
+  const fingerprint = `${host}|${port}|${secure}|${user}`;
+  if (smtpTransportCache && smtpTransportCache.fingerprint === fingerprint) return smtpTransportCache.transport;
+  const mod = (await import("nodemailer")) as unknown as {
+    default?: { createTransport: (...args: unknown[]) => SmtpSender };
+    createTransport: (...args: unknown[]) => SmtpSender;
+  };
+  const nodemailer = mod.default ?? mod;
+  const transport = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user, pass },
+    pool: true,
+    maxConnections: 1,
+    maxMessages: 100,
+    // Without these a dead SMTP server can hang a request until the platform kills it.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
+  });
+  smtpTransportCache = { fingerprint, transport };
+  return transport;
+}
+
+async function sendWithRetry(transport: SmtpSender, message: unknown) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await transport.sendMail(message);
+    } catch (error) {
+      const code = (error as { code?: string }).code ?? "";
+      if (attempt >= 2 || !RETRYABLE_SMTP_CODES.has(code)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 750));
+    }
+  }
 }
 
 export async function sendInvoiceEmail(to: string, subject: string, html: string, pdf: Uint8Array, filename: string) {
