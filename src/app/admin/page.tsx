@@ -698,6 +698,8 @@ export default function AdminPage() {
         <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}><Download size={15} /> Reports</button>
         <a className="admin-btn" href="/admin/notifications" style={{ textDecoration: "none" }}><Send size={15} /> App push</a>
         {canViewUsers && <a className="admin-btn" href="/admin/finance" style={{ textDecoration: "none" }}><CreditCard size={15} /> Finance &amp; night audit</a>}
+        {canViewUsers && <a className="admin-btn" href="/admin/calendar" style={{ textDecoration: "none" }}><Calendar size={15} /> Room calendar</a>}
+        {canViewUsers && <a className="admin-btn" href="/admin/housekeeping" style={{ textDecoration: "none" }}><BedDouble size={15} /> Housekeeping</a>}
       </nav>
 
       {/* ---------------- BOOKINGS ---------------- */}

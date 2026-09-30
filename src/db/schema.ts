@@ -599,6 +599,22 @@ export const expensesTable = pgTable("expenses", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+// DATED BLOCKS — a room that must not be sold for a window of nights: deep clean,
+// painting, a plumbing repair, or the owner holding a room. Kept separate from
+// `rooms.state`, which says what a room is doing *right now* and cannot express
+// "not next Tuesday". With this table empty, nothing in the system behaves differently.
+export const roomBlocksTable = pgTable("room_blocks", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  roomNumber: varchar("room_number", { length: 16 }).notNull(),
+  roomTypeId: varchar("room_type_id", { length: 64 }),
+  startDate: varchar("start_date", { length: 10 }).notNull(), // first blocked night
+  endDate: varchar("end_date", { length: 10 }).notNull(), // first night it is sellable again
+  reason: varchar("reason", { length: 24 }).notNull().default("maintenance"), // maintenance | hold | ooo | other
+  note: text("note"),
+  createdBy: varchar("created_by", { length: 160 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export type Room = typeof roomsTable.$inferSelect;
 export type Guest = typeof guestsTable.$inferSelect;
 export type GuestAccount = typeof guestAccountsTable.$inferSelect;

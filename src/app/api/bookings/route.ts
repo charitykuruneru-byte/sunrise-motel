@@ -6,6 +6,7 @@ import { logBookingEvent } from "@/lib/booking-events";
 import { clientIp, logAudit } from "@/lib/audit";
 import { buildInvoicePdf } from "@/lib/invoice-pdf";
 import { findOrCreateGuest } from "@/lib/hotel";
+import { blockedCountByRoomType } from "@/lib/room-blocks";
 import { adminAlertHtml, guestEmailHtml, sendInvoiceEmail, sendMail } from "@/lib/mail";
 import { bookingMath, calculateStayQuote, nextBookingNumber } from "@/lib/pricing";
 import { malawiShortDate, malawiYear, nowDate } from "@/lib/time";
@@ -125,7 +126,12 @@ export async function POST(request: Request) {
         .from(bookings)
         .where(and(eq(bookings.roomTypeId, roomTypeId), ne(bookings.status, "cancelled"), sql`${bookings.checkIn} < ${checkOut}`, sql`${bookings.checkOut} > ${checkIn}`));
 
-      const availableCount = roomRecord.totalInventory - overlapping.length;
+      // Dated blocks take rooms off sale as well as drawing them red on the calendar.
+      // With no blocks recorded this is 0 and the arithmetic is exactly as before.
+      const blockedCounts = await blockedCountByRoomType(checkIn, checkOut);
+      const blockedForType = blockedCounts[roomTypeId] ?? 0;
+
+      const availableCount = roomRecord.totalInventory - overlapping.length - blockedForType;
       if (availableCount <= 0) {
         return { soldOut: true as const, availableCount: 0 };
       }

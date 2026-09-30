@@ -161,9 +161,11 @@ by the night audit.
 
 # 5. Recommended order from here
 
-**Phase 2 (the day-to-day gaps that remain):** the 30-day room calendar with date blocking;
-a guest 360 page; the housekeeping Kanban board; `m_pesa` and `card` in the desk payment
-picker; CSV/PDF export of the night audit and expense book.
+**Phase 2 (the day-to-day gaps that remain):** the 30-day room calendar with date blocking
+(**done**, §63), a guest 360 page (**done**, §63), the housekeeping Kanban board (**done**,
+§63), `m_pesa` and `card` in the desk payment picker (**done**), CSV/print export of the
+night audit and expense book (**done**). Still outstanding from this phase: drag-and-drop on
+the board, and a guest-360 link from the desk's guest list.
 
 **Phase 3 (polish, visual only):** apply the premium card/table treatment across the older
 admin and desk screens — CSS and markup only, no data-fetching or state changes.

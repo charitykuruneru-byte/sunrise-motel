@@ -2914,3 +2914,55 @@ back with `guest_rows = 1`, `bookings = 2`, `distinct_guest_ids = 1`, each invoi
 disabled (settings backed up, blanked, restored) so no real message left the building, and the
 test bookings, invoices, events and guest row were then deleted.
 
+---
+
+## 63. Phase 2: calendar, blocks, housekeeping board, guest 360, exports ✅
+
+Everything here is additive. Prices did not move, the VAT stays inclusive, no existing
+screen changed behaviour, and with `room_blocks` empty the availability arithmetic is
+byte-identical to before.
+
+### The room calendar, and blocks that really block
+
+`/admin/calendar` draws 30 nights × every physical room. A cell is green (free), blue (a
+stay is assigned to that room), red (blocked) or yellow (needs attention today) — and the
+blue cells come from `bookings.assigned_room_id`, the room the desk actually assigned, so
+the grid never invents an assignment. Bookings with no room chosen yet are listed
+separately instead of being painted onto a row nobody picked.
+
+**Blocking is not decoration.** New table `room_blocks` (migration
+`0014_lame_firelord.sql`, one `CREATE TABLE`, no drops) records "this room is not sellable
+between these nights". `blockedCountByRoomType()` is subtracted in **both** places that
+decide what is for sale — `/api/bookings` (inside its transaction, next to the overbooking
+check) and `/api/availability` — using the same overlap rule as stays: a block that ends on
+your check-in day leaves that night sellable. Click a night to start a block; the release
+button puts the room back on sale.
+
+### The housekeeping board
+
+`/admin/housekeeping` sorts every room into Dirty · Cleaning · Clean · Inspecting ·
+Maintenance from two real sources: `rooms.state` and the open `service_tasks` rows. Moving
+a room writes through the same tables the desk reads, and marking a room clean closes the
+cleaning task that put it there — so the board cannot tell a different story from the desk.
+Every move is a button (not drag-and-drop), because the person using it is holding a phone.
+
+### Guest 360
+
+`/admin/guests/[id]` (reachable by guest id) shows one person: stays and lifetime figures,
+then tabs for Bookings, Invoices, Payments, POS orders, Audit trail and Notes. Bookings are
+matched by guest id **and** by email, so stays made before the one-profile rule are shown
+with a marker rather than hidden, and `balanceDue` is summed from unsettled invoices instead
+of booking totals — a part payment shows as a part payment.
+
+### Exports
+
+`/api/admin/reports?report=night-audit|expenses&format=csv` for Excel, and the same without
+`format` for a printable page (Save as PDF in the browser). Buttons sit on `/admin/finance`.
+
+### Honestly not done
+
+Drag-and-drop on the board (buttons instead); a guest-360 link from the desk's guest list —
+the page works by URL, the entry point is still to come; PDF *generation* for the finance
+reports (the print view covers it); and the Phase 3 premium restyle of the older screens,
+which is visual only and therefore deliberately separate from anything that moves money.
+

@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { bookings, roomTypesTable } from "@/db/schema";
 import { seedDatabaseIfEmpty } from "@/db/seed";
 import { and, ne, sql } from "drizzle-orm";
+import { blockedCountByRoomType } from "@/lib/room-blocks";
 
 export const dynamic = "force-dynamic";
 
@@ -31,13 +32,19 @@ export async function GET(request: Request) {
     const bookedCounts: Record<string, number> = {};
     for (const b of overlapping) bookedCounts[b.roomTypeId] = (bookedCounts[b.roomTypeId] || 0) + 1;
 
+    // Rooms held back by a dated block come off sale too (empty blocks table = no change).
+    const blockedCounts = await blockedCountByRoomType(checkIn, checkOut);
+
     const rooms = allRoomTypes.map((room) => {
       const booked = bookedCounts[room.id] || 0;
-      const available = Math.max(0, room.totalInventory - booked);
+      const blocked = blockedCounts[room.id] || 0;
+      const available = Math.max(0, room.totalInventory - booked - blocked);
       const isSoldOut = available <= 0;
       const statusText = isSoldOut
-        ? "Fully booked for these dates"
-        : booked === 0
+        ? blocked >= room.totalInventory
+          ? "Closed for maintenance for these dates"
+          : "Fully booked for these dates"
+        : booked === 0 && blocked === 0
           ? `All ${room.totalInventory} rooms available`
           : available === 1
             ? `Only 1 of ${room.totalInventory} rooms left`
@@ -55,6 +62,7 @@ export async function GET(request: Request) {
         taxRateBp: room.taxRateBp,
         totalInventory: room.totalInventory,
         bookedCount: booked,
+        blockedCount: blocked,
         availableCount: available,
         isSoldOut,
         statusText,

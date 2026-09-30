@@ -243,11 +243,13 @@ export default function DeskMoney({
               value={cash.channel}
               onChange={(e) => setCash({ ...cash, channel: e.target.value })}
             >
-              <option value="cash">cash</option>
-              <option value="bank">bank</option>
+              <option value="cash">Cash</option>
+              <option value="m_pesa">M-Pesa</option>
               <option value="airtel_money">Airtel Money</option>
               <option value="tnm_mpamba">TNM Mpamba</option>
-              <option value="other">other</option>
+              <option value="bank">Bank transfer</option>
+              <option value="card">Card</option>
+              <option value="other">Other</option>
             </select>
             <input
               className={`${INPUT} max-w-[170px]`}

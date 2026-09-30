@@ -183,6 +183,10 @@ export default function FinancePage() {
             {busy ? <Loader2 size={14} className="animate-spin" /> : <Calendar size={14} />} Run night audit
           </button>
         </div>
+        <div className="invoice-actions" style={{ marginBottom: 12 }}>
+          <a className="btn-action" href="/api/admin/reports?report=night-audit&format=csv">Night audit CSV (Excel)</a>
+          <a className="btn-action" href="/api/admin/reports?report=night-audit" target="_blank" rel="noreferrer">Night audit print / PDF</a>
+        </div>
         <div className="invoice-list">
           {history.map((row) => (
             <div className="invoice-row" key={row.id}>
@@ -201,6 +205,10 @@ export default function FinancePage() {
             <p>Total on record: {money(expenseTotal)}. The audit subtracts these — otherwise net profit is just revenue.</p>
           </div>
           <button className="admin-btn" type="button" disabled={busy} onClick={() => void load()}><RefreshCw size={14} /> Refresh</button>
+        </div>
+        <div className="invoice-actions" style={{ marginBottom: 12 }}>
+          <a className="btn-action" href="/api/admin/reports?report=expenses&format=csv">Expenses CSV (Excel)</a>
+          <a className="btn-action" href="/api/admin/reports?report=expenses" target="_blank" rel="noreferrer">Expenses print / PDF</a>
         </div>
         <form onSubmit={addExpense} className="form-fields-group">
           <div className="form-grid-2">
