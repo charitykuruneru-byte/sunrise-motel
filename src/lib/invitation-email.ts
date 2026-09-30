@@ -1,7 +1,6 @@
 import { sendMail } from "@/lib/mail";
 
 const GUEST_APK = "https://github.com/charitykuruneru-byte/sunrise-motel/releases/latest/download/SunriseMotel.apk";
-const MANAGER_APK = "https://github.com/charitykuruneru-byte/sunrise-motel/releases/latest/download/SunriseManager.apk";
 
 const escapeHtml = (value: string) =>
   value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
@@ -40,10 +39,9 @@ export async function sendInvitationEmail(opts: {
     ? `<p><strong>Your booking</strong><br>Booking ID: ${escapeHtml(opts.booking.reference)}<br>Room: ${escapeHtml(opts.booking.roomType)}<br>Check-in: ${escapeHtml(opts.booking.checkIn)}</p>`
     : "";
   const actionLabel = guest ? "Create My Guest Account" : "Set Up My Account";
-  const androidLink = guest ? GUEST_APK : MANAGER_APK;
   const download = guest
-    ? `<p><a href="${androidLink}">Download the Sunrise Motel Android app</a> · <a href="${base}/download#guest-app">All app options</a></p>`
-    : `<p><a href="${androidLink}">Download Sunrise Manager for Android</a></p>`;
+    ? `<p><a href="${GUEST_APK}">Download the Sunrise Motel Android app</a> · <a href="${base}/download#guest-app">All app options</a></p>`
+    : `<p><a href="${base}/admin">Open Sunrise Manager</a> · <a href="${base}/download#manager-app">Install on this device</a></p><p>On Android, open the Manager portal in Chrome, tap the menu, then choose Install app or Add to Home screen. Use your staff login.</p>`;
   const loginUrl = guest ? `${base}/app` : `${base}/admin/login`;
 
   const html = `
@@ -64,7 +62,7 @@ export async function sendInvitationEmail(opts: {
     </div>`;
   const text = guest
     ? `Hello ${opts.name},\n\nThank you for staying with us at Sunrise Motel. Create your guest account: ${setupUrl}\n\nDownload the Android app: ${GUEST_APK}\nAll app options: ${base}/download#guest-app\n${opts.booking ? `Booking: ${opts.booking.reference}; room: ${opts.booking.roomType}; check-in: ${opts.booking.checkIn}\n` : ""}\nThis link expires in 24 hours and can only be used once.`
-    : `Hello ${opts.name},\n\nYou have been invited as ${opts.role} by ${opts.invitedByName} (${opts.invitedByEmail}).\nSet up your account within 24 hours: ${setupUrl}\n\nLogin: ${loginUrl}\nManager app: ${MANAGER_APK}\n\nIf you did not expect this invitation, please ignore this email.`;
+    : `Hello ${opts.name},\n\nYou have been invited as ${opts.role} by ${opts.invitedByName} (${opts.invitedByEmail}).\nSet up your account within 24 hours: ${setupUrl}\n\nLogin: ${loginUrl}\nOpen Sunrise Manager: ${base}/admin\nInstall on Android: open the Manager portal in Chrome, tap the menu, then choose Install app or Add to Home screen.\n\nIf you did not expect this invitation, please ignore this email.`;
 
   return sendMail({ to: opts.email, subject, html, text });
 }

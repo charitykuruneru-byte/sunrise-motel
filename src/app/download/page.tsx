@@ -7,7 +7,6 @@ export const metadata: Metadata = {
 };
 
 const GUEST_APK = "https://github.com/charitykuruneru-byte/sunrise-motel/releases/latest/download/SunriseMotel.apk";
-const MANAGER_APK = "https://github.com/charitykuruneru-byte/sunrise-motel/releases/latest/download/SunriseManager.apk";
 
 export default function DownloadPage() {
   return (
@@ -33,17 +32,16 @@ export default function DownloadPage() {
           </p>
         </div>
 
-        <div className="extras-calculator-box" style={{ marginTop: 16 }}>
+        <div id="manager-app" className="extras-calculator-box" style={{ marginTop: 16 }}>
           <div className="extras-header"><strong>Sunrise Manager — manager app</strong></div>
           <p style={{ fontSize: 13, color: "var(--muted)" }}>
-            The portal on the home screen: arrivals, room map, orders, guest issues, payments and folios. It asks for
-            the same sign-in as the portal, and it installs beside the guest app — its own icon, its own updates.
+            Install the staff portal from your browser. It opens as Sunrise Manager and uses the same staff sign-in.
           </p>
-          <a href={MANAGER_APK} className="btn-submit-booking-request" style={{ marginTop: 14, textDecoration: "none" }}>
-            Download SunriseManager.apk (v1.0)
+          <a href="/admin" className="btn-submit-booking-request" style={{ marginTop: 14, textDecoration: "none" }}>
+            Open Sunrise Manager
           </a>
           <p style={{ marginTop: 10, fontSize: 12, color: "var(--muted)" }}>
-            Package com.sunrisemotel.admin · version 1.0 · for staff. Only install it if you have a staff login.
+            Android Chrome: open the portal, tap ⋮, then choose Install app or Add to Home screen. iPhone Safari: tap Share, then Add to Home Screen.
           </p>
         </div>
 
@@ -52,9 +50,9 @@ export default function DownloadPage() {
         </p>
 
         <ol style={{ marginTop: 28, display: "grid", gap: 14, fontSize: 14, lineHeight: 1.6 }}>
-          <li><strong>1. Download the APK</strong> — tap the button above on your Android phone.</li>
-          <li><strong>2. Allow unknown sources</strong> — when Android asks, tap Settings → allow your browser to install apps, then go back.</li>
-          <li><strong>3. Install & open</strong> — tap Install, then Open. The app loads https://sunrise-motel.vercel.app and keeps you signed in.</li>
+          <li><strong>1. Guest Android app</strong> — download the APK above, allow your browser to install apps if prompted, then tap Install.</li>
+          <li><strong>2. Sunrise Manager</strong> — open the portal above in Android Chrome and choose Install app from the browser menu.</li>
+          <li><strong>3. iPhone or iPad</strong> — open either app option in Safari, tap Share, then Add to Home Screen.</li>
         </ol>
 
         <div className="extras-calculator-box" style={{ marginTop: 24 }}>
@@ -67,8 +65,8 @@ export default function DownloadPage() {
         </div>
 
         <p style={{ marginTop: 20, fontSize: 12, color: "var(--muted)" }}>
-          Both APKs are built from the open source repo and attached to each release. The apps ask for Internet access
-          only: no location, no camera, no contacts. Photos are picked through the system file chooser.
+          The guest APK is attached to the latest release. Sunrise Manager installs from its browser-based portal and
+          asks staff to sign in. Photos are picked through the system file chooser.
         </p>
       </main>
     </div>

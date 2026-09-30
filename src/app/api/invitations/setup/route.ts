@@ -152,14 +152,19 @@ export async function POST(request: Request) {
     const { invitation, accountId } = created;
     const guest = invitation.accountType === "guest";
     const loginUrl = guest ? `${base}/app` : `${base}/admin/login`;
+    const appLink = guest ? "https://github.com/charitykuruneru-byte/sunrise-motel/releases/latest/download/SunriseMotel.apk" : `${base}/admin`;
+    const appLabel = guest ? "Download the Sunrise Motel Android app" : "Open Sunrise Manager";
+    const appInstallNote = guest
+      ? "On Android, open the downloaded APK, allow your browser to install apps if prompted, then tap Install."
+      : "On Android, open Sunrise Manager in Chrome, tap the menu, then choose Install app or Add to Home screen.";
     const escapedName = name.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
     const loginEmail = invitation.email.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
     const role = invitation.role.replaceAll("_", " ");
     const delivery = await notifyByEmail({
       to: invitation.email,
       subject: "Your Sunrise Motel Account is Ready",
-      html: `<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;color:#171513"><div style="background:#171513;padding:22px;text-align:center"><img src="${base}/images/sunrise-logo.svg" alt="Sunrise Motel" width="52" height="52"></div><div style="padding:26px"><p>Welcome ${escapedName}!</p><p>Your account as <strong>${role}</strong> is now active.</p><p>Email: <strong>${loginEmail}</strong></p><p><a href="${loginUrl}" style="display:inline-block;background:#f28c18;color:#171513;font-weight:bold;text-decoration:none;padding:12px 18px;border-radius:6px">Login Now</a></p><p>For security, this account setup link is now disabled.</p><p>Regards,<br>Sunrise Motel Team</p></div></div>`,
-      text: `Welcome ${name}! Your account as ${role} is active. Email: ${invitation.email}. Login: ${loginUrl}. This setup link is now disabled.`,
+      html: `<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;color:#171513"><div style="background:#171513;padding:22px;text-align:center"><img src="${base}/images/sunrise-logo.svg" alt="Sunrise Motel" width="52" height="52"></div><div style="padding:26px"><p>Welcome ${escapedName}!</p><p>Your account as <strong>${role}</strong> is now active.</p><p>Email: <strong>${loginEmail}</strong></p><p><a href="${loginUrl}" style="display:inline-block;background:#f28c18;color:#171513;font-weight:bold;text-decoration:none;padding:12px 18px;border-radius:6px">Login Now</a></p><p><a href="${appLink}">${appLabel}</a></p><p>${appInstallNote}</p><p>For security, this account setup link is now disabled.</p><p>Regards,<br>Sunrise Motel Team</p></div></div>`,
+      text: `Welcome ${name}! Your account as ${role} is active. Email: ${invitation.email}. Login: ${loginUrl}. ${appLabel}: ${appLink}. ${appInstallNote} This setup link is now disabled.`,
       template: "account_ready",
       guestId: invitation.guestId,
     });
