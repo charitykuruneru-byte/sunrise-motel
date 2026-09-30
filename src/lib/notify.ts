@@ -41,7 +41,7 @@ export async function logNotification(input: {
   }
 }
 
-/** Send a guest email and record the attempt either way. */
+/** Send an email and record the attempt either way. */
 export async function notifyByEmail(input: {
   to: string | null | undefined;
   subject: string;
@@ -82,6 +82,9 @@ export async function notifyByEmail(input: {
       subject: input.subject,
       body: input.logBody ?? input.text ?? null,
       status: result.sent ? "sent" : "skipped",
+      // The provider's own id when it gave us one — the receipt to quote if the
+      // message never arrives.
+      providerRef: result.sent ? result.messageId : null,
       error: result.sent ? null : result.reason,
       guestId: input.guestId,
       bookingId: input.bookingId,

@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Clock3, Loader2, Mail, Plus, RefreshCw, Shield, Trash2, UserRoundX, Users, X } from "lucide-react";
+import { Check, Clock3, Copy, Loader2, Mail, Plus, RefreshCw, Shield, Trash2, UserRoundX, Users, X } from "lucide-react";
 
 type UserRow = { id: string; name: string; email?: string; role: string; invitedBy?: string | null; status: string; lastLogin?: string | null; createdAt?: string };
 type InviteRow = { id: string; email: string; name: string; role: string; accountType: string; invitedByName: string; status: string; expiresAt: string; deliveryError: string | null; updatedAt: string | null };
-const ROLES = ["super_admin", "motel_manager", "restaurant_manager", "staff"];
-const roleName = (role: string) => ({ super_admin: "Super Admin", admin: "Super Admin", motel_manager: "Motel Manager", restaurant_manager: "Restaurant Manager", staff: "Front Desk Staff" }[role] ?? role);
+const ROLES = ["super_admin", "admin", "motel_manager", "restaurant_manager", "staff"];
+const roleName = (role: string) => ({ super_admin: "Super Admin", admin: "Administrator", motel_manager: "Motel Manager", restaurant_manager: "Restaurant Manager", staff: "Front Desk Staff" }[role] ?? role);
 
 export default function UserManagement() {
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -55,6 +55,70 @@ export default function UserManagement() {
     setRole("staff");
   };
 
+  // The brief, as one button: invite every address on file. The list itself lives on
+  // the server (src/lib/staff-invite.ts → DEFAULT_ADMIN_INVITES), so the three
+  // addresses are not typed out again here where they could drift.
+  const inviteAll = async () => {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/invite/bulk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+      const data = (await response.json()) as {
+        error?: string;
+        sent?: number;
+        failed?: number;
+        results?: { email: string; status: string; emailSent: boolean; reason?: string | null }[];
+      };
+      if (!response.ok) throw new Error(data.error ?? "Could not send the invitations.");
+      const detail = (data.results ?? [])
+        .map((row) => `${row.email} — ${row.status}${row.emailSent ? " (email sent)" : row.reason ? ` (${row.reason})` : ""}`)
+        .join(" · ");
+      setNotice(`${data.sent ?? 0} handled, ${data.failed ?? 0} failed. ${detail}`);
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not send the invitations.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // A fresh single-use link WITHOUT sending another email — for the days a mailbox
+  // misbehaves and the manager would rather hand the link over themselves. The
+  // previous link stops working, which is said out loud rather than discovered.
+  const copyLink = async (invite: InviteRow) => {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/invitations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "resend", id: invite.id, notify: false }),
+      });
+      const data = (await response.json()) as { error?: string; inviteLink?: string };
+      if (!response.ok) throw new Error(data.error ?? "Could not create a fresh link.");
+      const link = data.inviteLink;
+      if (!link) {
+        setNotice("A fresh link was created but the server did not return it — press Resend instead.");
+      } else {
+        let copied = false;
+        try {
+          await navigator.clipboard.writeText(link);
+          copied = true;
+        } catch {
+          copied = false;
+        }
+        setNotice(copied ? `Fresh link for ${invite.email} copied. The previous link no longer works.` : `Fresh link for ${invite.email} (previous one no longer works): ${link}`);
+      }
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not create a fresh link.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const revoke = async (invite: InviteRow) => {
     if (!window.confirm(`Revoke the invitation for ${invite.email}?`)) return;
     setBusy(true);
@@ -93,7 +157,7 @@ export default function UserManagement() {
 
       {canManage ? (
         <section className="admin-content-section">
-          <div className="section-toolbar"><div className="toolbar-info"><h2>Invite a user</h2><p>Setup links expire after 24 hours and can only be used once.</p></div></div>
+          <div className="section-toolbar"><div className="toolbar-info"><h2>Invite a user</h2><p>Setup links expire after 7 days and can only be used once.</p></div><button className="admin-btn" type="button" disabled={busy} onClick={() => void inviteAll()}><Mail size={14} /> Invite all 3 default emails</button></div>
           <form className="admin-modal-form admin-inline-form" onSubmit={invite}>
             <div className="form-grid-2">
               <label><span>Full name</span><input required minLength={2} maxLength={160} value={name} onChange={(event) => setName(event.target.value)} /></label>
@@ -113,7 +177,7 @@ export default function UserManagement() {
               <div><strong>{user.name}</strong><small>{user.email ?? "Email visible to Super Admin only"}{user.invitedBy ? ` · invited by ${user.invitedBy}` : ""}</small></div>
               <div><strong>{roleName(user.role)}</strong><small>{user.status}{user.lastLogin ? ` · last login ${new Date(user.lastLogin).toLocaleString()}` : " · never signed in"}</small></div>
               {canManage ? <div className="invoice-actions">
-                <select aria-label={`Change role for ${user.name}`} value={user.role === "admin" ? "super_admin" : user.role} disabled={busy || user.status === "deleted"} onChange={(event) => void post("PATCH", { action: "role", id: user.id, role: event.target.value })}>{ROLES.map((item) => <option value={item} key={item}>{roleName(item)}</option>)}</select>
+                <select aria-label={`Change role for ${user.name}`} value={user.role} disabled={busy || user.status === "deleted"} onChange={(event) => void post("PATCH", { action: "role", id: user.id, role: event.target.value })}>{ROLES.map((item) => <option value={item} key={item}>{roleName(item)}</option>)}</select>
                 {user.status === "active" ? <button className="btn-action" type="button" disabled={busy} onClick={() => userAction(user, "deactivate")}><UserRoundX size={14} /> Deactivate</button> : user.status === "deactivated" ? <button className="btn-action" type="button" disabled={busy} onClick={() => userAction(user, "activate")}><Check size={14} /> Activate</button> : null}
                 {user.status !== "deleted" ? <button className="btn-action btn-danger-text" type="button" disabled={busy} onClick={() => userAction(user, "delete")}><Trash2 size={14} /> Delete</button> : null}
               </div> : null}
@@ -132,6 +196,7 @@ export default function UserManagement() {
               <div><strong>{roleName(invite.role)}</strong><small><Clock3 size={12} /> {invite.status} · expires {new Date(invite.expiresAt).toLocaleString()}</small>{invite.deliveryError ? <small>{invite.deliveryError}</small> : null}{invite.deliveryError && invite.updatedAt ? <small>Last attempt {new Date(invite.updatedAt).toLocaleString()} — press Retry send to deliver it now.</small> : null}</div>
               <div className="invoice-actions">
                 {invite.status !== "accepted" && invite.status !== "revoked" ? <button className="btn-action" type="button" disabled={busy} onClick={() => void post("PATCH", { action: "resend", id: invite.id })}><RefreshCw size={14} /> {invite.status === "failed" ? "Retry send" : "Resend"}</button> : null}
+                {invite.status !== "accepted" && invite.status !== "revoked" ? <button className="btn-action" type="button" disabled={busy} onClick={() => void copyLink(invite)}><Copy size={14} /> Copy link</button> : null}
                 {invite.status !== "accepted" && invite.status !== "revoked" ? <button className="btn-action btn-danger-text" type="button" disabled={busy} onClick={() => void revoke(invite)}><X size={14} /> Revoke</button> : null}
               </div>
             </div>

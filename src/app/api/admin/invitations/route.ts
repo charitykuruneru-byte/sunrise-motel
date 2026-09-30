@@ -1,17 +1,18 @@
-import { randomBytes, randomUUID, createHash } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { auditLogTable, guestAccountsTable, invitationsTable, staffTable } from "@/db/schema";
+import { auditLogTable, invitationsTable, staffTable } from "@/db/schema";
 import { clientIp, logAudit } from "@/lib/audit";
-import { sendInvitationEmail } from "@/lib/invitation-email";
+import { INVITEE_TTL_HOURS, sendInvitationEmail } from "@/lib/invitation-email";
+import { INVITABLE_ROLES, createStaffInvitation, hashInviteToken, setupLinkFor, type InvitableRole } from "@/lib/staff-invite";
 import { isManagerRole, isSuperAdminRole, readSession } from "@/lib/staff-auth";
 import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
-const INVITABLE_ROLES = ["super_admin", "motel_manager", "restaurant_manager", "staff"] as const;
-type InvitableRole = (typeof INVITABLE_ROLES)[number];
+// The role list lives in src/lib/staff-invite.ts (INVITABLE_ROLES) and includes
+// "admin" — the role the motel actually asked for, which this file used to refuse.
 
 function fail(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
@@ -119,78 +120,36 @@ export async function POST(request: Request) {
   const user = auth.user;
   try {
     const body = (await request.json()) as { name?: string; email?: string; role?: string };
-    const name = (body.name ?? "").trim();
-    const email = (body.email ?? "").trim().toLowerCase();
-    const role = (body.role ?? "staff").trim() as InvitableRole;
-    if (name.length < 2 || name.length > 160) return fail("Enter a name between 2 and 160 characters.", 400);
-    if (email.length > 180 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail("Enter a valid email address.", 400);
-    if (!INVITABLE_ROLES.includes(role)) return fail("Choose a valid staff role.", 400);
-    if (!(await checkInviteLimit(user.id))) return fail("Invite limit reached. Try again in an hour.", 429);
-
-    const [existingStaff] = await db
-      .select({ id: staffTable.id, isDeleted: staffTable.isDeleted })
-      .from(staffTable)
-      .where(sql`lower(${staffTable.email}) = ${email}`)
-      .limit(1);
-    const [existingGuest] = await db
-      .select({ id: guestAccountsTable.id })
-      .from(guestAccountsTable)
-      .where(sql`lower(${guestAccountsTable.loginEmail}) = ${email}`)
-      .limit(1);
-    if ((existingStaff && !existingStaff.isDeleted) || existingGuest) return fail("This email already has an account. Ask the Super Admin to manage it.", 409);
-
-    const [pending] = await db
-      .select({ id: invitationsTable.id })
-      .from(invitationsTable)
-      .where(and(sql`lower(${invitationsTable.email}) = ${email}`, sql`${invitationsTable.status} in ('pending', 'failed')`))
-      .limit(1);
-    if (pending) return fail("An invitation already exists for this email. Resend it from Users.", 409);
-
-    const token = randomBytes(32).toString("hex");
-    const [invitation] = await db
-      .insert(invitationsTable)
-      .values({
-        id: randomUUID(),
-        email,
-        name,
-        role,
-        accountType: "staff",
-        invitedById: user.id,
-        invitedByName: user.name,
-        invitedByEmail: user.email,
-        invitedByRole: user.role,
-        tokenHash: createHash("sha256").update(token).digest("hex"),
-        status: "pending",
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      })
-      .returning();
-    if (!invitation) return fail("Invitation could not be created.", 500);
-
-    const delivery = await emailInvitation(request, invitation, token);
-    await db
-      .update(invitationsTable)
-      .set({ status: delivery.sent ? "pending" : "failed", deliveryError: delivery.sent ? null : delivery.reason ?? "Email failed", updatedAt: new Date() })
-      .where(eq(invitationsTable.id, invitation.id));
-    await audit(request, user, {
-      action: delivery.sent ? "INVITE_SENT" : "EMAIL_FAILED",
-      invitationId: invitation.id,
-      targetEmail: email,
-      details: { role, accountType: "staff", invitedBy: user.id, emailSent: delivery.sent, reason: delivery.sent ? undefined : delivery.reason },
+    const result = await createStaffInvitation({
+      request,
+      actor: user,
+      email: body.email ?? "",
+      role: body.role ?? "staff",
+      name: body.name,
     });
-    revalidateLiveContent();
-    return NextResponse.json({ success: true, invitationId: invitation.id, emailSent: delivery.sent, reason: delivery.sent ? null : delivery.reason }, { status: 201 });
+    if (result.outcome === "invalid") return fail(result.reason, 400);
+    if (result.outcome === "rate_limited") return fail(result.reason, 429);
+    if (result.outcome === "already_invited") return fail("An invitation already exists for this email. Resend it from Users.", 409);
+    if (result.outcome === "already_has_account") return fail("This email already has an account. Ask the Super Admin to manage it.", 409);
+    // Same reply shape as before, plus the setup link — so the portal can offer
+    // "Copy link" when a mailbox is having a bad day.
+    return NextResponse.json(
+      { success: true, invitationId: result.invitationId, emailSent: result.emailSent, reason: result.reason, inviteLink: result.inviteLink },
+      { status: 201 },
+    );
   } catch (error) {
     console.error("Staff invitation failed", error);
     return fail("Could not create the invitation.", 500);
   }
 }
 
+
 export async function PATCH(request: Request) {
   const auth = await superAdmin(request);
   if (auth.error) return auth.error;
   const user = auth.user;
   try {
-    const body = (await request.json()) as { action?: string; id?: string; role?: string };
+    const body = (await request.json()) as { action?: string; id?: string; role?: string; notify?: boolean };
     if (!body.id) return fail("An id is required.", 400);
 
     if (body.action === "resend") {
@@ -198,17 +157,21 @@ export async function PATCH(request: Request) {
       if (!invitation || invitation.status === "accepted" || invitation.status === "revoked") return fail("This invitation cannot be resent.", 404);
       if (!(await checkInviteLimit(user.id))) return fail("Invite limit reached. Try again in an hour.", 429);
       const token = randomBytes(32).toString("hex");
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const expiresAt = new Date(Date.now() + INVITEE_TTL_HOURS * 60 * 60 * 1000);
       const [refreshed] = await db
         .update(invitationsTable)
-        .set({ tokenHash: createHash("sha256").update(token).digest("hex"), status: "pending", expiresAt, deliveryError: null, updatedAt: new Date() })
+        .set({ tokenHash: hashInviteToken(token), status: "pending", expiresAt, deliveryError: null, updatedAt: new Date() })
         .where(eq(invitationsTable.id, invitation.id))
         .returning();
-      const delivery = await emailInvitation(request, refreshed!, token);
-      await db.update(invitationsTable).set({ status: delivery.sent ? "pending" : "failed", deliveryError: delivery.sent ? null : delivery.reason ?? "Email failed", updatedAt: new Date() }).where(eq(invitationsTable.id, invitation.id));
-      await audit(request, user, { action: delivery.sent ? "INVITE_RESENT" : "EMAIL_FAILED", invitationId: invitation.id, targetEmail: invitation.email, details: { role: invitation.role, emailSent: delivery.sent, reason: delivery.sent ? undefined : delivery.reason } });
+      // `notify: false` re-issues the link WITHOUT emailing it — the portal's "Copy
+      // link" uses that when a mailbox is refusing mail and the manager wants to
+      // hand the link over another way. A fresh link invalidates the previous one.
+      const delivery = body.notify === false ? ({ sent: false as const, reason: "Not emailed — copy the link and send it yourself." }) : await emailInvitation(request, refreshed!, token);
+      const linkIsLive = delivery.sent || body.notify === false;
+      await db.update(invitationsTable).set({ status: linkIsLive ? "pending" : "failed", deliveryError: linkIsLive ? null : delivery.reason ?? "Email failed", updatedAt: new Date() }).where(eq(invitationsTable.id, invitation.id));
+      await audit(request, user, { action: linkIsLive ? "INVITE_RESENT" : "EMAIL_FAILED", invitationId: invitation.id, targetEmail: invitation.email, details: { role: invitation.role, emailSent: delivery.sent, notified: body.notify !== false, reason: delivery.sent ? undefined : delivery.reason } });
       revalidateLiveContent();
-      return NextResponse.json({ success: true, emailSent: delivery.sent, reason: delivery.sent ? null : delivery.reason });
+      return NextResponse.json({ success: true, emailSent: delivery.sent, reason: delivery.sent ? null : delivery.reason, inviteLink: setupLinkFor(request, token) });
     }
 
     const [target] = await db.select().from(staffTable).where(eq(staffTable.id, body.id)).limit(1);

@@ -2785,3 +2785,46 @@ cron, not an event: it fires at 16:00 local, not the instant a cancellation arri
 `DIGEST_LAST_SENT_ON` / `DIGEST_LAST_COUNT` rows to reset their memory, or remove the `crons` entry
 from `vercel.json` to stop the daily digest entirely.
 
+
+---
+
+## 60. Inviting administrators ✅
+
+Three addresses had to become administrators and receive an invitation with a link to set up their own
+account. The invitation machinery already existed, so this section maps the brief onto it **instead of
+building a second one** — two parallel tables would have meant two answers to "is this person invited?".
+
+| The brief asked for | Where it already lives | Why not a new one |
+| --- | --- | --- |
+| `admin_invites` table | **`invitations`** (+ `staff`) | Already carries `tokenHash`, `status`, `expiresAt`, `deliveryError` — and hashed tokens, so a database dump cannot be used to take over an account |
+| `users` columns (`passwordHash`, `role`, `isActive`) | **`staff`** | Same three columns, plus `staffCode`, soft deletes and the audit links |
+| `POST /api/admin/invite` | `/api/admin/invite` (added) + `/api/admin/invitations` (existing) | Thin shells over `src/lib/staff-invite.ts` — one implementation, two names |
+| `POST /api/admin/invite/bulk` | `/api/admin/invite/bulk` (added) | A short loop plus a per-address report |
+| `GET/POST /api/admin/setup` | `/api/admin/setup` → re-exports `/api/invitations/setup` | One token check, one account-creation path |
+| `/admin/setup?token=…` page | `/admin/setup` → redirects to `/setup-account` | The real form is shared with guest invitations and is the URL in the email |
+| `notification_log(to, subject, status, messageId)` | Now written for **every** invitation email | It was the one gap: invitations emailed through `sendMail` and logged nothing, so a failed invite was invisible in the database |
+
+**Roles.** `INVITABLE_ROLES` now includes **`admin`**. `src/lib/staff-auth.ts` has always treated
+`admin` as a Super Admin and the staff table already held such rows, yet the portal could neither
+invite nor promote anybody to it — so the one role the motel asked for was the one the form refused.
+The portal's role dropdown offers it as *Administrator*, and the "role" select no longer rewrites a
+stored `admin` into `super_admin` while displaying it.
+
+**The three addresses** live in one place (`DEFAULT_ADMIN_INVITES` in `src/lib/staff-invite.ts`):
+`sunrisemotelllw@gmail.com` as **Super Admin**, `evone.azraa@yahoo.com` and `cchiwale25@gmail.com` as
+**Admin**. The portal button *Invite all 3 default emails* asks the server for that list rather than
+repeating it in the component, and reports each address's own outcome.
+
+**One of them already had an account** — which is why the endpoint does not simply refuse. For an
+address that already has an active staff account the role is set and a *role granted* email is sent
+that says what is true: your existing password still works; if you have forgotten it, ask a Super Admin
+to set a new one. Sending a "set up your account" link to somebody who already has a password is how a
+person ends up with two of them and no idea which works.
+
+**Expiry is one constant.** `INVITEE_TTL_DAYS = 7` in `src/lib/invitation-email.ts` feeds both the row
+and the sentence in the email; before this they were two hard-coded literals that happened to agree.
+
+**Honest limits.** An address that already has a *guest* account is still skipped (its owner is told
+why); "Copy link" re-issues the token, so the previously emailed link stops working — the portal says
+so at the moment you press it; and nothing here proves an email reached an inbox, only that the mail
+server accepted it with a provider reference recorded in `notification_log`.

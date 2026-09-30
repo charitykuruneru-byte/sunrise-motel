@@ -72,7 +72,9 @@ export async function sendMail(opts: {
       }),
     });
     if (!response.ok) return { sent: false as const, reason: `Resend rejected the email (HTTP ${response.status}). Check the API key, sender domain and recipient.` };
-    return { sent: true as const };
+    // Resend's own id — the receipt a human can quote when chasing a missing email.
+    const receipt = (await response.json().catch(() => ({}))) as { id?: string };
+    return { sent: true as const, messageId: receipt.id ?? null };
   }
 
   const host = config.SMTP_HOST;
@@ -98,14 +100,15 @@ export async function sendMail(opts: {
       ? `${config.FROM_NAME} <${config.FROM_EMAIL}>`
       : `Sunrise Motel <${user}>`);
   try {
-    await sendWithRetry(transporter, {
+    const info = (await sendWithRetry(transporter, {
       from,
       to: Array.isArray(opts.to) ? opts.to.join(", ") : opts.to,
       subject: opts.subject,
       html: opts.html,
       text: opts.text,
       attachments: opts.attachments,
-    });
+    })) as { messageId?: string } | undefined;
+    return { sent: true as const, messageId: info?.messageId ?? null };
   } catch (error) {
     // A delivery hiccup must never break a booking, an invoice email or a
     // manager action — the failure comes back in the same { sent:false, reason }
@@ -117,7 +120,6 @@ export async function sendMail(opts: {
       reason: `SMTP delivery failed${code ? ` (${code})` : ""}${response ? `: ${response}` : ""}. Check SMTP_USER / SMTP_PASS and the account's sending limits.`,
     };
   }
-  return { sent: true as const };
 }
 
 type SmtpSender = { sendMail: (message: unknown) => Promise<unknown> };
