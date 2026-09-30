@@ -76,7 +76,44 @@ jobs:
             echo "::error::KEYSTORE_BASE64 secret is missing. Generate once locally (see SunriseMotelApp/README.md), then: base64 -w0 SunriseMotelApp/sunrise-motel-release.jks, and save as repo secret KEYSTORE_BASE64."
             exit 1
           fi
-          echo "$KEYSTORE_BASE64" | base64 -d > SunriseMotelApp/sunrise-motel-release.jks
+          # Print the SHAPE of the value, never its contents — length is all we
+          # need to debug a bad paste without leaking the key into a public log.
+          echo "KEYSTORE_BASE64: ${#KEYSTORE_BASE64} characters"
+          # Accept whatever tool produced the value: `base64 -w0` output, a wrapped
+          # or indented paste, `certutil -encode` PEM armour, or a stray pair of
+          # quotes from a careless copy. Never print the value itself.
+          CLEAN=$(printf '%s' "$KEYSTORE_BASE64" | sed -E '/^[[:space:]]*-{5}(BEGIN|END)/d' | tr -d '[:space:]' | tr -d "\"'")
+          if printf '%s' "$CLEAN" | grep -q '[^A-Za-z0-9+/=]'; then
+            echo "::error::KEYSTORE_BASE64 is not base64 — it holds characters outside A-Za-z0-9+/= (a command line, a file path, JSON, or a half-copied value). Paste the single line printed by: base64 -w0 SunriseMotelApp/sunrise-motel-release.jks"
+            exit 1
+          fi
+          # A padding-stripped paste (a common casualty of copy/paste) is still
+          # the same keystore: put the '=' back rather than refusing it.
+          case $(( ${#CLEAN} % 4 )) in
+            2) CLEAN="${CLEAN}==" ;;
+            3) CLEAN="${CLEAN}=" ;;
+          esac
+          if ! DECODE_ERR=$(printf '%s' "$CLEAN" | base64 -d 2>&1 > SunriseMotelApp/sunrise-motel-release.jks); then
+            echo "::error::KEYSTORE_BASE64 did not decode (${#CLEAN} characters): $DECODE_ERR — the paste is incomplete, so re-copy the whole line."
+            exit 1
+          fi
+          # A keystore is a binary container: JKS starts FE ED FE ED, PKCS#12 (what
+          # keytool writes by default) starts with a DER SEQUENCE, 30 8x.
+          MAGIC=$(head -c 2 SunriseMotelApp/sunrise-motel-release.jks | od -An -tx1 | tr -d ' \n')
+          case "$MAGIC" in
+            feed|30*) ;;
+            *) echo "::error::KEYSTORE_BASE64 decoded to something that is not a keystore (magic $MAGIC). It must be the .jks file itself, base64-encoded — not a certificate, a password or JSON."
+               exit 1;;
+          esac
+          SIZE=$(wc -c < SunriseMotelApp/sunrise-motel-release.jks)
+          echo "Restored $SIZE bytes (magic $MAGIC)"
+          # A truncated paste decodes happily as long as it ends on a base64 group
+          # boundary, so the only cheap proof of completeness is size: a keystore
+          # holding one key plus its certificate is always well over 512 bytes.
+          if [ "$SIZE" -lt 512 ]; then
+            echo "::error::KEYSTORE_BASE64 decoded to only $SIZE bytes — far too small for a keystore, so the paste is truncated. Re-copy the whole line."
+            exit 1
+          fi
 
       # Prove the restored keystore really is the app identity BEFORE burning a
       # Gradle build on a truncated base64 paste. A wrong/rotated keystore would
