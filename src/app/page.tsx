@@ -63,6 +63,8 @@ import { HERO_IMAGE, HERO_VIDEO } from "@/lib/media-catalog";
 // request on a prepaid bundle is not — and Georgia is the fallback it assumes.
 import "./home-premium.css";
 
+export const dynamic = "force-dynamic";
+
 type RoomData = {
   id: string;
   name: string;

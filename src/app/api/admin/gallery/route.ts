@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { galleryImagesTable } from "@/db/schema";
@@ -58,6 +59,12 @@ export async function POST(request: Request) {
       actor: "manager", ip: clientIp(request), metadata: { title: newImg.title, category: newImg.category, imageUrl: newImg.imageUrl },
     });
 
+    revalidatePath("/");
+    revalidatePath("/stay");
+    revalidatePath("/gallery");
+    revalidatePath("/admin");
+    revalidatePath("/desk");
+
     return NextResponse.json({ image: newImg }, { status: 201 });
   } catch (error) {
     console.error("Failed to add image:", error);
@@ -82,6 +89,11 @@ export async function DELETE(request: Request) {
       action: "gallery.image_removed", entity: "gallery", entityId: id,
       summary: `Gallery image removed (id ${id}).`, actor: "manager", ip: clientIp(request),
     });
+    revalidatePath("/");
+    revalidatePath("/stay");
+    revalidatePath("/gallery");
+    revalidatePath("/admin");
+    revalidatePath("/desk");
     return NextResponse.json({ success: true, message: "Image removed from gallery." });
   } catch (error) {
     console.error("Failed to delete image:", error);

@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import ImageUploader from "@/components/ImageUploader";
 import { SunriseLogo } from "@/components/sunrise-logo";
 import { formatMalawi } from "@/lib/time";
@@ -111,6 +112,7 @@ const EVENT_LABEL: Record<string, string> = {
 };
 
 export default function AdminPage() {
+  const router = useRouter();
   const [tab, setTab] = useState<"bookings" | "invoices" | "gallery" | "posts" | "audit" | "staff" | "rooms" | "reports">("bookings");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState("");
@@ -430,6 +432,7 @@ export default function AdminPage() {
       setImgUrl("");
       setImgAlt("");
       setImgCaption("");
+      router.refresh();
       notify("Picture added to the gallery");
     } else notify(data.error || "Could not add picture");
   };
@@ -437,7 +440,10 @@ export default function AdminPage() {
   const removeImage = async (id: string) => {
     if (!confirm("Remove this picture from the public gallery?")) return;
     const res = await fetch(`/api/admin/gallery?id=${id}`, { method: "DELETE" });
-    if (res.ok) setGallery((prev) => prev.filter((g) => g.id !== id));
+    if (res.ok) {
+      setGallery((prev) => prev.filter((g) => g.id !== id));
+      router.refresh();
+    }
   };
 
   const addPost = async (e: FormEvent) => {
@@ -470,19 +476,26 @@ export default function AdminPage() {
         notify("Post published");
       }
       setPost({ title: "", category: "Event", day: "SAT", date: "26", time: "12:00 — 20:00", detail: "", priceTag: "", imageUrl: "" });
+      router.refresh();
     } else notify(data.error || "Could not publish");
   };
 
   const removePost = async (id: string) => {
     if (!confirm("Delete this post?")) return;
     const res = await fetch(`/api/admin/posts?id=${id}`, { method: "DELETE" });
-    if (res.ok) setPosts((prev) => prev.filter((p) => p.id !== id));
+    if (res.ok) {
+      setPosts((prev) => prev.filter((p) => p.id !== id));
+      router.refresh();
+    }
   };
 
   const togglePost = async (p: PostItem) => {
     const res = await fetch("/api/admin/posts", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: p.id, isActive: !p.isActive }) });
     const data = await res.json();
-    if (data.post) setPosts((prev) => prev.map((x) => (x.id === p.id ? data.post : x)));
+    if (data.post) {
+      setPosts((prev) => prev.map((x) => (x.id === p.id ? data.post : x)));
+      router.refresh();
+    }
   };
 
   const addRoom = async (e: FormEvent) => {
