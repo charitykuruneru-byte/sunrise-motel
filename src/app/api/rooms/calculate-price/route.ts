@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { roomTypeRatesTable, roomTypesTable } from "@/db/schema";
 import { calculateStayQuote, nightsBetween } from "@/lib/pricing";
+import { setting } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,8 @@ export async function POST(request: Request) {
       extraBed?: number | boolean;
       extraBeds?: number;
       amenities?: string[];
+      /** Override the motel's VAT mode for one quote. */
+      taxInclusive?: boolean;
     };
 
     const id = (body.roomTypeId ?? body.roomId ?? "").trim();
@@ -59,6 +62,10 @@ export async function POST(request: Request) {
     const activeRates = rates.filter((rate) => rate.isActive);
     const extraBeds = typeof body.extraBed === "boolean" ? (body.extraBed ? 1 : 0) : (body.extraBeds ?? (Number(body.extraBed) || 0));
 
+    // VAT mode: default to what the motel actually does — the advertised price already
+    // includes VAT. `POST` may override it explicitly rather than by accident.
+    const taxInclusive = body.taxInclusive === undefined ? (await setting("PRICE_TAX_MODE")) !== "exclusive" : body.taxInclusive !== false;
+
     const quote = calculateStayQuote({
       room,
       rates: activeRates,
@@ -67,6 +74,7 @@ export async function POST(request: Request) {
       guests: body.guests,
       extraBeds,
       amenities: Array.isArray(body.amenities) ? body.amenities.filter((name) => typeof name === "string") : [],
+      taxInclusive,
     });
 
     return NextResponse.json({ roomTypeId: room.id, roomType: room.name, checkIn, checkOut, ...quote });

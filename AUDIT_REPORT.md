@@ -129,6 +129,7 @@ by the night audit.
 | Three-role auth + invitations, no self-registration | **KEEP AS-IS** | Exactly the unique flow described |
 | Night audit: occupancy, ADR, RevPAR | **MISSING → BUILT** | Table + engine + API + `/admin/finance` |
 | Expenses feeding net profit | **MISSING → BUILT** | Table + API + form |
+| VAT (16.5%) | **MISSING → BUILT (inclusive)** | The advertised price stays the price paid; VAT is recorded *inside* the total. `PRICE_TAX_MODE=exclusive` adds it on top instead |
 | Audit logs with diffs | **KEEP** | `audit_log` + `/admin/audit-logs` |
 | Premium UI everywhere | **PARTLY** | New pages use the existing premium classes; restyling every old page is Phase 3 (visual only) |
 

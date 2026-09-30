@@ -2872,3 +2872,45 @@ original `bookingMath` path: switching live bookings over to VAT-inclusive quote
 what guests are charged, so that is a deliberate decision for the owner, not a side effect of
 an audit.
 
+---
+
+## 62. VAT, and the decision that had to be made before wiring it ✅
+
+The audit found the quote endpoint charging 16.5% VAT while the **public booking widget was
+not** — because `bookingMath` predates the pricing engine. Wiring it up meant choosing whose
+price changes, and there was only one answer that could not surprise a guest:
+
+**VAT is INCLUSIVE.** `MWK 85,000 per night` on the website is what the guest pays, and the
+VAT is the slice *inside* that figure:
+
+```
+gross 170,000 (2 nights × 85,000)
+  VAT portion = 170,000 − round(170,000 × 10000 ÷ 11650) = 24,077
+  net of VAT  = 145,923
+  total charged = 170,000   ← unchanged
+```
+
+Bookings and their invoices now carry `taxAmount` (24,077 in that example) and an explanatory
+line item — *“VAT 16.50% (included in the total)”* — so the books can file the tax while the
+guest's total is exactly what it was before this change. In the current data the arithmetic
+proves it: with no weekend price, no seasonal rate and no discount set, the engine's gross is
+`rate × nights`, the same number `bookingMath` produced.
+
+**To switch to adding VAT on top instead**, write one settings row — no code change, no deploy
+of logic, no dashboard:
+
+```sql
+insert into app_settings (key, value) values ('PRICE_TAX_MODE', 'exclusive')
+  on conflict (key) do update set value = 'exclusive';
+```
+
+Then `/stay` prices would no longer be the final price, so the website copy would need to say
+“+ 16.5% VAT” — which is why inclusive is the default.
+
+**What was verified, and how.** Two bookings were made through the real route with the *same
+email in different capitalisation and the same phone number typed two ways*: the database came
+back with `guest_rows = 1`, `bookings = 2`, `distinct_guest_ids = 1`, each invoice
+`total 170,000 · tax 24,077`. The test ran against a local server with the mailbox deliberately
+disabled (settings backed up, blanked, restored) so no real message left the building, and the
+test bookings, invoices, events and guest row were then deleted.
+

@@ -86,9 +86,13 @@ export type StayQuote = {
   amenities: { name: string; amount: number }[];
   amenitiesTotal: number;
   discount: { label: string | null; basisPoints: number; amount: number };
-  subtotal: number; // everything before tax
+  subtotal: number; // everything before tax is considered
   taxRateBp: number;
-  taxAmount: number; // VAT 16.5% unless the room type says otherwise
+  taxAmount: number; // the VAT portion — broken out whether prices include it or not
+  /** The amount before VAT: `subtotal` when VAT is added on top, the gross minus VAT when prices already include it. */
+  netOfTax: number;
+  /** True when the advertised price already contains VAT, so `total` equals `subtotal`. */
+  taxInclusive: boolean;
   total: number;
   currency: "MWK";
   minimumNights: number;
@@ -174,6 +178,13 @@ export function calculateStayQuote(opts: {
   extraBeds?: number;
   /** Amenity names the guest accepted, matched against the room type's charge list. */
   amenities?: string[];
+  /**
+   * `true` (the default for this motel) means the advertised price already contains VAT:
+   * a guest reading "MWK 85,000 per night" pays 85,000, and VAT is the portion inside it —
+   * broken out for the books, not added to the bill. `false` adds VAT on top, which would
+   * change every price the website shows, so it is opt-in.
+   */
+  taxInclusive?: boolean;
 }): StayQuote {
   const rates = opts.rates ?? [];
   const nights = nightsBetween(opts.checkIn, opts.checkOut);
@@ -210,7 +221,11 @@ export function calculateStayQuote(opts: {
   const subtotal = Math.max(0, beforeDiscount - discountAmount);
 
   const taxRateBp = Math.max(0, Math.round(Number(opts.room.taxRateBp ?? 1650)));
-  const taxAmount = Math.round((subtotal * taxRateBp) / 10_000);
+  const taxInclusive = opts.taxInclusive ?? true;
+  // Inclusive: the gross is the price, and VAT is the slice inside it (gross × bp ÷ (10000+bp)).
+  // Exclusive: VAT is added on top of the net.
+  const netOfTax = taxInclusive ? Math.round((subtotal * 10_000) / (10_000 + taxRateBp)) : subtotal;
+  const taxAmount = taxInclusive ? subtotal - netOfTax : Math.round((subtotal * taxRateBp) / 10_000);
   const minimumNights = Math.max(1, Math.round(Number(opts.room.minNights) || 1));
 
   return {
@@ -226,7 +241,9 @@ export function calculateStayQuote(opts: {
     subtotal,
     taxRateBp,
     taxAmount,
-    total: subtotal + taxAmount,
+    netOfTax,
+    taxInclusive,
+    total: taxInclusive ? subtotal : subtotal + taxAmount,
     currency: "MWK",
     minimumNights,
     meetsMinimumNights: nights >= minimumNights,

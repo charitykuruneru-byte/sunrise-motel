@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { bookings, invoicesTable, roomTypesTable } from "@/db/schema";
+import { bookings, invoicesTable, roomTypeRatesTable, roomTypesTable } from "@/db/schema";
 import { logBookingEvent } from "@/lib/booking-events";
 import { clientIp, logAudit } from "@/lib/audit";
 import { buildInvoicePdf } from "@/lib/invoice-pdf";
 import { findOrCreateGuest } from "@/lib/hotel";
 import { adminAlertHtml, guestEmailHtml, sendInvoiceEmail, sendMail } from "@/lib/mail";
-import { bookingMath, nextBookingNumber } from "@/lib/pricing";
+import { bookingMath, calculateStayQuote, nextBookingNumber } from "@/lib/pricing";
 import { malawiShortDate, malawiYear, nowDate } from "@/lib/time";
 import { setting } from "@/lib/settings";
 import { and, eq, ne, sql } from "drizzle-orm";
@@ -84,6 +84,38 @@ export async function POST(request: Request) {
     // the reason a booking is left with no identity behind it.
     const guest = await findOrCreateGuest({ fullName: guestName, phone, email });
 
+    // PRICE, from the SAME engine the quote endpoint uses: weekend and seasonal nights
+    // priced as configured, extras included — and VAT handled the way this motel quotes,
+    // which is INCLUSIVE. The advertised rate is what the guest pays; the VAT portion is
+    // recorded *inside* that figure (invoices.taxAmount) so the books can file without the
+    // guest's price changing. One row in app_settings (PRICE_TAX_MODE=exclusive) switches
+    // to adding VAT on top instead.
+    //
+    // With no weekend price, no seasonal rate and no discount set — which is today's
+    // state — the gross this produces is exactly rate × nights, the same number the old
+    // bookingMath produced, which is why no existing price moves.
+    const seasonalRates = await db
+      .select({
+        kind: roomTypeRatesTable.kind,
+        label: roomTypeRatesTable.label,
+        startDate: roomTypeRatesTable.startDate,
+        endDate: roomTypeRatesTable.endDate,
+        minNights: roomTypeRatesTable.minNights,
+        nightlyRate: roomTypeRatesTable.nightlyRate,
+        isActive: roomTypeRatesTable.isActive,
+      })
+      .from(roomTypeRatesTable)
+      .where(eq(roomTypeRatesTable.roomTypeId, roomTypeId));
+    const taxInclusive = (await setting("PRICE_TAX_MODE")) !== "exclusive";
+    const quote = calculateStayQuote({
+      room: roomRecord,
+      rates: seasonalRates.filter((rate) => rate.isActive),
+      checkIn,
+      checkOut,
+      guests: adults + children,
+      taxInclusive,
+    });
+
     // Anti-overbooking: count overlapping live bookings inside a transaction with a row lock on the room type
     const result = await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT id FROM room_types WHERE id = ${roomTypeId} FOR UPDATE`);
@@ -100,11 +132,18 @@ export async function POST(request: Request) {
 
       const reference = makeReference();
       const invoiceNumber = makeInvoiceNumber();
-      // Total = (nightly rate × nights) + service fee + extension fee + extras − discount
+      // MONEY — from the shared engine (see the quote above): the room at its correct
+      // nightly rate (weekend/seasonal applied), any length-of-stay discount, then the
+      // guest's extras, which are advertised prices and therefore VAT-inclusive too.
       const serviceFee = 0;
       const extensionFee = 0;
-      const discount = 0;
-      const { subtotal, total: totalAmount } = bookingMath(nightlyRate, nights, { serviceFee, extensionFee, discount, extrasTotal });
+      const discount = quote.discount.amount;
+      const subtotal = quote.nightlySubtotal;
+      const grossBeforeTax = quote.total + extrasTotal;
+      const taxAmount = taxInclusive
+        ? grossBeforeTax - Math.round((grossBeforeTax * 10_000) / (10_000 + quote.taxRateBp))
+        : Math.round((grossBeforeTax * quote.taxRateBp) / 10_000);
+      const totalAmount = taxInclusive ? grossBeforeTax : grossBeforeTax + taxAmount;
       const bookingId = randomUUID();
       const bookingNumber = await nextBookingNumber(tx as unknown, malawiYear(nowDate()));
 
@@ -139,9 +178,15 @@ export async function POST(request: Request) {
         .returning();
 
       const lineItems = [
-        { description: `${roomType} (${nights} night${nights > 1 ? "s" : ""} @ MWK ${nightlyRate.toLocaleString()}/night)`, amount: subtotal },
+        {
+          description: `${roomType} (${nights} night${nights > 1 ? "s" : ""} @ MWK ${nightlyRate.toLocaleString()}/night)${quote.discount.label ? ` — ${quote.discount.label}` : ""}`,
+          amount: Math.max(0, subtotal - discount),
+        },
         ...(serviceFee ? [{ description: "Service fee", amount: serviceFee }] : []),
         ...extras.map((e) => ({ description: e.label, amount: e.amount })),
+        // VAT is already inside the prices above — this line states the portion, so the
+        // guest's total is unchanged while the books can still file the tax.
+        { description: `VAT ${(quote.taxRateBp / 100).toFixed(2)}% (included in the total)`, amount: 0 },
       ];
 
       await tx.insert(invoicesTable).values({
@@ -158,7 +203,7 @@ export async function POST(request: Request) {
         nights,
         subtotal,
         extrasTotal,
-        taxAmount: 0,
+        taxAmount,
         totalAmount,
         amountPaid: 0,
         balanceDue: totalAmount,
