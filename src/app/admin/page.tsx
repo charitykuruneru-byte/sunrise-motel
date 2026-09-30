@@ -115,6 +115,7 @@ export default function AdminPage() {
   const router = useRouter();
   const [tab, setTab] = useState<"bookings" | "invoices" | "gallery" | "posts" | "audit" | "staff" | "rooms" | "reports">("bookings");
   const [busy, setBusy] = useState(false);
+  const [emailTesting, setEmailTesting] = useState(false);
   const [toast, setToast] = useState("");
 
   const [bookingsList, setBookingsList] = useState<BookingItem[]>([]);
@@ -180,6 +181,19 @@ export default function AdminPage() {
   const notify = (text: string) => {
     setToast(text);
     window.setTimeout(() => setToast(""), 3500);
+  };
+
+  const testEmail = async () => {
+    setEmailTesting(true);
+    try {
+      const res = await fetch("/api/admin/email-test", { method: "POST" });
+      const data = await res.json();
+      notify(res.ok ? `Test email sent to ${data.recipient}` : data.error || "Email test failed");
+    } catch {
+      notify("Email test failed. Check the connection and try again.");
+    } finally {
+      setEmailTesting(false);
+    }
   };
 
   const loadAll = async () => {
@@ -567,6 +581,7 @@ export default function AdminPage() {
               availability — it sits beside the header actions, not in the nav). */}
           <a className="admin-btn" href="/desk"><LayoutDashboard size={15} /> Front desk console</a>
           <button className="admin-btn admin-btn-refresh" onClick={loadAll}>{busy ? <Loader2 size={15} className="spin" /> : <RefreshCw size={15} />} Refresh</button>
+          {authed && isAdmin && <button className="admin-btn" onClick={testEmail} disabled={emailTesting}>{emailTesting ? <Loader2 size={15} className="spin" /> : <Mail size={15} />} Test email</button>}
           {authed && <button className="admin-btn" onClick={logout}><Key size={15} /> Lock</button>}
         </div>
       </header>
