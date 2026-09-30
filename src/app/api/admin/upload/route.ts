@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { clientIp, logAudit } from "@/lib/audit";
-import { readSession } from "@/lib/staff-auth";
+import { isManagerRole, readSession } from "@/lib/staff-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -17,9 +17,9 @@ const MAX_BYTES = 8 * 1024 * 1024;
  * caller can no longer write files into the server.
  */
 export async function POST(request: Request) {
-  const user = readSession(request);
+  const user = await readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
-  if (user.role !== "admin") return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  if (!isManagerRole(user.role)) return NextResponse.json({ error: "Manager access required." }, { status: 403 });
   try {
     const form = await request.formData();
     const file = form.get("file");

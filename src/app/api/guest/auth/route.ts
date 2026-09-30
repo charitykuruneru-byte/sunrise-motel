@@ -19,6 +19,7 @@ export const dynamic = "force-dynamic";
 
 const MAX_FAILED = 5;
 const LOCK_MINUTES = 15;
+const SIGN_IN_ERROR = "That email (or phone) and password do not match. Check your details or contact the front desk to activate your account.";
 
 function setSessionCookie(response: NextResponse, token: string) {
   response.cookies.set(GUEST_COOKIE, token, {
@@ -70,11 +71,7 @@ export async function POST(request: Request) {
       });
       return NextResponse.json(
         {
-          error:
-            "That email (or phone) and password do not match. Check them and try again — the front desk registers every guest account and hands over the password, so if you are unsure about either, ask at the counter or on WhatsApp and we will sort it out with you.",
-          // Accounts are only ever created AT THE COUNTER now, so there is no sign-up
-          // form to point anybody at: the desk is the way in.
-          deskRegistersAccounts: true,
+          error: SIGN_IN_ERROR,
           noEnumeration: true,
         },
         { status: 401 },
@@ -144,7 +141,7 @@ export async function POST(request: Request) {
         ip: clientIp(request),
       });
       return NextResponse.json(
-        { error: lock ? `Too many attempts — locked for ${LOCK_MINUTES} minutes.` : "That password is not correct." },
+        { error: lock ? `Too many attempts — locked for ${LOCK_MINUTES} minutes.` : SIGN_IN_ERROR },
         { status: 401 },
       );
     }

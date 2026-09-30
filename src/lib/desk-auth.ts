@@ -3,10 +3,10 @@
 // desk work, admins do everything.
 
 import { NextResponse } from "next/server";
-import { readSession, sessionLabel, type SessionUser } from "@/lib/staff-auth";
+import { isManagerRole, isMotelManagerRole, isRestaurantManagerRole, isSuperAdminRole, readSession, sessionLabel, type SessionUser } from "@/lib/staff-auth";
 
-export function deskActor(request: Request, opts: { write?: boolean } = {}) {
-  const user = readSession(request);
+export async function deskActor(request: Request, opts: { write?: boolean } = {}) {
+  const user = await readSession(request);
   if (!user) {
     return { error: NextResponse.json({ error: "Please sign in." }, { status: 401 }) } as const;
   }
@@ -18,10 +18,27 @@ export function deskActor(request: Request, opts: { write?: boolean } = {}) {
   return { user: user as SessionUser, label: sessionLabel(user) } as const;
 }
 
-/** Only admins may touch money, rates, staff, deletion or broadcasts (§9). */
+/** Manager roles may use operational controls; sensitive account management is Super Admin-only. */
 export function requireAdmin(user: SessionUser) {
-  if (user.role !== "admin") {
-    return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  if (!isManagerRole(user.role)) {
+    return NextResponse.json({ error: "Manager access required." }, { status: 403 });
   }
+  return null;
+}
+
+export function requireSuperAdmin(user: SessionUser) {
+  if (!isSuperAdminRole(user.role)) {
+    return NextResponse.json({ error: "Super Admin access required." }, { status: 403 });
+  }
+  return null;
+}
+
+export function requireMotelManager(user: SessionUser) {
+  if (!isMotelManagerRole(user.role)) return NextResponse.json({ error: "Motel Manager access required." }, { status: 403 });
+  return null;
+}
+
+export function requireRestaurantManager(user: SessionUser) {
+  if (!isRestaurantManagerRole(user.role)) return NextResponse.json({ error: "Restaurant Manager access required." }, { status: 403 });
   return null;
 }

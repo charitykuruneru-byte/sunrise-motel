@@ -1,0 +1,25 @@
+=== live data is left to the browser (must NOT be claimed) ===
+PASS  GET availability (the bug)           got=false expected=false
+PASS  GET posts feed                       got=false expected=false
+PASS  GET admin gallery                    got=false expected=false
+PASS  GET uploaded image                   got=false expected=false
+PASS  POST booking                         got=false expected=false
+=== shell + assets still served by the worker (must be claimed) ===
+PASS  navigate /                           got=true expected=true
+PASS  navigate /stay                       got=true expected=true
+PASS  immutable /_next asset               got=true expected=true
+PASS  manifest                             got=true expected=true
+=== left alone by design ===
+PASS  cross-origin request                 got=false expected=false
+=== a failed or opaque response is never stored ===
+PASS  nav 500 -> entries stored            got=0 expected=0
+PASS  nav opaque -> entries stored         got=0 expected=0
+PASS  nav 200 -> entries stored            got=1 expected=1
+PASS  asset 503 -> entries stored          got=0 expected=0
+PASS  asset 200 -> entries stored          got=1 expected=1
+=== a deployed worker WAITS for the guest (what makes the update card usable) ===
+PASS  install does NOT skipWaiting         got=0 expected=0
+PASS  the SKIP_WAITING message still activates got=1 expected=1
+
+cache version: sunrise-motel-v3
+ALL CHECKS PASSED

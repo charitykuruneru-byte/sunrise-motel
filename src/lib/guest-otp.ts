@@ -20,7 +20,7 @@ import { db } from "@/db";
 import { activationTokensTable, guestAccountsTable } from "@/db/schema";
 import { logAudit } from "@/lib/audit";
 import { issueToken } from "@/lib/guest-auth";
-import { publicBaseUrl } from "@/lib/mail";
+import { guestAppDownloadUrl, publicBaseUrl } from "@/lib/mail";
 import { notifyByEmail, notifyBySms, notifyInPortal } from "@/lib/notify";
 
 export const OTP_LENGTH = 6;
@@ -28,6 +28,9 @@ export const OTP_TTL_MINUTES = 10;
 export const OTP_MAX_ATTEMPTS = 3;
 export const OTP_RESEND_SECONDS = 60;
 export const OTP_LOCK_MINUTES = 15;
+
+const escapeHtml = (value: string) =>
+  value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
 
 /** A cryptographically random 6-digit code — never Math.random. */
 export function generateOtp() {
@@ -101,7 +104,9 @@ export async function issueActivationOtp(opts: {
 
   const base = publicBaseUrl(opts.request);
   const link = `${base}/activate?token=${issued.token}`;
-  const firstName = opts.guestName.split(" ")[0] || "there";
+  const downloadUrl = guestAppDownloadUrl(opts.request);
+  const safeGuestName = escapeHtml(opts.guestName);
+  const firstName = escapeHtml(opts.guestName.split(" ")[0] || "there");
 
   let emailSent = false;
   let emailReason: string | null = null;
@@ -110,13 +115,14 @@ export async function issueActivationOtp(opts: {
       to: email,
       subject: "Sunrise Motel — your verification code",
       html:
-        `<p>Hello ${opts.guestName},</p>` +
+        `<p>Hello ${safeGuestName},</p>` +
         `<p>Your Sunrise Motel verification code is:</p>` +
         `<p style="font-size:28px;font-weight:800;letter-spacing:6px">${issued.otp}</p>` +
         `<p>It is valid for ${OTP_TTL_MINUTES} minutes and can be used once.</p>` +
         `<p>Then set your own password here: <a href="${link}">Set my password</a> — ${firstName}, the link is valid for 7 days and only you can use it.</p>` +
+        `<p><a href="${downloadUrl}">Download the Sunrise Motel guest app</a> for Android.</p>` +
         `<p>If you did not ask for this, tell the front desk and we will stop it. Nothing about your room, your bill or your meals depends on it.</p>`,
-      text: `Sunrise Motel verification code: ${issued.otp} (valid ${OTP_TTL_MINUTES} minutes). Set your password: ${link}`,
+      text: `Sunrise Motel verification code: ${issued.otp} (valid ${OTP_TTL_MINUTES} minutes). Set your password: ${link}. Download the guest app: ${downloadUrl}`,
       template: "guest_activation_otp",
       guestId: opts.guestId,
       // The code travels in the email — never into the log.
@@ -182,11 +188,12 @@ export async function resendOtp(opts: { tokenId: string; request?: Request }) {
   const sentTo =
     row.channel === "email" ? row.sentTo ?? account?.loginEmail ?? null : row.sentTo ?? account?.loginPhone ?? null;
   if (row.channel === "email" && sentTo) {
+    const downloadUrl = guestAppDownloadUrl(opts.request);
     await notifyByEmail({
       to: sentTo,
       subject: "Sunrise Motel — your new verification code",
-      html: `<p>Your new Sunrise Motel verification code is:</p><p style="font-size:28px;font-weight:800;letter-spacing:6px">${code}</p><p>Valid for ${OTP_TTL_MINUTES} minutes. This replaces the previous code.</p>`,
-      text: `Sunrise Motel verification code: ${code} (valid ${OTP_TTL_MINUTES} minutes).`,
+      html: `<p>Your new Sunrise Motel verification code is:</p><p style="font-size:28px;font-weight:800;letter-spacing:6px">${code}</p><p>Valid for ${OTP_TTL_MINUTES} minutes. This replaces the previous code.</p><p><a href="${downloadUrl}">Download the Sunrise Motel guest app</a> for Android.</p>`,
+      text: `Sunrise Motel verification code: ${code} (valid ${OTP_TTL_MINUTES} minutes). Download the guest app: ${downloadUrl}`,
       template: "guest_otp_resent",
       guestId: row.guestId,
       logBody: "A replacement verification code was emailed. The code itself is never stored.",

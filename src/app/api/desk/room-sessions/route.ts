@@ -28,7 +28,7 @@ import { ROOM_PIN_RULES, closeRoomSessions, openRoomSession, rotateRoomPin } fro
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const auth = deskActor(request);
+  const auth = await deskActor(request);
   if ("error" in auth) return auth.error;
   try {
     const [openSessions, liveBookings] = await Promise.all([
@@ -91,7 +91,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = deskActor(request, { write: true });
+  const auth = await deskActor(request, { write: true });
   if ("error" in auth) return auth.error;
   try {
     const body = (await request.json()) as {

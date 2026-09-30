@@ -1,0 +1,12 @@
+PASS  Manager sign-in ÔÇö HTTP 200
+PASS  Image upload (/api/upload) ÔÇö HTTP 201 ┬À database ┬À /api/images/db177fd5-7fb4-4516-934e-a1cefbe4fb80
+PASS  Gallery add (/api/admin/gallery) ÔÇö HTTP 201
+PASS  Alt text stored with the picture ÔÇö "Sunrise Motel courtyard with garden seating and evening lanterns, Area 5, Lilongwe"
+PASS  Post publish (/api/admin/posts) ÔÇö HTTP 201
+PASS  Post appears in the public feed (/api/posts) ÔÇö image: /api/images/db177fd5-7fb4-4516-934e-a1cefbe4fb80
+PASS  Feed image is the uploaded file, not a placeholder
+PASS  Post delete ÔÇö HTTP 200
+PASS  Gallery image delete ÔÇö HTTP 200
+PASS  Feed is clean again
+
+10/10 checks passed.

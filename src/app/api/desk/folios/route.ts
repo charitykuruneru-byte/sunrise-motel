@@ -3,7 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { bookings, folioItemsTable, invoicesTable, roomsTable } from "@/db/schema";
 import { clientIp, logAudit } from "@/lib/audit";
-import { deskActor, requireAdmin } from "@/lib/desk-auth";
+import { deskActor, requireMotelManager } from "@/lib/desk-auth";
 import { buildFolioInvoice } from "@/lib/folio-invoice";
 import { folioTotals, postFolioItem } from "@/lib/hotel";
 
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  * invoice with its status. Invoices are always regenerated FROM the folio.
  */
 export async function GET(request: Request) {
-  const auth = deskActor(request);
+  const auth = await deskActor(request);
   if ("error" in auth) return auth.error;
   try {
     const [items, allBookings, rooms, invoices] = await Promise.all([
@@ -105,7 +105,7 @@ export async function GET(request: Request) {
  * regenerate the invoice from the folio.
  */
 export async function POST(request: Request) {
-  const auth = deskActor(request, { write: true });
+  const auth = await deskActor(request, { write: true });
   if ("error" in auth) return auth.error;
   try {
     const body = (await request.json()) as {
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
     // ADDENDUM (authority matrix + staff dashboard §6.2): the whole money surface beyond cash —
     // a manual charge, voiding a room-bill line, and regenerating an invoice — is admin only.
     // Staff read every folio and invoice and download the PDF; they cannot move a figure.
-    const denied = requireAdmin(auth.user);
+    const denied = requireMotelManager(auth.user);
     if (denied) return denied;
 
     if (action === "add_charge") {

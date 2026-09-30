@@ -16,6 +16,7 @@ android {
         versionName = "1.3"
         // Single place to change the website URL. Debug and release both read it.
         buildConfigField("String", "BASE_URL", "\"https://sunrise-motel.vercel.app\"")
+        buildConfigField("String", "START_PATH", "\"/app\"")
     }
 
     buildFeatures {

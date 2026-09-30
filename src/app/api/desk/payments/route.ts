@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { bookings, paymentsTable } from "@/db/schema";
 import { clientIp, logAudit } from "@/lib/audit";
 import { logBookingEvent } from "@/lib/booking-events";
-import { deskActor, requireAdmin } from "@/lib/desk-auth";
+import { deskActor, requireMotelManager } from "@/lib/desk-auth";
 import { buildFolioInvoice } from "@/lib/folio-invoice";
 import { logNotification } from "@/lib/notify";
 
@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
  * confirm. Cash is entered already verified.
  */
 export async function GET(request: Request) {
-  const auth = deskActor(request);
+  const auth = await deskActor(request);
   if ("error" in auth) return auth.error;
   try {
     const [payments, allBookings] = await Promise.all([
@@ -73,7 +73,7 @@ export async function GET(request: Request) {
  * receipt from the folio invoice.
  */
 export async function POST(request: Request) {
-  const auth = deskActor(request, { write: true });
+  const auth = await deskActor(request, { write: true });
   if ("error" in auth) return auth.error;
   try {
     const body = (await request.json()) as {
@@ -117,7 +117,7 @@ export async function POST(request: Request) {
           note: body.note ?? "Recorded at the front desk",
         })
         .returning();
-      const result = await applyVerifiedAmount(booking.id, amount, auth.label, request);
+      const result = await applyVerifiedAmount(booking.id, amount, auth.label, request, auth.user);
       return NextResponse.json({ success: true, payment, booking: result });
     }
 
@@ -126,7 +126,7 @@ export async function POST(request: Request) {
     // ADDENDUM (authority matrix): only an admin VERIFIES or REJECTS a claimed payment. Staff
     // record cash at the desk and can see the whole queue — they never confirm a claim, so a
     // staff account that calls this endpoint directly gets 403 rather than a verified payment.
-    const denied = requireAdmin(auth.user);
+    const denied = requireMotelManager(auth.user);
     if (denied) return denied;
 
     const [payment] = await db.select().from(paymentsTable).where(eq(paymentsTable.id, body.paymentId)).limit(1);
@@ -141,7 +141,7 @@ export async function POST(request: Request) {
         .set({ status: "verified", verifiedByLabel: auth.label, verifiedAt: now, note: body.note ?? payment.note })
         .where(eq(paymentsTable.id, payment.id));
       const result = payment.bookingId
-        ? await applyVerifiedAmount(payment.bookingId, payment.amount, auth.label, request)
+        ? await applyVerifiedAmount(payment.bookingId, payment.amount, auth.label, request, auth.user)
         : null;
       await logAudit({
         action: "payment.verified",
@@ -173,6 +173,7 @@ export async function POST(request: Request) {
             "payment_rejected",
             `${auth.label}: rejected MWK ${payment.amount.toLocaleString()} via ${payment.channel} — ${body.reason.trim()}`,
             "manager",
+            auth.user,
           );
         }
       }
@@ -200,7 +201,7 @@ export async function POST(request: Request) {
  * Add a verified amount to a booking. When the verified total covers the booking,
  * the booking confirms and the pro-forma becomes a receipt (§12 auto-confirm).
  */
-async function applyVerifiedAmount(bookingId: string, amount: number, actorLabel: string, request: Request) {
+async function applyVerifiedAmount(bookingId: string, amount: number, actorLabel: string, request: Request, actor: import("@/lib/staff-auth").SessionUser) {
   const [booking] = await db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
   if (!booking) return null;
   const amountPaid = (booking.amountPaid ?? 0) + amount;
@@ -213,6 +214,7 @@ async function applyVerifiedAmount(bookingId: string, amount: number, actorLabel
     "payment_recorded",
     `${actorLabel}: MWK ${amount.toLocaleString()} verified — total paid MWK ${amountPaid.toLocaleString()} of ${booking.totalAmount.toLocaleString()}`,
     "manager",
+    actor,
   );
   const invoice = await buildFolioInvoice(booking.id, { status: covered ? "paid" : undefined });
   if (covered) {

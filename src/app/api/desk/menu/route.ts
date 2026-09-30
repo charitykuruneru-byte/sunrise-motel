@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
  * Read: any signed-in session (staff, admin, auditor). Write: staff and admin, never an auditor.
  */
 export async function GET(request: Request) {
-  const auth = deskActor(request);
+  const auth = await deskActor(request);
   if ("error" in auth) return auth.error;
   try {
     const items = await db.select().from(menuItemsTable).orderBy(menuItemsTable.category, menuItemsTable.name);
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = deskActor(request, { write: true });
+  const auth = await deskActor(request, { write: true });
   if ("error" in auth) return auth.error;
   try {
     const body = (await request.json()) as { menuItemId?: string; isAvailable?: boolean };
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     // The audit entry is the honest part: the desk changed what a guest can buy, so it is
     // recorded with who did it, when, and in which direction.
     await logAudit({
-      action: body.isAvailable ? "menu.item_available" : "menu.item_sold_out",
+      action: body.isAvailable ? "DISH_UPDATED" : "DISH_OUT_OF_STOCK",
       entity: "menu_item",
       entityId: item.id,
       summary: body.isAvailable

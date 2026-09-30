@@ -124,7 +124,10 @@ img { display: block; max-width: 100%; height: auto; }
 
 /* ================= HERO & DYNAMIC SEARCH CALCULATOR ================= */
 .mobile-hero-section { position: relative; padding: 42px 16px 50px; background: #171513; color: #fff; overflow: hidden; isolation: isolate; }
-.hero-backdrop { position: absolute; inset: 0; z-index: -2; background-image: url("/images/hero-standard.jpg"); background-size: cover; background-position: center; filter: brightness(0.42); }
+/* The backdrop under every inner-page hero: a room at this motel, because the
+   pages that use it are the ones about staying. The Deluxe photograph that used
+   to be named here is on /stay's deluxe card, where it belongs. */
+.hero-backdrop { position: absolute; inset: 0; z-index: -2; background-image: url("/media/organized/room_standard/691294046.jpg"); background-size: cover; background-position: center; filter: brightness(0.42); }
 .hero-gradient-overlay { position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(23, 21, 19, 0.7) 0%, rgba(23, 21, 19, 0.95) 100%); }
 .hero-content-wrapper { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
 

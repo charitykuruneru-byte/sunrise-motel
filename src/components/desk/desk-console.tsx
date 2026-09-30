@@ -113,10 +113,9 @@ export default function DeskConsole() {
   }, []);
 
   const isReadOnly = user?.role === "auditor";
-  // ADDENDUM (authority matrix §5/§6): the admin-only controls are not greyed out for a staff
-  // session — they are ABSENT, so a staff member never has to wonder whether they are allowed.
-  // The server enforces the same line (403), so hiding them here is convenience, not security.
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "super_admin";
+  const isMotelManager = isAdmin || user?.role === "motel_manager";
+  const isRestaurantManager = isAdmin || user?.role === "restaurant_manager";
 
   const loadOverview = useCallback(async () => {
     const [data, roomData] = await Promise.all([
@@ -254,9 +253,9 @@ export default function DeskConsole() {
       {tab === "tasks" && <DeskTasks setToast={setToast} onChanged={loadOverview} readOnly={Boolean(isReadOnly)} />}
       {/* ADDENDUM (staff dashboard §15.1): the ONE menu control the desk has — sold out. */}
       {tab === "menu" && <DeskMenu setToast={setToast} readOnly={Boolean(isReadOnly)} />}
-      {tab === "money" && <DeskMoney setToast={setToast} onChanged={loadOverview} readOnly={Boolean(isReadOnly)} isAdmin={Boolean(isAdmin)} />}
+      {tab === "money" && <DeskMoney setToast={setToast} onChanged={loadOverview} readOnly={Boolean(isReadOnly)} isAdmin={Boolean(isMotelManager)} />}
       {tab === "guests" && <DeskGuests setToast={setToast} onChanged={loadOverview} readOnly={Boolean(isReadOnly)} isAdmin={Boolean(isAdmin)} />}
-      {tab === "reviews" && <DeskReviews setToast={setToast} onChanged={loadOverview} readOnly={Boolean(isReadOnly)} isAdmin={Boolean(isAdmin)} />}
+      {tab === "reviews" && <DeskReviews setToast={setToast} onChanged={loadOverview} readOnly={Boolean(isReadOnly)} isAdmin={Boolean(isRestaurantManager)} />}
     </Shell>
   );
 }

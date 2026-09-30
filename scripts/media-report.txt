@@ -1,0 +1,169 @@
+MEDIA REPORT - Sunrise Motel      2026-09-29 19:48
+88 files: 62 live on the site, 26 not (held, spare or unclassified)
+
+WHERE EVERYTHING WENT
+  category                  files  live  cover                         used on
+  room_standard            7     7  691294046.jpg                 / /stay /gallery
+  room_deluxe              5     5  listing-12.jpg                / /stay /gallery
+  room_family              1     1  691294883.jpg                 / /stay /gallery
+  building_exterior        8     7  cute-and-cozy-place-friendly.jpg  / /connect /gallery
+  building_interior        5     4  cute-and-cozy-place-friendly-3.jpg  / /stay /connect /gallery
+  reception                1     1  reception.jpg                 /connect /stay /gallery
+  restaurant              11     9  night-terrace.jpg             / /dine /unwind /connect /gallery
+  food_dish               15    10  food-chambo.jpg               /dine /unwind /gallery
+  bar                      9     6  happy-hour-terrace.jpg        /unwind /dine /gallery
+  breakfast                3     3  breakfast-full.jpg            / /dine /stay /connect /gallery
+  amenity_garden           4     3  courtyard.jpg                 / /unwind /connect /gallery
+  amenity_parking          1     1  520576120.jpg                 / /connect /gallery
+  event                    8     4  unwind-happy-hour-board.jpg   / /unwind /gallery
+  team_staff               2     1  connect-hospitality-team.jpg  /connect /gallery
+  other                    8     0  -                             
+
+ROOMS - one line per room type, which is the part that was wrong
+  room_deluxe / deluxe                5 photo(s)   cover: listing-12.jpg
+  room_family / NO ROOM TYPE          1 photo(s)   cover: 691294883.jpg
+  room_standard / standard            2 photo(s)   cover: 691294046.jpg
+  room_standard / twin                5 photo(s)   cover: twin-main.jpg
+      ! room-layout.jpg -> put on a room from its name alone, not from looking at it: Name says room layout, but this was not looked at frame by frame — confirm it shows a bed before it is used as a cover
+      ! twin-setup.jpg -> put on a room from its name alone, not from looking at it: Name says twin setup, but this was not verified frame by frame — confirm the bed count
+
+HELD BACK (8) - published on no surface at all, and here is why
+  caption (1).jpg
+      Third-party watermark burned into the photograph: publishing it advertises someone else's site
+  caption.jpg
+      Third-party watermark burned into the photograph: publishing it advertises someone else's site
+  connect-facilities.jpg
+      Shows a five-star rating the property has not been awarded — not publishable as a claim
+  unwind-match-day-specials.jpg
+      Carries UEFA / Champions League marks and player likenesses — third-party rights, not ours to publish
+  unwind-pool-table.jpg
+      Carries a third-party whisky brand logo
+  WhatsApp Image 2026-07-23 at 7.05.57 PM (1).jpeg
+      Carries UEFA / Champions League marks and player likenesses — third-party rights, not ours to publish
+  WhatsApp Image 2026-07-23 at 7.05.58 PM.jpeg
+      Carries a third-party whisky brand logo
+  WhatsApp Image 2026-07-23 at 7.05.59 PM.jpeg
+      Shows a five-star rating the property has not been awarded — not publishable as a claim
+  To clear one: fix the rights issue, then delete its `hold` line in scripts/media-overrides.json
+  and run this again. Identical copies inherit a hold, so one entry can hold several files.
+
+NEEDS A HUMAN EYE (8) - filed from the filename, not from the picture
+  bathroom.jpg  ->  building_interior   (0.60)
+  drinks-poolside.jpg  ->  bar   (0.72)
+  food-curry.jpg  ->  food_dish   (0.62)
+  food-grill.jpg  ->  food_dish   (0.62)
+  food-nsima-beef.jpg  ->  food_dish   (0.62)
+  food-salad.jpg  ->  food_dish   (0.62)
+  room-layout.jpg  ->  room_standard   (0.55)
+  twin-setup.jpg  ->  room_standard   (0.60)
+
+UNCLASSIFIED (8) - listed but deliberately shown nowhere
+  icon-192.png  (10 KB)
+  icon-512.png  (32 KB)
+  connect-facilities.jpg  (59 KB)
+  stay-accommodation-offer.jpg  (41 KB)
+  stay-escape-to-serenity.jpg  (49 KB)
+  WhatsApp Image 2026-07-23 at 7.05.58 PM (1).jpeg  (41 KB)
+  WhatsApp Image 2026-07-23 at 7.05.58 PM (2).jpeg  (49 KB)
+  WhatsApp Image 2026-07-23 at 7.05.59 PM.jpeg  (59 KB)
+  These are the site icons, the old advert posters and anything nobody has named yet. They are
+  in the manifest and in the media_library table, so the portal can list them — but no page may
+  pick one up until it has been named, which is what stops a shop poster becoming a room card.
+
+LOOSE FILES IN THE PROJECT ROOT: 37 found (19 of them usable)
+  These sat outside public/, so no page could ever show them. The servable ones have been copied
+  into public/media/organized/<category>/ and the originals were left exactly where they were:
+  520576061.jpg  ->  media/organized/building_exterior/520576061.jpg
+  520576108.jpg  ->  media/organized/restaurant/520576108.jpg
+  520576120.jpg  ->  media/organized/amenity_parking/520576120.jpg
+  520576130.jpg  ->  media/organized/building_exterior/520576130.jpg
+  520576151.jpg  ->  media/organized/bar/520576151.jpg
+  520576165.jpg  ->  media/organized/building_exterior/520576165.jpg
+  520576171.jpg  ->  media/organized/restaurant/520576171.jpg
+  520596171.jpg  ->  media/organized/room_deluxe/520596171.jpg
+  520596180.jpg  ->  media/organized/bar/520596180.jpg
+  691294046.jpg  ->  media/organized/room_standard/691294046.jpg
+  691294368.jpg  ->  media/organized/room_deluxe/691294368.jpg
+  691294883.jpg  ->  media/organized/room_family/691294883.jpg
+  691295644.jpg  ->  media/organized/room_standard/691295644.jpg
+  691296171.jpg  ->  media/organized/room_standard/691296171.jpg
+  caption (1).jpg  ->  media/organized/amenity_garden/caption-1.jpg
+  caption.jpg  ->  media/organized/bar/caption.jpg
+  cute-and-cozy-place-friendly (1).jpg  ->  media/organized/bar/cute-and-cozy-place-friendly-1.jpg
+  cute-and-cozy-place-friendly (2).jpg  ->  media/organized/restaurant/cute-and-cozy-place-friendly-2.jpg
+  cute-and-cozy-place-friendly (3).jpg  ->  media/organized/building_interior/cute-and-cozy-place-friendly-3.jpg
+  cute-and-cozy-place-friendly (4).jpg  ->  media/organized/building_exterior/cute-and-cozy-place-friendly-4.jpg
+  cute-and-cozy-place-friendly.jpg  ->  media/organized/building_exterior/cute-and-cozy-place-friendly.jpg
+  Spacious_rooms__Bed___Breakfast,_aircon_and_free_wifi_,_well_stocked_bar_and_a_variety_of_delicious_dishes_in_our_spacious_restaurant.(480p).mp4  ->  Spacious_rooms__Bed___Breakfast,_aircon_and_free_wifi_,_well_stocked_bar_and_a_variety_of_delicious_dishes_in_our_spacious_restaurant.(480p).mp4
+  WhatsApp Image 2026-07-23 at 7.05.54 PM (1).jpeg  ->  media/organized/food_dish/whatsapp-image-2026-07-23-at-7.05.54-pm-1.jpeg
+  WhatsApp Image 2026-07-23 at 7.05.54 PM.jpeg  ->  media/organized/food_dish/whatsapp-image-2026-07-23-at-7.05.54-pm.jpeg
+  WhatsApp Image 2026-07-23 at 7.05.55 PM.jpeg  ->  media/organized/food_dish/whatsapp-image-2026-07-23-at-7.05.55-pm.jpeg
+  WhatsApp Image 2026-07-23 at 7.05.56 PM.jpeg  ->  media/organized/food_dish/whatsapp-image-2026-07-23-at-7.05.56-pm.jpeg
+  WhatsApp Image 2026-07-23 at 7.05.57 PM (1).jpeg  ->  media/organized/event/whatsapp-image-2026-07-23-at-7.05.57-pm-1.jpeg
+  WhatsApp Image 2026-07-23 at 7.05.57 PM.jpeg  ->  media/organized/food_dish/whatsapp-image-2026-07-23-at-7.05.57-pm.jpeg
+  WhatsApp Image 2026-07-23 at 7.05.58 PM (1).jpeg  ->  media/organized/other/whatsapp-image-2026-07-23-at-7.05.58-pm-1.jpeg
+  WhatsApp Image 2026-07-23 at 7.05.58 PM (2).jpeg  ->  media/organized/other/whatsapp-image-2026-07-23-at-7.05.58-pm-2.jpeg
+  WhatsApp Image 2026-07-23 at 7.05.58 PM.jpeg  ->  media/organized/bar/whatsapp-image-2026-07-23-at-7.05.58-pm.jpeg
+  WhatsApp Image 2026-07-23 at 7.05.59 PM (1).jpeg  ->  media/organized/event/whatsapp-image-2026-07-23-at-7.05.59-pm-1.jpeg
+  WhatsApp Image 2026-07-23 at 7.05.59 PM.jpeg  ->  media/organized/other/whatsapp-image-2026-07-23-at-7.05.59-pm.jpeg
+  WhatsApp Image 2026-07-23 at 7.06.00 PM (1).jpeg  ->  media/organized/team_staff/whatsapp-image-2026-07-23-at-7.06.00-pm-1.jpeg
+  WhatsApp Image 2026-07-23 at 7.06.00 PM.jpeg  ->  media/organized/building_interior/whatsapp-image-2026-07-23-at-7.06.00-pm.jpeg
+  WhatsApp Image 2026-07-23 at 7.06.01 PM.jpeg  ->  media/organized/event/whatsapp-image-2026-07-23-at-7.06.01-pm.jpeg
+  WhatsApp Image 2026-07-23 at 7.07.44 PM.jpeg  ->  media/organized/restaurant/whatsapp-image-2026-07-23-at-7.07.44-pm.jpeg
+
+IDENTICAL FILES (16 group(s)) - the same bytes saved under more than one name
+  connect-coffee-snacks.jpg  <-  keeps the name   (59 KB each)
+      spare: WhatsApp Image 2026-07-23 at 7.06.00 PM.jpeg
+  connect-facilities.jpg  <-  keeps the name   (59 KB each)
+      spare: WhatsApp Image 2026-07-23 at 7.05.59 PM.jpeg   [inherits the hold on this picture]
+  connect-hospitality-team.jpg  <-  keeps the name   (54 KB each)
+      spare: WhatsApp Image 2026-07-23 at 7.06.00 PM (1).jpeg
+  dine-boiled-beef.jpg  <-  keeps the name   (138 KB each)
+      spare: WhatsApp Image 2026-07-23 at 7.05.57 PM.jpeg
+  dine-carrot-salad.jpg  <-  keeps the name   (138 KB each)
+      spare: WhatsApp Image 2026-07-23 at 7.05.55 PM.jpeg
+  dine-mutton-curry.jpg  <-  keeps the name   (169 KB each)
+      spare: WhatsApp Image 2026-07-23 at 7.05.56 PM.jpeg
+  dine-potato-salad.jpg  <-  keeps the name   (142 KB each)
+      spare: WhatsApp Image 2026-07-23 at 7.05.54 PM (1).jpeg
+  dine-roast-beef.jpg  <-  keeps the name   (143 KB each)
+      spare: WhatsApp Image 2026-07-23 at 7.05.54 PM.jpeg
+  stay-accommodation-offer.jpg  <-  keeps the name   (41 KB each)
+      spare: WhatsApp Image 2026-07-23 at 7.05.58 PM (1).jpeg
+  stay-escape-to-serenity.jpg  <-  keeps the name   (49 KB each)
+      spare: WhatsApp Image 2026-07-23 at 7.05.58 PM (2).jpeg
+  unwind-braai-chef.jpg  <-  keeps the name   (150 KB each)
+      spare: WhatsApp Image 2026-07-23 at 7.07.44 PM.jpeg
+  unwind-happy-hour-board.jpg  <-  keeps the name   (156 KB each)
+      spare: WhatsApp Image 2026-07-23 at 7.05.59 PM (1).jpeg
+  unwind-happy-hour-ice.jpg  <-  keeps the name   (142 KB each)
+      spare: WhatsApp Image 2026-07-23 at 7.06.01 PM.jpeg
+  unwind-match-day-specials.jpg  <-  keeps the name   (176 KB each)
+      spare: WhatsApp Image 2026-07-23 at 7.05.57 PM (1).jpeg   [inherits the hold on this picture]
+  unwind-pool-table.jpg  <-  keeps the name   (68 KB each)
+      spare: WhatsApp Image 2026-07-23 at 7.05.58 PM.jpeg   [inherits the hold on this picture]
+  sunrise-tour-480p.mp4  <-  keeps the name   (8400 KB each)
+      spare: Spacious_rooms__Bed___Breakfast,_aircon_and_free_wifi_,_well_stocked_bar_and_a_variety_of_delicious_dishes_in_our_spacious_restaurant.(480p).mp4
+
+VIDEO
+  media/sunrise-tour-480p.mp4   8.2 MB   tags: hero_video, large
+      referenced where it already lives (8.2 MB, above the 6 MB copy limit — no second copy on disk)
+  Spacious_rooms__Bed___Breakfast,_aircon_and_free_wifi_,_well_stocked_bar_and_a_variety_of_delicious_dishes_in_our_spacious_restaurant.(480p).mp4   8.2 MB   tags: hero_video, large, duplicate
+      NOT SERVABLE YET — 8.2 MB loose file in the project root; move it into public/media/ by hand
+      identical to sunrise-tour-480p.mp4, so it is kept as a spare rather than published twice
+  Home page hero candidate: media/sunrise-tour-480p.mp4
+
+GAPS TO SHOOT - a room type with fewer than three photographs looks thin on /stay
+  room_family / NO ROOM TYPE has only 1 photo(s)
+  room_standard / standard has only 2 photo(s)
+
+WHAT TO DO NEXT
+  1. Open scripts/media-overrides.json and fix any category that is plainly wrong - the entry key is
+     the file name. Add a `hold` line to take a picture off every page, or `isCover: true` to put one
+     at the front of its group. Then run this script again: the correction survives every re-run.
+  2. Anything in UNCLASSIFIED stays off every page until it is given a category in that same file —
+     the catalogue is the only door onto a page, and nothing walks through it by accident.
+  3. scripts/media-report.txt is this report, public/media/manifest.json is the machine copy, and
+     src/lib/media-catalog.ts is the same decision in the form the pages import.
+
+THE PAGES: all 73 /images/... paths written in src/ agree with the manifest.

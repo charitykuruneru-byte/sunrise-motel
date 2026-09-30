@@ -20,7 +20,7 @@ export default function DownloadPage() {
           separate update needed. The guest app is for guests; the manager app is for the desk and the office.
         </p>
 
-        <div className="extras-calculator-box" style={{ marginTop: 24 }}>
+        <div id="guest-app" className="extras-calculator-box" style={{ marginTop: 24 }}>
           <div className="extras-header"><strong>Sunrise Motel — guest app</strong></div>
           <p style={{ fontSize: 13, color: "var(--muted)" }}>
             Rooms, live availability, booking, tracking and your account. Free, and nothing on the website needs it.

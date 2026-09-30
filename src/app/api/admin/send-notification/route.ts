@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { clientIp, logAudit } from "@/lib/audit";
-import { readSession, sessionLabel } from "@/lib/staff-auth";
+import { isManagerRole, readSession, sessionLabel } from "@/lib/staff-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +18,9 @@ type Payload = {
 // If Firebase is not configured, returns { queued: true, delivered: false } so
 // the admin UI stays honest instead of claiming a send.
 export async function POST(request: Request) {
-  const user = readSession(request);
+  const user = await readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
-  if (user.role !== "admin") return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  if (!isManagerRole(user.role)) return NextResponse.json({ error: "Manager access required." }, { status: 403 });
 
   let payload: Payload = {};
   try {
@@ -76,14 +76,15 @@ export async function POST(request: Request) {
         : undefined;
     const messageId = result.name ?? null;
     await logAudit({
-      action: dryRun ? "notification.test" : "notification.broadcast",
+      action: dryRun ? "NOTIFICATION_TESTED" : "NOTIFICATION_SENT",
       entity: "notification",
       entityId: messageId,
       summary: (dryRun ? "Firebase dry run OK (no notification sent): " : "Broadcast push sent to topic all_users: ") + JSON.stringify(title),
       actor: "manager",
       actorLabel: sessionLabel(user),
       ip: clientIp(request),
-      metadata: { topic: "all_users", dryRun, messageId, url, imageUrl: imageUrl || null },
+      metadata: { topic: "all_users", dryRun, messageId, successCount, url, imageUrl: imageUrl || null },
+      details: { recipientCount: successCount ?? null, topic: "all_users", dryRun },
     });
     return NextResponse.json({ queued: true, delivered: true, dryRun, messageId, successCount });
   } catch (err) {

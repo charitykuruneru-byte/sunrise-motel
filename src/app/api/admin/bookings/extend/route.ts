@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { logBookingEvent } from "@/lib/booking-events";
 import { clientIp, logAudit } from "@/lib/audit";
 import { bookingMath } from "@/lib/pricing";
-import { readSession } from "@/lib/staff-auth";
+import { isMotelManagerRole, readSession } from "@/lib/staff-auth";
 import { nowDate } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -20,10 +20,10 @@ function nightsBetween(a: string, b: string) {
 // room's availability for the nights it now holds. Part A gap #6 left this open to any signed-in
 // staff account; it is now enforced on the server.
 export async function POST(request: Request) {
-  const user = readSession(request);
+  const user = await readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
-  if (user.role !== "admin") {
-    return NextResponse.json({ error: "Only an admin can extend a stay." }, { status: 403 });
+  if (!isMotelManagerRole(user.role)) {
+    return NextResponse.json({ error: "Motel Manager access required." }, { status: 403 });
   }
   try {
     const body = (await request.json()) as { id?: string; newCheckOut?: string };
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
         balanceDue: Math.max(0, updated.totalAmount - updated.amountPaid),
       }).where(eq(invoicesTable.invoiceNumber, updated.invoiceNumber));
     }
-    await logBookingEvent(booking.id, booking.reference, "extended", `Stay extended by ${extraNights} night(s) to ${body.newCheckOut}. Additional MWK ${additionalFee.toLocaleString()}.`, "manager");
+    await logBookingEvent(booking.id, booking.reference, "extended", `Stay extended by ${extraNights} night(s) to ${body.newCheckOut}. Additional MWK ${additionalFee.toLocaleString()}.`, "manager", user);
     await logAudit({
       action: "booking.extended", entity: "booking", entityId: booking.id, reference: booking.reference,
       summary: `${user.name} extended ${booking.reference} by ${extraNights} night(s) to ${body.newCheckOut} (+MWK ${additionalFee.toLocaleString()}).`,

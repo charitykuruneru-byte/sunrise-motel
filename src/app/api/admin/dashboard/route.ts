@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 // Revenue + losses dashboard: paid vs pending vs cancelled, today/week/month.
 export async function GET(request: Request) {
-  const user = readSession(request);
+  const user = await readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   try {
     const rows = await db.select().from(bookings).orderBy(desc(bookings.createdAt));

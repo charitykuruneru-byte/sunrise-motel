@@ -13,6 +13,7 @@ import {
   History,
   Image as ImageIcon,
   Key,
+  LayoutDashboard,
   Loader2,
   Mail,
   MessageCircle,
@@ -28,7 +29,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import ImageUploader from "@/components/ImageUploader";
 import { SunriseLogo } from "@/components/sunrise-logo";
@@ -70,7 +71,7 @@ type BookingItem = {
   createdAt: string;
 };
 
-type BookingEvent = { id: string; action: string; note: string | null; actor: string; createdAt: string };
+type BookingEvent = { id: string; action: string; note: string | null; actor: string; actorId: string | null; actorName: string | null; actorEmail: string | null; actorRole: string | null; createdAt: string };
 
 type InvoiceItem = {
   id: string;
@@ -130,7 +131,6 @@ export default function AdminPage() {
   const [reminders, setReminders] = useState<{ pendingCount: number; reminderDue: { id: string; reference: string; bookingNumber: string | null; guestName: string; hours: number }[] } | null>(null);
   const [staffList, setStaffList] = useState<{ id: string; staffCode: string; name: string; email: string; phone: string | null; role: string; isActive: boolean; lastLoginAt: string | null }[]>([]);
   const [roomsList, setRoomsList] = useState<{ id: string; name: string; rate: number; totalInventory: number; isActive: boolean }[]>([]);
-  const [staffForm, setStaffForm] = useState({ name: "", email: "", phone: "", role: "staff", password: "", sendCredentials: true });
   const [roomForm, setRoomForm] = useState({ id: "", name: "", rate: "", totalInventory: "3" });
 
   const [query, setQuery] = useState("");
@@ -163,8 +163,17 @@ export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginBusy, setLoginBusy] = useState(false);
-  const [sessionUser, setSessionUser] = useState<{ id: string; staffCode: string; name: string; email: string; role: "admin" | "staff" } | null>(null);
-  const isAdmin = sessionUser?.role === "admin";
+  // The password box takes the keyboard when the pop-up appears, and the button that
+  // opened it takes it back when the pop-up closes — otherwise a keyboard user is
+  // left standing at the top of the page with no idea where the focus went.
+  const passwordRef = useRef<HTMLInputElement | null>(null);
+  const signInButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [sessionUser, setSessionUser] = useState<{ id: string; staffCode: string; name: string; email: string; role: "admin" | "super_admin" | "motel_manager" | "restaurant_manager" | "staff" | "auditor" } | null>(null);
+  const isAdmin = sessionUser?.role === "admin" || sessionUser?.role === "super_admin";
+  const isMotelManager = isAdmin || sessionUser?.role === "motel_manager";
+  const isRestaurantManager = isAdmin || sessionUser?.role === "restaurant_manager";
+  const isManager = isMotelManager || isRestaurantManager;
+  const canViewUsers = isAdmin || sessionUser?.role === "motel_manager" || sessionUser?.role === "restaurant_manager";
 
   const notify = (text: string) => {
     setToast(text);
@@ -184,11 +193,15 @@ export default function AdminPage() {
       setAuditEntries(aj.entries ?? []);
       setDashboard(dj.totals ? dj : null);
       setReminders(rj.pendingCount !== undefined ? rj : null);
-      if (sessionUser?.role === "admin") {
-        const [s, rm] = await Promise.all([fetch("/api/admin/staff"), fetch("/api/admin/rooms")]);
-        const [sj, rmj] = await Promise.all([s.json(), rm.json()]);
-        setStaffList(sj.staff ?? []);
-        setRoomsList(rmj.rooms ?? []);
+      if (isAdmin) {
+        const staffResponse = await fetch("/api/admin/staff");
+        const staffData = await staffResponse.json();
+        setStaffList(staffData.staff ?? []);
+      }
+      if (isMotelManager) {
+        const roomResponse = await fetch("/api/admin/rooms");
+        const roomData = await roomResponse.json();
+        setRoomsList(roomData.rooms ?? []);
       }
     } catch (e) {
       console.error(e);
@@ -235,7 +248,7 @@ export default function AdminPage() {
     (async () => {
       try {
         const res = await fetch("/api/admin/login", { cache: "no-store" });
-        const data = (await res.json().catch(() => ({}))) as { authed?: boolean; user?: { id: string; staffCode: string; name: string; email: string; role: "admin" | "staff" } | null };
+        const data = (await res.json().catch(() => ({}))) as { authed?: boolean; user?: { id: string; staffCode: string; name: string; email: string; role: "admin" | "super_admin" | "motel_manager" | "restaurant_manager" | "staff" | "auditor" } | null };
         if (cancelled) return;
         setCheckingAuth(false);
         if (data.authed) {
@@ -257,7 +270,43 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (authed) loadAll();
-  }, [authed]);
+  }, [authed, isAdmin, isMotelManager]);
+
+  // ---- The sign-in pop-up (front desk, not a maze) ---------------------------
+  // It can always be closed — the cross, a tap on the dark background, or Escape —
+  // and closing reveals nothing: the portal behind it stays blurred and inert, and
+  // the "Manager sign-in" button brings the pop-up straight back. It used to be
+  // impossible to leave without signing in or reloading, which made the whole site
+  // unreachable from /admin for anyone who opened the page by accident.
+  const closeLogin = () => {
+    setLoginOpen(false);
+    setPassword("");
+    setLoginError("");
+  };
+
+  useEffect(() => {
+    if (!loginOpen) return;
+    // The box the cursor belongs in, once the dialog is really in the DOM.
+    const focusTimer = window.setTimeout(() => passwordRef.current?.focus(), 30);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setLoginOpen(false);
+      setPassword("");
+      setLoginError("");
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [loginOpen]);
+
+  useEffect(() => {
+    // Focus goes back where it came from, so a keyboard user is never dropped at
+    // the top of a page they were not looking at.
+    if (loginOpen || authed) return;
+    signInButtonRef.current?.focus();
+  }, [loginOpen, authed]);
 
   const submitLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -269,13 +318,13 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: loginEmail.trim() || undefined, password }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string; success?: boolean; user?: { id: string; staffCode: string; name: string; email: string; role: "admin" | "staff" } };
+      const data = (await res.json().catch(() => ({}))) as { error?: string; success?: boolean; user?: { id: string; staffCode: string; name: string; email: string; role: "admin" | "super_admin" | "motel_manager" | "restaurant_manager" | "staff" | "auditor" } };
       if (!res.ok || !data.success) throw new Error(data.error || "Login failed.");
       setAuthed(true);
       setSessionUser(data.user ?? null);
       setLoginOpen(false);
       setPassword("");
-      notify(`Welcome back ${data.user ? `${data.user.name} (${data.user.role === "admin" ? "Admin" : data.user.staffCode})` : ""}.`);
+      notify(`Welcome back ${data.user ? `${data.user.name} (${data.user.role.replaceAll("_", " ")})` : ""}.`);
     } catch (err) {
       setLoginError(err instanceof Error ? err.message : "Login failed.");
     } finally {
@@ -436,51 +485,6 @@ export default function AdminPage() {
     if (data.post) setPosts((prev) => prev.map((x) => (x.id === p.id ? data.post : x)));
   };
 
-  const addStaff = async (e: FormEvent) => {
-    e.preventDefault();
-    const res = await fetch("/api/admin/staff", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(staffForm) });
-    const data = await res.json();
-    if (!res.ok) { notify(data.error || "Could not add staff"); return; }
-    const creds = data.credentials as { password: string; emailed: boolean; reason?: string } | null;
-    setStaffForm({ name: "", email: "", phone: "", role: "staff", password: "", sendCredentials: true });
-    if (creds) {
-      notify(creds.emailed
-        ? `Added ${data.staff.staffCode} — ${data.staff.name}. Password ${creds.password} emailed to ${data.staff.email}.`
-        : `Added ${data.staff.staffCode} — ${data.staff.name}. Password ${creds.password} — email failed (${creds.reason || "check SMTP settings"}), share it on WhatsApp.`);
-    } else {
-      notify(`Added ${data.staff.staffCode} — ${data.staff.name}.`);
-    }
-    loadAll();
-  };
-
-  // Reset a login and email the new details to that person.
-  const emailStaffLogin = async (id: string, name: string, email: string) => {
-    if (!confirm(`Create a new password for ${name} and email the login details to ${email}? Their current password stops working immediately.`)) return;
-    const res = await fetch("/api/admin/staff", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, sendCredentials: true }) });
-    const data = await res.json();
-    if (!res.ok) { notify(data.error || "Could not email login details"); return; }
-    const creds = data.credentials as { password: string; emailed: boolean; reason?: string } | null;
-    notify(creds?.emailed
-      ? `New login details emailed to ${email}.`
-      : `New password for ${name}: ${creds?.password ?? "(not returned)"} — email failed (${creds?.reason || "check SMTP settings"}), share it on WhatsApp.`);
-    loadAll();
-  };
-
-  const toggleStaff = async (id: string, isActive: boolean) => {
-    const res = await fetch("/api/admin/staff", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, isActive }) });
-    const data = await res.json();
-    notify(res.ok ? "Staff updated." : (data.error || "Update failed"));
-    loadAll();
-  };
-
-  const removeStaff = async (id: string, name: string) => {
-    if (!confirm(`Remove staff ${name}? They will lose portal access immediately.`)) return;
-    const res = await fetch(`/api/admin/staff?id=${id}`, { method: "DELETE" });
-    const data = await res.json();
-    notify(res.ok ? "Staff removed." : (data.error || "Remove failed"));
-    loadAll();
-  };
-
   const addRoom = async (e: FormEvent) => {
     e.preventDefault();
     const res = await fetch("/api/admin/rooms", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...roomForm, rate: Number(roomForm.rate), totalInventory: Number(roomForm.totalInventory) }) });
@@ -542,6 +546,13 @@ export default function AdminPage() {
           </div>
         </div>
         <div className="admin-header-actions">
+          {/* `/desk` is the console the front desk actually works the day from — ten
+              tabs, the room map, the order board, the money. It linked OUT to this
+              legacy portal, but nothing linked IN to it, so the only way to reach it
+              was to type the URL. This is that missing inbound link (§2.6: the
+              manager portal is a text link and never competes with Check
+              availability — it sits beside the header actions, not in the nav). */}
+          <a className="admin-btn" href="/desk"><LayoutDashboard size={15} /> Front desk console</a>
           <button className="admin-btn admin-btn-refresh" onClick={loadAll}>{busy ? <Loader2 size={15} className="spin" /> : <RefreshCw size={15} />} Refresh</button>
           {authed && <button className="admin-btn" onClick={logout}><Key size={15} /> Lock</button>}
         </div>
@@ -553,39 +564,42 @@ export default function AdminPage() {
           <ShieldCheck size={28} />
           <h2>Manager area is locked</h2>
           <p>Please sign in to see bookings, invoices and guest details.</p>
-          <button className="admin-btn admin-btn-primary" onClick={() => setLoginOpen(true)}><Key size={15} /> Manager sign-in</button>
+          <button ref={signInButtonRef} className="admin-btn admin-btn-primary" onClick={() => setLoginOpen(true)}><Key size={15} /> Manager sign-in</button>
         </div>
       )}
 
       {/* ---------- Login pop-up ---------- */}
       {loginOpen && (
-        <div className="modal-overlay" onClick={(e) => { if (authed && e.target === e.currentTarget) setLoginOpen(false); }}>
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeLogin(); }}>
           <div className="modal-dialog admin-login-dialog" role="dialog" aria-modal="true" aria-label="Manager sign-in">
-            {!authed ? null : <button className="modal-close-btn" onClick={() => setLoginOpen(false)} aria-label="Close sign-in"><X size={18} /></button>}
+            <button className="modal-close-btn" onClick={closeLogin} aria-label="Close sign-in"><X size={18} /></button>
             <div className="modal-head">
               <span className="eyebrow"><span className="eyebrow-line" /> MANAGER PORTAL</span>
               <h2>Manager sign-in</h2>
               <p className="modal-sub">Staff only. Guests never need a login — they track with reference + phone.</p>
             </div>
             <form onSubmit={submitLogin} className="admin-modal-form">
-              <label><span>Staff email (leave blank for legacy manager password)</span>
-                <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} placeholder="you@sunrisemotel.mw" autoComplete="username" />
+              <label><span>Invitation email</span>
+                <input type="email" required value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} placeholder="you@sunrisemotel.mw" autoComplete="username" />
               </label>
-              <label><span>Password{loginEmail ? "" : " (manager password)"}</span>
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter manager password" autoComplete="current-password" autoFocus />
+              <label><span>Password</span>
+                <input ref={passwordRef} required type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" autoComplete="current-password" />
               </label>
               {loginError && <div className="booking-error-banner"><X size={14} /><span>{loginError}</span></div>}
               <button type="submit" className="admin-btn admin-btn-primary admin-btn-wide" disabled={loginBusy || !password}>
                 {loginBusy ? <><Loader2 size={15} className="spin" /> Checking…</> : <><Key size={15} /> Unlock manager portal</>}
               </button>
-              <p className="no-account-guarantee"><ShieldCheck size={13} /> Password is checked on the server (ADMIN_PASSWORD in .env). Session lasts 12 hours on this device.</p>
+              <p className="no-account-guarantee"><ShieldCheck size={13} /> Sign in with the email and password you set from your invitation. Session lasts 12 hours on this device.</p>
+              <p className="admin-login-dismiss">Not the manager? Close this and carry on reading the site — nothing here opens without the password.</p>
             </form>
           </div>
         </div>
       )}
 
-      {/* Main portal - blurred/locked until login */}
-      <div className={authed ? "" : "admin-locked-blur"} aria-hidden={!authed}>
+      {/* Main portal - blurred/locked until login. `inert` is what makes that a
+          promise rather than a picture: while it is locked the keyboard cannot
+          wander into the blurred cards behind the pop-up either. */}
+      <div className={authed ? "" : "admin-locked-blur"} aria-hidden={!authed} inert={!authed}>
         <div className="admin-stats">
         <div className="stat"><span>Requests</span><strong>{stats.total}</strong></div>
         <div className="stat stat-warn"><span>Pending review{reminders && reminders.pendingCount > 0 ? ` (${reminders.pendingCount})` : ""}</span><strong>{stats.pending}</strong></div>
@@ -622,9 +636,9 @@ export default function AdminPage() {
         <button className={tab === "invoices" ? "active" : ""} onClick={() => setTab("invoices")}><FileText size={15} /> Invoices ({invoices.length})</button>
         <button className={tab === "gallery" ? "active" : ""} onClick={() => setTab("gallery")}><ImageIcon size={15} /> Pictures ({gallery.length})</button>
         <button className={tab === "posts" ? "active" : ""} onClick={() => setTab("posts")}><Flame size={15} /> Posts ({posts.length})</button>
-        <button className={tab === "audit" ? "active" : ""} onClick={() => { setTab("audit"); loadAudit(); }}><History size={15} /> Audit trail</button>
-        {isAdmin && <button className={tab === "staff" ? "active" : ""} onClick={() => setTab("staff")}><Users size={15} /> Staff ({staffList.length})</button>}
-        {isAdmin && <button className={tab === "rooms" ? "active" : ""} onClick={() => setTab("rooms")}><BedDouble size={15} /> Rooms ({roomsList.length})</button>}
+        <a className="admin-btn" href="/admin/audit-logs" style={{ textDecoration: "none" }}><History size={15} /> Audit trail</a>
+        {canViewUsers && <a className="admin-btn" href="/admin/users" style={{ textDecoration: "none" }}><Users size={15} /> Users{isAdmin ? ` (${staffList.length})` : ""}</a>}
+        {isMotelManager && <button className={tab === "rooms" ? "active" : ""} onClick={() => setTab("rooms")}><BedDouble size={15} /> Rooms ({roomsList.length})</button>}
         <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}><Download size={15} /> Reports</button>
         <a className="admin-btn" href="/admin/notifications" style={{ textDecoration: "none" }}><Send size={15} /> App push</a>
       </nav>
@@ -723,7 +737,7 @@ export default function AdminPage() {
         <section className="admin-content-section">
           <div className="section-toolbar">
             <div className="toolbar-info"><h2>Pictures & gallery</h2><p>Upload photos from your phone or paste an image link. Remove anything outdated — changes are live immediately.</p></div>
-            {isAdmin
+            {isMotelManager
               ? <button className="admin-btn admin-btn-primary" onClick={() => setShowAddImage(true)}><Plus size={15} /> Add picture</button>
               : <small className="hint">Admins only — staff can view the gallery here.</small>}
           </div>
@@ -734,7 +748,7 @@ export default function AdminPage() {
                 <div className="card-body">
                   <strong>{img.title}</strong>
                   {img.caption && <p>{img.caption}</p>}
-                  {isAdmin && <div className="card-actions"><button className="btn-delete" onClick={() => removeImage(img.id)}><Trash2 size={13} /> Remove</button></div>}
+                  {isMotelManager && <div className="card-actions"><button className="btn-delete" onClick={() => removeImage(img.id)}><Trash2 size={13} /> Remove</button></div>}
                 </div>
               </div>
             ))}
@@ -747,7 +761,7 @@ export default function AdminPage() {
         <section className="admin-content-section">
           <div className="section-toolbar">
             <div className="toolbar-info"><h2>Posts, events & offers</h2><p>Publish braai days, happy hour, match days and offers. Pause or delete anything that has passed.</p></div>
-            {isAdmin
+            {isRestaurantManager
               ? <button className="admin-btn admin-btn-primary" onClick={() => setShowAddPost(true)}><Plus size={15} /> New post</button>
               : <small className="hint">Admins only — staff can view posts here.</small>}
           </div>
@@ -764,7 +778,7 @@ export default function AdminPage() {
                     {p.priceTag && <strong className="price-tag-badge">{p.priceTag}</strong>}
                   </div>
                 </div>
-                {isAdmin && (
+                {isRestaurantManager && (
                   <div className="post-admin-actions">
                     <button className={`btn-toggle ${p.isActive ? "btn-active" : "btn-paused"}`} onClick={() => togglePost(p)}>{p.isActive ? "Live" : "Paused"}</button>
                     <button className="btn-delete-post" onClick={() => removePost(p.id)}><Trash2 size={13} /> Delete</button>
@@ -807,18 +821,18 @@ export default function AdminPage() {
                     <button className="admin-btn admin-btn-secondary" onClick={() => approveBooking(selected, "confirm")}>Confirm</button>
                     <button className="admin-btn" onClick={() => approveBooking(selected, "follow_up")}><Send size={14} /> Follow-up</button>
                     <button className="admin-btn" onClick={() => extendBooking(selected)}>Extend stay</button>
-                    {!isAdmin && <small className="hint">Staff: approve / confirm / cancel / follow-up only.</small>}
+                    {!isMotelManager && <small className="hint">Desk staff can approve, confirm, cancel and follow up; Motel Managers handle extensions and room controls.</small>}
                   </div>
                 </div>
                 <div className="admin-form-group">
                   <label>Status</label>
                   <div className="status-button-row">
                     {STATUSES.map((s) => (
-                      <button key={s} className={`status-btn ${selected.status === s ? "active" : ""}`} disabled={!isAdmin && !["confirmed", "cancelled"].includes(s)} title={!isAdmin && !["confirmed", "cancelled"].includes(s) ? "Admins only" : undefined} onClick={() => patchBooking(selected.id, { status: s })}>{s.replace("_", " ")}</button>
+                      <button key={s} className={`status-btn ${selected.status === s ? "active" : ""}`} disabled={!isManager && !["confirmed", "cancelled"].includes(s)} title={!isManager && !["confirmed", "cancelled"].includes(s) ? "Manager action" : undefined} onClick={() => patchBooking(selected.id, { status: s })}>{s.replace("_", " ")}</button>
                     ))}
                   </div>
                 </div>
-                {isAdmin && (
+                {isMotelManager && (
                 <div className="admin-form-group">
                   <label>Assign physical room (admin)</label>
                   <div className="input-with-button">
@@ -827,7 +841,7 @@ export default function AdminPage() {
                   </div>
                 </div>
                 )}
-                {isAdmin && (
+                {isMotelManager && (
                 <div className="admin-form-group">
                   <label>Record payment received (MWK, admin)</label>
                   <div className="input-with-button">
@@ -864,7 +878,7 @@ export default function AdminPage() {
                         <div>
                           <strong>{EVENT_LABEL[ev.action] || ev.action}</strong>
                           {ev.note && <p>{ev.note}</p>}
-                          <small>{when(ev.createdAt)} · {ev.actor}</small>
+                          <small>{when(ev.createdAt)} · {ev.actorName ?? ev.actor}{ev.actorRole ? ` (${ev.actorRole.replaceAll("_", " ")})` : ""}{ev.actorEmail ? ` · ${ev.actorEmail}` : ""}</small>
                         </div>
                       </li>
                     ))}
@@ -1024,45 +1038,16 @@ export default function AdminPage() {
         </section>
       )}
 
-      {/* ---------------- STAFF (admin only) ---------------- */}
+      {/* ---------------- STAFF DIRECTORY ---------------- */}
       {tab === "staff" && isAdmin && (
         <section className="admin-content-section">
-          <div className="section-toolbar">
-            <div className="toolbar-info"><h2>Staff accounts</h2><p>Staff can only view + approve / confirm / cancel / follow-up — every action is logged with their staff ID.</p></div>
-          </div>
-          <form onSubmit={addStaff} className="admin-modal-form admin-inline-form">
-            <div className="form-grid-2">
-              <label><span>Name *</span><input required value={staffForm.name} onChange={(e) => setStaffForm({ ...staffForm, name: e.target.value })} placeholder="e.g. Kondwani Phiri" /></label>
-              <label><span>Email (login) *</span><input required type="email" value={staffForm.email} onChange={(e) => setStaffForm({ ...staffForm, email: e.target.value })} placeholder="staff@sunrisemotel.mw" /></label>
-            </div>
-            <div className="form-grid-2">
-              <label><span>Phone</span><input value={staffForm.phone} onChange={(e) => setStaffForm({ ...staffForm, phone: e.target.value })} placeholder="+265 …" /></label>
-              <label><span>Role</span><select value={staffForm.role} onChange={(e) => setStaffForm({ ...staffForm, role: e.target.value })}><option value="staff">Staff (limited)</option><option value="admin">Admin (full)</option></select></label>
-            </div>
-            <label><span>{staffForm.sendCredentials ? "Password (created for them)" : "Password (min 6) *"}</span><input required={!staffForm.sendCredentials} disabled={staffForm.sendCredentials} type="password" value={staffForm.password} onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })} placeholder={staffForm.sendCredentials ? "A strong password is created and emailed" : "Set a password"} /></label>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-              <input type="checkbox" checked={staffForm.sendCredentials} onChange={(e) => setStaffForm({ ...staffForm, sendCredentials: e.target.checked, password: e.target.checked ? "" : staffForm.password })} />
-              <span>Email these login details to the new user (recommended — they can set their own later)</span>
-            </label>
-            <button type="submit" className="admin-btn admin-btn-primary"><Plus size={15} /> Add staff</button>
-          </form>
-          <div className="invoice-list">
-            {staffList.map((s) => (
-              <div key={s.id} className="invoice-row">
-                <div><strong>{s.staffCode} — {s.name}</strong><small>{s.email}</small></div>
-                <div><strong>{s.role}</strong><small>{s.isActive ? "active" : "deactivated"}</small></div>
-                <div className="invoice-actions">
-                  <button className="btn-action" onClick={() => emailStaffLogin(s.id, s.name, s.email)}>Email login</button>
-                  <button className="btn-action" onClick={() => toggleStaff(s.id, !s.isActive)}>{s.isActive ? "Deactivate" : "Activate"}</button>
-                  <button className="btn-action btn-danger-text" onClick={() => removeStaff(s.id, s.name)}>Remove</button>
-                </div>
-              </div>
-            ))}
-          </div>
+          <h2>User and invitation controls</h2>
+          <p>Direct password creation is disabled. Use the invitation manager to grant access and audit all changes.</p>
+          <Link className="admin-btn admin-btn-primary" href="/admin/users"><Users size={15} /> Open user management</Link>
         </section>
       )}
       {/* ---------------- ROOMS (admin only) ---------------- */}
-      {tab === "rooms" && isAdmin && (
+      {tab === "rooms" && isMotelManager && (
         <section className="admin-content-section">
           <div className="section-toolbar">
             <div className="toolbar-info"><h2>Rooms / services</h2><p>Only admins can add, hide or remove these.</p></div>

@@ -3,24 +3,24 @@ import { db } from "@/db";
 import { bookings, roomTypesTable } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { clientIp, logAudit } from "@/lib/audit";
-import { readSession } from "@/lib/staff-auth";
+import { isMotelManagerRole, readSession } from "@/lib/staff-auth";
 
 export const dynamic = "force-dynamic";
 
 // Admin-only: add/remove rooms & services (room types + rates + inventory).
 // Staff sessions get 403. Rooms are never hard-deleted while live bookings exist.
 export async function GET(request: Request) {
-  const user = readSession(request);
+  const user = await readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
-  if (user.role !== "admin") return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  if (!isMotelManagerRole(user.role)) return NextResponse.json({ error: "Motel Manager access required." }, { status: 403 });
   const rooms = await db.select().from(roomTypesTable);
   return NextResponse.json({ rooms });
 }
 
 export async function POST(request: Request) {
-  const user = readSession(request);
+  const user = await readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
-  if (user.role !== "admin") return NextResponse.json({ error: "Only admins can add rooms/services." }, { status: 403 });
+  if (!isMotelManagerRole(user.role)) return NextResponse.json({ error: "Motel Manager access required." }, { status: 403 });
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
       isActive: true,
     }).returning();
     await logAudit({
-      action: "room.created", entity: "room", entityId: room.id,
+      action: "ROOM_CREATED", entity: "room", entityId: room.id,
       summary: `${user.name} added room/service ${room.name} @ MWK ${room.rate.toLocaleString()}/night.`,
       actor: "manager", actorLabel: `${user.staffCode} — ${user.name}`, ip: clientIp(request),
     });
@@ -57,9 +57,9 @@ export async function POST(request: Request) {
 
 
 export async function PATCH(request: Request) {
-  const user = readSession(request);
+  const user = await readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
-  if (user.role !== "admin") return NextResponse.json({ error: "Only admins can edit rooms/services." }, { status: 403 });
+  if (!isMotelManagerRole(user.role)) return NextResponse.json({ error: "Motel Manager access required." }, { status: 403 });
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const id = typeof body.id === "string" ? body.id : "";
@@ -76,7 +76,7 @@ export async function PATCH(request: Request) {
     const [room] = await db.update(roomTypesTable).set(update).where(eq(roomTypesTable.id, id)).returning();
     if (!room) return NextResponse.json({ error: "Room not found." }, { status: 404 });
     await logAudit({
-      action: "room.updated", entity: "room", entityId: room.id,
+      action: "ROOM_UPDATED", entity: "room", entityId: room.id,
       summary: `${user.name} updated room/service ${room.name}.`,
       actor: "manager", actorLabel: `${user.staffCode} — ${user.name}`, ip: clientIp(request),
     });
@@ -88,9 +88,9 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const user = readSession(request);
+  const user = await readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
-  if (user.role !== "admin") return NextResponse.json({ error: "Only admins can remove rooms/services." }, { status: 403 });
+  if (!isMotelManagerRole(user.role)) return NextResponse.json({ error: "Motel Manager access required." }, { status: 403 });
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id") ?? "";
@@ -99,7 +99,7 @@ export async function DELETE(request: Request) {
     if (live.length > 0) {
       await db.update(roomTypesTable).set({ isActive: false }).where(eq(roomTypesTable.id, id));
       await logAudit({
-        action: "room.deactivated", entity: "room", entityId: id,
+        action: "ROOM_UPDATED", entity: "room", entityId: id,
         summary: `${user.name} hid room/service ${id} (live bookings exist — deactivated).`,
         actor: "manager", actorLabel: `${user.staffCode} — ${user.name}`, ip: clientIp(request),
       });
@@ -107,7 +107,7 @@ export async function DELETE(request: Request) {
     }
     await db.delete(roomTypesTable).where(eq(roomTypesTable.id, id));
     await logAudit({
-      action: "room.removed", entity: "room", entityId: id,
+      action: "ROOM_DELETED", entity: "room", entityId: id,
       summary: `${user.name} removed room/service ${id}.`,
       actor: "manager", actorLabel: `${user.staffCode} — ${user.name}`, ip: clientIp(request),
     });

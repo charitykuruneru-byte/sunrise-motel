@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { auditLogTable } from "@/db/schema";
 import { and, desc, eq, ilike, or, type SQL } from "drizzle-orm";
-import { readSession } from "@/lib/staff-auth";
+import { isSuperAdminRole, readSession } from "@/lib/staff-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +12,9 @@ export const dynamic = "force-dynamic";
 // ADDENDUM (authority matrix): the audit trail is readable by staff, admin and auditor — but
 // never by an anonymous caller. A signed-in session is required, and nobody can edit or delete.
 export async function GET(request: Request) {
-  const user = readSession(request);
+  const user = await readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+  if (!isSuperAdminRole(user.role)) return NextResponse.json({ error: "Super Admin access required." }, { status: 403 });
   try {
     const { searchParams } = new URL(request.url);
     const q = searchParams.get("q")?.trim() ?? "";

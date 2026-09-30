@@ -15,7 +15,7 @@ import { eq } from "drizzle-orm";
 // Re-exported so existing `import { hashPassword } from "@/lib/staff-auth"` keeps working.
 export { hashPassword, verifyPassword, generatePassword } from "./password";
 
-export type SessionRole = "admin" | "staff" | "auditor";
+export type SessionRole = "admin" | "super_admin" | "motel_manager" | "restaurant_manager" | "staff" | "auditor";
 
 export type SessionUser = {
   id: string;
@@ -23,9 +23,23 @@ export type SessionUser = {
   name: string;
   email: string;
   role: SessionRole;
-  /** Legacy single-password manager session (ADMIN_PASSWORD) — treated as admin. */
-  legacy?: boolean;
 };
+
+export function isSuperAdminRole(role: SessionRole | string) {
+  return role === "admin" || role === "super_admin";
+}
+
+export function isManagerRole(role: SessionRole | string) {
+  return isSuperAdminRole(role) || role === "motel_manager" || role === "restaurant_manager";
+}
+
+export function isMotelManagerRole(role: SessionRole | string) {
+  return isSuperAdminRole(role) || role === "motel_manager";
+}
+
+export function isRestaurantManagerRole(role: SessionRole | string) {
+  return isSuperAdminRole(role) || role === "restaurant_manager";
+}
 
 export function nextStaffCode(existing: string[]) {
   let max = 1;
@@ -37,12 +51,15 @@ export function nextStaffCode(existing: string[]) {
 }
 
 /**
- * The signing secret. `SESSION_SECRET` is the intended variable; `ADMIN_PASSWORD` is accepted
- * as a fallback so an existing deployment keeps working without a new setting, and the last
- * value is a development-only default so a fresh local clone still boots.
+ * Production requires a strong SESSION_SECRET; only local development has a fallback.
  */
 function sessionSecret() {
-  return process.env.SESSION_SECRET ?? process.env.ADMIN_PASSWORD ?? "sunrise-motel-local-dev-secret";
+  const configured = process.env.SESSION_SECRET;
+  if (configured && configured.length >= 32) return configured;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET must be configured with at least 32 characters in production.");
+  }
+  return "sunrise-motel-local-dev-secret";
 }
 
 function sign(payload: string) {
@@ -74,7 +91,11 @@ function readSignedSession(value: string): SessionUser | null {
   if (!signatureMatches(payload, signature)) return null;
   try {
     const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as SessionUser;
-    if (parsed && (parsed.role === "admin" || parsed.role === "staff" || parsed.role === "auditor") && parsed.name) {
+    if (
+      parsed &&
+      ["admin", "super_admin", "motel_manager", "restaurant_manager", "staff", "auditor"].includes(parsed.role) &&
+      parsed.name
+    ) {
       return parsed;
     }
   } catch {
@@ -83,32 +104,44 @@ function readSignedSession(value: string): SessionUser | null {
   return null;
 }
 
-export function readSession(request: Request): SessionUser | null {
+export async function readSession(request: Request): Promise<SessionUser | null> {
   const parts = (request.headers.get("cookie") ?? "").split(";").map((part) => part.trim());
   const session = parts.find((part) => part.startsWith("sunrise_session="));
   if (session) {
     const user = readSignedSession(session.slice("sunrise_session=".length));
-    if (user) return user;
-  }
-  // Legacy ADMIN_PASSWORD cookie — full admin, but the marker must carry a valid signature.
-  const legacy = parts.find((part) => part.startsWith("sunrise_admin="));
-  if (legacy) {
-    const value = legacy.slice("sunrise_admin=".length);
-    if (value && signatureMatches("legacy-admin-marker", value)) {
-      return { id: "legacy-admin", staffCode: "ADM000", name: "Manager", email: "", role: "admin", legacy: true };
-    }
+    if (!user || user.id === "legacy-admin") return null;
+    const [staff] = await db
+      .select()
+      .from(staffTable)
+      .where(eq(staffTable.id, user.id))
+      .limit(1);
+    if (!staff || !staff.isActive || staff.isDeleted) return null;
+    return {
+      id: staff.id,
+      staffCode: staff.staffCode,
+      name: staff.name,
+      email: staff.email,
+      role: staff.role as SessionRole,
+    };
   }
   return null;
 }
 
 export function sessionLabel(user: SessionUser | null) {
   if (!user) return "anonymous";
-  if (user.role === "admin") return `Admin — ${user.name}`;
+  if (isSuperAdminRole(user.role)) return `Super Admin — ${user.name}`;
   if (user.role === "auditor") return `Auditor ${user.staffCode} — ${user.name}`;
+  if (user.role === "motel_manager" || user.role === "restaurant_manager") {
+    return `${user.role === "motel_manager" ? "Motel Manager" : "Restaurant Manager"} — ${user.name}`;
+  }
   return `Staff ${user.staffCode} — ${user.name}`;
 }
 
 export async function getStaffByEmail(email: string) {
-  const [row] = await db.select().from(staffTable).where(eq(staffTable.email, email.trim().toLowerCase())).limit(1);
-  return row ?? null;
+  const [row] = await db
+    .select()
+    .from(staffTable)
+    .where(eq(staffTable.email, email.trim().toLowerCase()))
+    .limit(1);
+  return row && !row.isDeleted ? row : null;
 }

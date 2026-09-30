@@ -1,8 +1,7 @@
 "use client";
 
-import { Loader2, UserPlus, Users } from "lucide-react";
+import { Loader2, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import GuestCredentialsPanel, { type GuestCredentials } from "./guest-credentials-card";
 import { api, BTN, BTN_PRIMARY, CARD, INPUT, money } from "./shared";
 
 type Account = {
@@ -62,8 +61,6 @@ export default function DeskGuests({
   const [busy, setBusy] = useState(false);
   const [emailFor, setEmailFor] = useState<Record<string, string>>({});
   const [deskPassword, setDeskPassword] = useState<Record<string, string>>({});
-  /** The password the SYSTEM chose, held in memory only until the card is printed. */
-  const [credentials, setCredentials] = useState<GuestCredentials | null>(null);
 
   const load = useCallback(async () => {
     const data = await api<{ guests: GuestRow[]; stats: typeof stats }>("/api/desk/guests");
@@ -91,68 +88,29 @@ export default function DeskGuests({
   };
 
   const invite = (guest: GuestRow) =>
-    run("Guest account created — activation email sent (or the code is shown to read out).", async () => {
-      if (!guest.activeStay) throw new Error("This guest has no active stay to link the account to.");
+    run("Guest invitation sent. The guest can set their own password from the email.", async () => {
+      if (guest.activeStay?.status !== "checked_in") throw new Error("Guest accounts can only be invited after check-in.");
+      const email = (emailFor[guest.id] ?? guest.email ?? "").trim();
+      if (!email) throw new Error("Capture the guest's email address after check-in.");
       const data = await api<{
         result: {
           existingAccount: boolean;
           emailSent: boolean;
           emailReason: string | null;
-          activationLink: string | null;
-          activationOtp: string | null;
         };
       }>("/api/desk/guests", {
         method: "POST",
         body: JSON.stringify({
           action: "invite",
           bookingId: guest.activeStay.id,
-          login: emailFor[guest.id] || undefined,
+          login: email,
         }),
       });
       if (data.result.existingAccount) {
-        setToast("Returning guest — their stay is now linked to the existing account; no new password issued.");
+        setToast("Returning guest — stay linked to the existing account; no duplicate account created.");
       } else if (!data.result.emailSent) {
-        setToast(
-          `Saved but not emailed (${data.result.emailReason ?? "SMTP unavailable"}). Read out code ${data.result.activationOtp ?? "—"} or share ${data.result.activationLink ?? "—"}`,
-        );
+        setToast(`Invitation saved, but email failed (${data.result.emailReason ?? "SMTP unavailable"}). Ask an administrator to resend it after email is restored.`);
       }
-    });
-
-  /**
-   * THE FRONT DESK IS THE DOORWAY. The desk types the email, the SYSTEM picks the
-   * password, and it comes back exactly once for the card that is handed over. A
-   * returning guest keeps the password they already know — the stay is just linked,
-   * and the panel says so instead of inventing a new one for a regular.
-   */
-  const register = (guest: GuestRow) =>
-    run("Account registered — hand over the sign-in card.", async () => {
-      if (!guest.activeStay) throw new Error("This guest has no active stay to link the account to.");
-      const email = (emailFor[guest.id] ?? guest.email ?? "").trim();
-      if (!email) throw new Error("Type the email address the guest will sign in with.");
-      const data = await api<{
-        result: {
-          loginEmail: string;
-          password: string | null;
-          existingAccount: boolean;
-          roomNumber: string | null;
-          checkOut: string | null;
-          emailSent: boolean;
-          emailReason: string | null;
-        };
-      }>("/api/desk/guests", {
-        method: "POST",
-        body: JSON.stringify({ action: "register", bookingId: guest.activeStay.id, login: email }),
-      });
-      setCredentials({
-        guestName: guest.fullName,
-        loginEmail: data.result.loginEmail,
-        password: data.result.password,
-        roomNumber: data.result.roomNumber,
-        checkOut: data.result.checkOut,
-        guestPhone: guest.phone,
-        emailSent: data.result.emailSent,
-        emailReason: data.result.emailReason,
-      });
     });
 
   const accountAction = (account: Account, action: string, extra: Record<string, unknown> = {}, label = "Saved.") =>
@@ -168,14 +126,6 @@ export default function DeskGuests({
   });
   return (
     <div className="space-y-4">
-      {credentials && (
-        <section>
-          <GuestCredentialsPanel credentials={credentials} />
-          <button className={`${BTN} mt-2`} type="button" onClick={() => setCredentials(null)}>
-            Done — the guest has the details
-          </button>
-        </section>
-      )}
       <section className="flex flex-wrap items-center gap-3">
         <h2 className="flex items-center gap-2 text-sm font-bold">
           <Users size={16} className="text-[#f8c66b]" /> Guests (CRM)
@@ -222,20 +172,18 @@ export default function DeskGuests({
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {!readOnly && guest.activeStay && !guest.accounts.some((a) => a.status === "active") && (
+                {!readOnly && guest.activeStay?.status === "checked_in" && !guest.accounts.some((a) => a.status === "active") && (
                   <>
                     <input
                       className={`${INPUT} max-w-[210px]`}
-                      placeholder="email the guest signs in with"
+                      type="email"
+                      required
+                      placeholder="guest email after check-in"
                       value={emailFor[guest.id] ?? ""}
                       onChange={(e) => setEmailFor({ ...emailFor, [guest.id]: e.target.value })}
                     />
-                    <button className={BTN_PRIMARY} disabled={busy} onClick={() => register(guest)}>
-                      {busy ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />} Register + show
-                      password
-                    </button>
                     <button className={BTN} disabled={busy} onClick={() => invite(guest)}>
-                      Email a link instead
+                      {busy ? <Loader2 size={13} className="animate-spin" /> : null} Invite guest by email
                     </button>
                   </>
                 )}

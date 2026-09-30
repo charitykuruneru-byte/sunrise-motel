@@ -144,6 +144,9 @@
    HERO — the photograph does the selling
    ===================================================================== */
 .hp-hero {
+  /* How much of the top of the hero the fixed nav sits over. The film controls
+     are placed below it, so they can never end up underneath the header. */
+  --hp-hero-top: 104px;
   position: relative;
   isolation: isolate;
   color: #fff;
@@ -185,6 +188,55 @@
     linear-gradient(90deg, rgba(20, 17, 15, 0.74) 0%, rgba(20, 17, 15, 0.1) 64%);
 }
 
+/* The hero film (§2.3) — the property's own footage of the grounds, laid in the
+   same box as the photograph so the poster is what shows until the first frame
+   arrives. Muted and looping by definition (every browser refuses to autoplay
+   with sound), decorative by intention: the photograph underneath is the real
+   hero, so a phone that refuses to play the file, or a guest who taps Pause,
+   still leaves a complete hero page behind. */
+.hp-hero-video {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 42%;
+}
+/* Play/pause and sound, sitting just under the fixed nav on the right — the one
+   corner of the hero that is sky. The film is never in charge: these two
+   buttons are the guest's way out of it. */
+.hp-hero-media-controls {
+  position: absolute;
+  z-index: 3;
+  top: calc(var(--hp-hero-top) + 16px);
+  right: var(--hp-gutter);
+  display: flex;
+  gap: 8px;
+}
+.hp-hero-media-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(20, 17, 15, 0.52);
+  backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.hp-hero-media-btn:hover,
+.hp-hero-media-btn:focus-visible {
+  background: rgba(20, 17, 15, 0.78);
+  border-color: var(--hp-gold);
+  color: #fff;
+}
 .hp-hero-inner { width: 100%; }
 .hp-hero-eyebrow {
   font-size: 12px;
@@ -1172,7 +1224,7 @@
 @media (max-width: 900px) {
   .hp-section { padding: 88px 0; }
   .hp-section--tight { padding: 64px 0; }
-  .hp-hero { padding: 88px 0 112px; min-height: clamp(520px, 78vh, 680px); }
+  .hp-hero { padding: 88px 0 112px; min-height: clamp(520px, 78vh, 680px); --hp-hero-top: 88px; }
   .hp-avail-float { margin-top: -88px; }
   .hp-avail-fields { grid-template-columns: 1fr 1fr; }
   .hp-avail-submit { width: 100%; }
@@ -1198,8 +1250,10 @@
   .hp-avail-float { padding: 0 18px; margin-top: -72px; }
   .hp-section { padding: 64px 0; }
   .hp-section--tight { padding: 52px 0; }
-  .hp-hero { padding: 76px 0 96px; min-height: 0; }
+  .hp-hero { padding: 76px 0 96px; min-height: 0; --hp-hero-top: 76px; }
   .hp-hero-img { object-position: center 38%; }
+  .hp-hero-media-controls { top: calc(var(--hp-hero-top) + 10px); gap: 6px; }
+  .hp-hero-media-btn { padding: 7px 10px; font-size: 10px; }
   .hp-h1 { font-size: clamp(30px, 9vw, 42px); max-width: 100%; }
   .hp-hero-sub { font-size: 15px; }
   .hp-hero-actions { gap: 16px; margin-top: 22px; }
@@ -1254,7 +1308,7 @@
 
 /* --- landscape phones: the hero must not eat the whole viewport ---- */
 @media (max-height: 520px) and (orientation: landscape) {
-  .hp-hero { min-height: 0; padding: 64px 0 96px; }
+  .hp-hero { min-height: 0; padding: 64px 0 96px; --hp-hero-top: 64px; }
   .hp-h1 { font-size: clamp(28px, 5vw, 40px); }
   .hp-avail-float { margin-top: -72px; }
 }

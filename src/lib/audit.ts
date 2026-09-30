@@ -4,7 +4,8 @@
 
 import { randomUUID } from "node:crypto";
 import { db } from "@/db";
-import { auditLogTable } from "@/db/schema";
+import { auditLogTable, staffTable } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 export type AuditActor = "guest" | "manager" | "system";
 
@@ -16,10 +17,34 @@ export async function logAudit(opts: {
   summary?: string | null;
   actor?: AuditActor;
   actorLabel?: string | null;
+  actorId?: string | null;
+  actorEmail?: string | null;
+  actorRole?: string | null;
+  targetId?: string | null;
+  targetEmail?: string | null;
   ip?: string | null;
   metadata?: Record<string, unknown> | null;
+  details?: Record<string, unknown> | null;
 }) {
   try {
+    let actorId = opts.actorId ?? null;
+    let actorEmail = opts.actorEmail ?? null;
+    let actorRole = opts.actorRole ?? null;
+    if (!actorId && opts.actor === "manager" && opts.actorLabel) {
+      const parts = opts.actorLabel.split(" — ");
+      const staffCode = /^(?:STF|ADM)\d+$/i.test(parts[0] ?? "") ? parts[0] : null;
+      const staffName = staffCode ? null : parts.at(-1)?.trim();
+      const matches = staffCode
+        ? await db.select().from(staffTable).where(eq(staffTable.staffCode, staffCode)).limit(1)
+        : staffName
+          ? await db.select().from(staffTable).where(eq(staffTable.name, staffName)).limit(2)
+          : [];
+      if (matches.length === 1) {
+        actorId = matches[0].id;
+        actorEmail = actorEmail ?? matches[0].email;
+        actorRole = actorRole ?? matches[0].role;
+      }
+    }
     await db.insert(auditLogTable).values({
       id: randomUUID(),
       action: opts.action,
@@ -29,8 +54,14 @@ export async function logAudit(opts: {
       summary: opts.summary ?? null,
       actor: opts.actor ?? "system",
       actorLabel: opts.actorLabel ?? null,
+      actorId,
+      actorEmail,
+      actorRole,
+      targetId: opts.targetId ?? opts.entityId ?? null,
+      targetEmail: opts.targetEmail ?? null,
       ip: opts.ip ?? null,
       metadataJson: opts.metadata ? JSON.stringify(opts.metadata) : null,
+      details: opts.details ?? null,
     });
   } catch (error) {
     console.error("Failed to write audit log", error);

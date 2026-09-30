@@ -1,0 +1,635 @@
+{
+  "_readme": [
+    "HAND-VERIFIED CLASSIFICATIONS — the judgement half of scripts/analyze-media.mjs, kept out of the code.",
+    "Every entry was decided by LOOKING at the photograph (a vision pass on 2026-09-29) or by reading a",
+    "filename that cannot mean anything else. `verifiedBy` says which: vision = the picture was seen,",
+    "filename = the name is unambiguous, owner = the owner said so.",
+    "The analyzer applies these OVER the keyword heuristics, so a run is reproducible and a correction here",
+    "survives every re-run. Keys are file names (case-insensitive). Set needsReview true when unsure.",
+    "`hold` keeps a file out of every public surface and records why in the manifest.",
+    "`keepActive: true` keeps a file in play even when its category is over quota — for a photograph a page",
+    "needs by name (the workspace table). `isCover: true` puts a file at the front of its group."
+  ],
+  "520576061.jpg": {
+    "category": "building_exterior",
+    "tags": ["exterior", "gate", "garden", "forecourt", "evening", "entrance"],
+    "alt": "The Sunrise Motel gate and front lawn at dusk, with the paved forecourt in front of the building",
+    "confidence": 0.95,
+    "verifiedBy": "vision",
+    "reason": "Seen: the motel from the forecourt at dusk — hedges, palms and the paved drive, no rooms in frame"
+  },
+  "520576108.jpg": {
+    "category": "restaurant",
+    "tags": ["terrace", "tables", "open-air", "statue", "dining", "restaurant"],
+    "alt": "Tables on the covered restaurant terrace at Sunrise Motel, with the carved statue beside the open doors",
+    "confidence": 0.94,
+    "verifiedBy": "vision",
+    "reason": "Seen: a covered terrace of wooden tables with the carved statue — a dining space, not a room"
+  },
+  "520576120.jpg": {
+    "category": "amenity_parking",
+    "tags": ["parking", "cars", "exterior", "brick", "secure"],
+    "alt": "Guest cars parked on the paved drive beside the Sunrise Motel building, under the trees",
+    "confidence": 0.9,
+    "verifiedBy": "vision",
+    "reason": "Seen: several guest cars on the property drive — parking, not accommodation"
+  },
+  "520576130.jpg": {
+    "category": "building_exterior",
+    "tags": ["exterior", "sign", "facade", "veranda", "aircon"],
+    "alt": "The Sun Rise Motel facade with its round sign and the shaded veranda where guests wait",
+    "confidence": 0.96,
+    "verifiedBy": "vision",
+    "reason": "Seen: the front facade and signage of the motel in daylight"
+  },
+  "520576151.jpg": {
+    "category": "bar",
+    "tags": ["bar", "stools", "supersport", "sport", "guests", "drinks"],
+    "alt": "The bar at Sunrise Motel: guests at the counter under the SuperSport and Manchester United flags",
+    "confidence": 0.95,
+    "verifiedBy": "vision",
+    "reason": "Seen: the bar counter, the spirits shelf and guests on stools — the bar, not a restaurant table"
+  },
+  "520576165.jpg": {
+    "category": "building_exterior",
+    "tags": ["exterior", "sign", "facade", "plants", "veranda"],
+    "alt": "The Sunrise Motel entrance arch and veranda, ringed with potted plants",
+    "confidence": 0.96,
+    "verifiedBy": "vision",
+    "reason": "Seen: the arched SUN RISE MOTEL sign and veranda in daylight"
+  },
+  "520576171.jpg": {
+    "category": "restaurant",
+    "tags": ["restaurant", "tables", "hall", "interior", "dining"],
+    "alt": "The long dining table and chairs in the Sunrise Motel restaurant, lit by the side windows",
+    "confidence": 0.93,
+    "verifiedBy": "vision",
+    "reason": "Seen: a long laid dining table with chairs — the restaurant hall"
+  },
+  "520596171.jpg": {
+    "category": "room_deluxe",
+    "roomTypeId": "deluxe",
+    "tags": ["bed", "double", "canopy", "mosquito-net", "wooden-floor", "spacious"],
+    "alt": "The four-poster double bed with its mosquito net in a Sunrise Motel deluxe room, wooden floors underfoot",
+    "confidence": 0.88,
+    "verifiedBy": "vision",
+    "reason": "Seen: a four-poster double bed with net, a luggage rack and room to move — the deluxe double"
+  },
+  "520596180.jpg": {
+    "category": "bar",
+    "tags": ["bar", "thatch", "terrace", "tables", "castel"],
+    "alt": "The thatched bar terrace at Sunrise Motel, tables set under the Castel Beer sign",
+    "confidence": 0.92,
+    "verifiedBy": "vision",
+    "reason": "Seen: the thatched drinking terrace with the Castel Beer sign — the bar, outdoors"
+  },
+  "691294046.jpg": {
+    "category": "room_standard",
+    "roomTypeId": "standard",
+    "tags": ["bed", "double", "armchair", "wardrobe", "wooden-floor", "standard"],
+    "alt": "A standard room at Sunrise Motel: the double bed with its wardrobe and armchair on polished wooden floors",
+    "confidence": 0.85,
+    "verifiedBy": "vision",
+    "reason": "Seen: one double bed, a wardrobe and a reading chair — the standard double, no canopy, no lounge",
+    "isCover": true
+  },
+  "691294368.jpg": {
+    "category": "room_deluxe",
+    "roomTypeId": "deluxe",
+    "tags": ["bed", "canopy", "fridge", "en-suite", "mosquito-net", "bar-fridge"],
+    "alt": "A deluxe room at Sunrise Motel with its four-poster bed, bar fridge and en-suite doorway",
+    "confidence": 0.87,
+    "verifiedBy": "vision",
+    "reason": "Seen: canopy double bed with a bar fridge and a private en-suite door — the deluxe room"
+  },
+  "691294883.jpg": {
+    "category": "room_family",
+    "tags": ["bed", "double", "single", "family", "fridge", "desk", "mosquito-net"],
+    "alt": "A family room at Sunrise Motel: the double bed with extra single beds, a desk and a bar fridge",
+    "confidence": 0.84,
+    "verifiedBy": "vision",
+    "reason": "Seen: more than two beds in one room with a desk and fridge — a room that sleeps a family, not a twin"
+  },
+  "691295644.jpg": {
+    "category": "room_standard",
+    "roomTypeId": "twin",
+    "tags": ["bed", "single", "twin", "two-beds", "en-suite", "mosquito-net"],
+    "alt": "The twin room at Sunrise Motel: two single beds with mosquito nets and a private bathroom door",
+    "confidence": 0.9,
+    "verifiedBy": "vision",
+    "reason": "Seen: exactly two single beds either side of the room, with the en-suite door between them"
+  },
+  "691296171.jpg": {
+    "category": "room_standard",
+    "roomTypeId": "twin",
+    "tags": ["bed", "single", "twin", "two-beds", "wooden-floor", "window"],
+    "alt": "A twin room at Sunrise Motel with two single beds on the polished wooden floor by the window",
+    "confidence": 0.88,
+    "verifiedBy": "vision",
+    "reason": "Seen: two single beds in one bright room on wooden floors — the twin"
+  },
+  "caption.jpg": {
+    "category": "bar",
+    "tags": ["bar", "thatch", "terrace", "castel", "watermark", "third-party"],
+    "alt": "The thatched bar terrace at Sunrise Motel with the Castel Beer sign overhead",
+    "confidence": 0.8,
+    "verifiedBy": "vision",
+    "reason": "Seen: the bar terrace under thatch — but a third-party 'Get Lost Safely' watermark is burned in",
+    "hold": "Third-party watermark burned into the photograph: publishing it advertises someone else's site"
+  },
+  "caption (1).jpg": {
+    "category": "amenity_garden",
+    "tags": ["garden", "grounds", "parking", "mango-tree", "watermark", "third-party"],
+    "alt": "The Sunrise Motel grounds and drive under the mango trees",
+    "confidence": 0.8,
+    "verifiedBy": "vision",
+    "reason": "Seen: the grounds and parking under the mango tree — but a third-party 'Get Lost Safely' watermark is burned in",
+    "hold": "Third-party watermark burned into the photograph: publishing it advertises someone else's site"
+  },
+  "cute-and-cozy-place-friendly.jpg": {
+    "category": "building_exterior",
+    "tags": ["exterior", "sign", "facade", "day", "plants"],
+    "alt": "The Sunrise Motel facade and its arched sign, with potted plants along the veranda",
+    "confidence": 0.95,
+    "verifiedBy": "vision",
+    "reason": "Seen: the front of the motel with the SUN RISE MOTEL sign and potted plants on the veranda",
+    "isCover": true
+  },
+  "cute-and-cozy-place-friendly (1).jpg": {
+    "category": "bar",
+    "tags": ["bar", "stools", "supersport", "sport", "drinks"],
+    "alt": "Inside the Sunrise Motel bar: the counter, its wooden stools and the big screen over the bottles",
+    "confidence": 0.94,
+    "verifiedBy": "vision",
+    "reason": "Seen: the bar counter and stools under the SuperSport banner and the wall screen"
+  },
+  "cute-and-cozy-place-friendly (2).jpg": {
+    "category": "restaurant",
+    "tags": ["terrace", "statue", "thatch", "tables", "dining"],
+    "alt": "The covered terrace at Sunrise Motel with its carved statue, thatch roof and guest tables",
+    "confidence": 0.93,
+    "verifiedBy": "vision",
+    "reason": "Seen: the thatched terrace with the carved statue and dining tables — the restaurant terrace"
+  },
+  "cute-and-cozy-place-friendly (3).jpg": {
+    "category": "building_interior",
+    "tags": ["staircase", "lobby", "wooden", "interior", "art"],
+    "alt": "The wooden staircase up from the Sunrise Motel lobby, hung with local artwork",
+    "confidence": 0.92,
+    "verifiedBy": "vision",
+    "reason": "Seen: the polished wooden staircase in the lobby with artwork on the walls — inside the building",
+    "isCover": true
+  },
+  "cute-and-cozy-place-friendly (4).jpg": {
+    "category": "building_exterior",
+    "tags": ["exterior", "sign", "facade", "day", "plants", "near-duplicate"],
+    "alt": "The Sunrise Motel frontage and its round sign seen from the forecourt",
+    "confidence": 0.9,
+    "verifiedBy": "vision",
+    "reason": "Seen: the same frontage as cute-and-cozy-place-friendly.jpg, shot wider — one of the two is enough as cover"
+  },
+  "WhatsApp Image 2026-07-23 at 7.05.54 PM.jpeg": {
+    "category": "food_dish",
+    "tags": ["food", "roast-beef", "potatoes", "branded", "sunday-lunch"],
+    "alt": "Sliced roast beef with roast potatoes, as served at Sunrise Motel",
+    "confidence": 0.94,
+    "verifiedBy": "vision",
+    "reason": "Seen: roast beef and roast potatoes carrying the Sunrise Motel logo — a dish, branded"
+  },
+  "WhatsApp Image 2026-07-23 at 7.05.54 PM (1).jpeg": {
+    "category": "food_dish",
+    "tags": ["food", "potato-salad", "egg", "green-beans", "branded"],
+    "alt": "Creamy potato salad with egg and green beans at Sunrise Motel",
+    "confidence": 0.93,
+    "verifiedBy": "vision",
+    "reason": "Seen: potato salad with egg and green beans — a side dish, branded"
+  },
+  "WhatsApp Image 2026-07-23 at 7.05.55 PM.jpeg": {
+    "category": "food_dish",
+    "tags": ["food", "carrot-salad", "olives", "branded", "side"],
+    "alt": "Grated carrot salad with olives and onion, served at Sunrise Motel",
+    "confidence": 0.93,
+    "verifiedBy": "vision",
+    "reason": "Seen: grated carrot salad with olives — a side dish, branded"
+  },
+  "WhatsApp Image 2026-07-23 at 7.05.56 PM.jpeg": {
+    "category": "food_dish",
+    "tags": ["food", "mutton-curry", "chapati", "dhal", "branded"],
+    "alt": "Mutton curry with folded chapati and a bowl of dhal at Sunrise Motel",
+    "confidence": 0.93,
+    "verifiedBy": "vision",
+    "reason": "Seen: mutton curry, chapati and dhal — a main dish, branded"
+  },
+  "WhatsApp Image 2026-07-23 at 7.05.57 PM.jpeg": {
+    "category": "food_dish",
+    "tags": ["food", "boiled-beef", "broth", "branded"],
+    "alt": "Slow-boiled beef in its own broth, as served at Sunrise Motel",
+    "confidence": 0.92,
+    "verifiedBy": "vision",
+    "reason": "Seen: boiled beef in broth — a main dish, branded"
+  },
+  "WhatsApp Image 2026-07-23 at 7.05.57 PM (1).jpeg": {
+    "category": "event",
+    "tags": ["poster", "match-day", "special-menu", "third-party-marks"],
+    "alt": "The match-day special menu at Sunrise Motel",
+    "confidence": 0.85,
+    "verifiedBy": "vision",
+    "reason": "Seen: a Champions League Final special menu poster",
+    "hold": "Carries UEFA / Champions League marks and player likenesses — third-party rights, not ours to publish"
+  },
+  "WhatsApp Image 2026-07-23 at 7.05.58 PM.jpeg": {
+    "category": "bar",
+    "tags": ["poster", "pool-table", "drinks", "third-party-marks"],
+    "alt": "The pool table and the bar at Sunrise Motel",
+    "confidence": 0.8,
+    "verifiedBy": "vision",
+    "reason": "Seen: a pool-table and drinks promotion — the bar lounge, NOT the swimming pool",
+    "hold": "Carries a third-party whisky brand logo"
+  },
+  "WhatsApp Image 2026-07-23 at 7.05.58 PM (1).jpeg": {
+    "category": "other",
+    "tags": ["poster", "accommodation", "branded", "advert"],
+    "alt": "Sunrise Motel accommodation offer poster",
+    "confidence": 0.85,
+    "verifiedBy": "vision",
+    "reason": "Seen: a branded accommodation advert whose inset picture is a room — an advert, kept out of room surfaces"
+  },
+  "WhatsApp Image 2026-07-23 at 7.05.58 PM (2).jpeg": {
+    "category": "other",
+    "tags": ["poster", "exterior", "branded", "marketing"],
+    "alt": "Sunrise Motel 'Escape to Serenity' offer poster",
+    "confidence": 0.85,
+    "verifiedBy": "vision",
+    "reason": "Seen: a branded marketing poster laid over an exterior photograph — an advert, not a property photo"
+  },
+  "WhatsApp Image 2026-07-23 at 7.05.59 PM.jpeg": {
+    "category": "other",
+    "tags": ["poster", "facilities", "collage", "marketing", "claims"],
+    "alt": "Sunrise Motel facilities poster",
+    "confidence": 0.82,
+    "verifiedBy": "vision",
+    "reason": "Seen: a collage poster of the facilities, rooms, drinks and food",
+    "hold": "Shows a five-star rating the property has not been awarded — not publishable as a claim"
+  },
+  "WhatsApp Image 2026-07-23 at 7.05.59 PM (1).jpeg": {
+    "category": "event",
+    "tags": ["poster", "happy-hour", "beer", "wednesday", "braai"],
+    "alt": "The Sunrise Motel happy hour poster: local beers 20% off every Wednesday",
+    "confidence": 0.88,
+    "verifiedBy": "vision",
+    "reason": "Seen: the Wednesday happy-hour poster (local beers 20% off, braai) — a recurring event"
+  },
+  "WhatsApp Image 2026-07-23 at 7.06.00 PM.jpeg": {
+    "category": "other",
+    "tags": ["poster", "coffee", "starlink", "workspace", "marketing"],
+    "alt": "The Sunrise Motel coffee and workspace poster",
+    "confidence": 0.85,
+    "verifiedBy": "vision",
+    "reason": "Seen: a coffee-and-snacks marketing poster with the Starlink promise — an advert, not a photograph"
+  },
+  "WhatsApp Image 2026-07-23 at 7.06.00 PM (1).jpeg": {
+    "category": "team_staff",
+    "tags": ["staff", "waitress", "hospitality", "poster", "team"],
+    "alt": "A Sunrise Motel waitress carrying a tray of cold drinks and taking an order",
+    "confidence": 0.9,
+    "verifiedBy": "vision",
+    "reason": "Seen: a member of staff with a drinks tray on the floor — the team, pictured on a poster"
+  },
+  "WhatsApp Image 2026-07-23 at 7.06.01 PM.jpeg": {
+    "category": "event",
+    "tags": ["poster", "happy-hour", "beer", "braai", "wednesday"],
+    "alt": "Sunrise Motel happy hour: beers on ice, every Wednesday from 5pm",
+    "confidence": 0.88,
+    "verifiedBy": "vision",
+    "reason": "Seen: the second happy-hour poster (beer bucket, braai available) — the same recurring event"
+  },
+  "WhatsApp Image 2026-07-23 at 7.07.44 PM.jpeg": {
+    "category": "restaurant",
+    "tags": ["braai", "grill", "chef", "collage", "real-photos"],
+    "alt": "The braai grill at Sunrise Motel with a chef carrying a plate of grilled meat and onions",
+    "confidence": 0.86,
+    "verifiedBy": "vision",
+    "reason": "Seen: a braai collage of the chef, the grill and the meat — the kitchen at work, not a menu poster"
+  },
+  "hero-standard.jpg": {
+    "category": "room_deluxe",
+    "roomTypeId": "deluxe",
+    "tags": ["bed", "double", "canopy", "mosquito-net", "wooden-floor", "fridge", "en-suite"],
+    "alt": "A Sunrise Motel room with its four-poster bed under a mosquito net, polished wooden floor and bar fridge",
+    "confidence": 0.88,
+    "verifiedBy": "vision",
+    "reason": "Seen: a four-poster double bed with net, fridge and en-suite door — a deluxe-style double room, NOT a room wing at golden hour, which is what its alt text claimed"
+  },
+  "deluxe-main.jpg": {
+    "category": "building_exterior",
+    "tags": ["exterior", "sign", "facade", "veranda", "plants"],
+    "alt": "The Sun Rise Motel facade and its round sign above the veranda, potted plants along the front",
+    "confidence": 0.95,
+    "verifiedBy": "vision",
+    "reason": "Seen: the BUILDING, not a room. It was the Deluxe room's cover and the /stay hero backdrop, which is why the rooms page looked like the outside of the motel",
+    "isCover": true
+  },
+  "deluxe-bed.jpg": {
+    "category": "restaurant",
+    "tags": ["terrace", "statue", "tables", "open-air", "dining"],
+    "alt": "The covered restaurant terrace at Sunrise Motel, tables set beside the open doors and the carved statue",
+    "confidence": 0.94,
+    "verifiedBy": "vision",
+    "reason": "Seen: a dining terrace with the carved statue — not a bed. It was sitting in the Deluxe room's photo set"
+  },
+  "deluxe-room.jpg": {
+    "category": "room_standard",
+    "roomTypeId": "twin",
+    "tags": ["bed", "single", "twin", "two-beds", "mosquito-net", "en-suite"],
+    "alt": "The twin room at Sunrise Motel with two single beds under mosquito nets and a private bathroom",
+    "confidence": 0.9,
+    "verifiedBy": "vision",
+    "reason": "Seen: two SINGLE beds, so a twin room — it was filed under Deluxe, which put a twin on the deluxe card"
+  },
+  "deluxe-detail.jpg": {
+    "category": "bar",
+    "tags": ["bar", "stools", "supersport", "sport", "drinks", "guests"],
+    "alt": "The bar at Sunrise Motel, guests on stools under the SuperSport and Manchester United flags",
+    "confidence": 0.94,
+    "verifiedBy": "vision",
+    "reason": "Seen: the BAR counter — it was in both the Deluxe and the Standard photo sets"
+  },
+  "twin-main.jpg": {
+    "category": "room_standard",
+    "roomTypeId": "twin",
+    "tags": ["bed", "single", "twin", "two-beds", "wooden-floor", "en-suite"],
+    "alt": "The twin room at Sunrise Motel: two single beds on polished wooden floors beside the window",
+    "confidence": 0.9,
+    "verifiedBy": "vision",
+    "reason": "Seen: two single beds in one room — correctly a twin, so its name tells the truth",
+    "isCover": true
+  },
+  "twin-view.jpg": {
+    "category": "room_deluxe",
+    "roomTypeId": "deluxe",
+    "tags": ["bed", "double", "canopy", "mosquito-net", "wooden-floor"],
+    "alt": "The four-poster double bed with its mosquito net in a Sunrise Motel deluxe room, seen across the wooden floor",
+    "confidence": 0.88,
+    "verifiedBy": "vision",
+    "reason": "Seen: a canopy DOUBLE bed with one pillow pair — the file is named twin-view, which is how a double bed ended up on the twin room"
+  },
+  "listing-11.jpg": {
+    "category": "restaurant",
+    "tags": ["terrace", "thatch", "lounge", "tables", "interior"],
+    "alt": "A corner of the covered Sunrise Motel terrace under its thatch roof, tables and chairs ready for guests",
+    "confidence": 0.92,
+    "verifiedBy": "vision",
+    "reason": "Seen: a thatched terrace corner with tables — it was listed as a Standard ROOM photo, which put a lounge on a room card"
+  },
+  "listing-12.jpg": {
+    "category": "room_deluxe",
+    "roomTypeId": "deluxe",
+    "tags": ["bed", "double", "canopy", "mosquito-net", "wooden-floor", "spacious"],
+    "alt": "The four-poster double bed in a Sunrise Motel deluxe room, with the mosquito net drawn back",
+    "confidence": 0.9,
+    "verifiedBy": "vision",
+    "reason": "Seen: a canopy double bed room — genuinely deluxe, and the cleanest of the deluxe shots",
+    "isCover": true
+  },
+  "room-layout.jpg": {
+    "category": "room_standard",
+    "roomTypeId": "standard",
+    "tags": ["room", "layout", "review"],
+    "alt": "A room at Sunrise Motel, showing the layout of the beds and furniture",
+    "confidence": 0.55,
+    "verifiedBy": "filename",
+    "needsReview": true,
+    "reason": "Name says room layout, but this was not looked at frame by frame — confirm it shows a bed before it is used as a cover"
+  },
+  "twin-setup.jpg": {
+    "category": "room_standard",
+    "roomTypeId": "twin",
+    "tags": ["bed", "twin", "review"],
+    "alt": "The twin room at Sunrise Motel with its two beds made up",
+    "confidence": 0.6,
+    "verifiedBy": "filename",
+    "needsReview": true,
+    "reason": "Name says twin setup, but this was not verified frame by frame — confirm the bed count"
+  },
+  "bathroom.jpg": {
+    "category": "building_interior",
+    "tags": ["bathroom", "en-suite", "shower", "review", "room-facility"],
+    "alt": "The private bathroom in a room at Sunrise Motel, with hot water on demand",
+    "confidence": 0.6,
+    "verifiedBy": "filename",
+    "needsReview": true,
+    "reason": "There is no bathroom category in the agreed list, and a bathroom must never be a room cover, so it is filed as building interior until the owner says otherwise"
+  },
+  "courtyard.jpg": {
+    "category": "amenity_garden",
+    "tags": ["courtyard", "garden", "open-air", "seating"],
+    "alt": "The open-air courtyard at Sunrise Motel with its garden and seating",
+    "confidence": 0.75,
+    "verifiedBy": "filename",
+    "isCover": true,
+    "reason": "Courtyard and garden: the name agrees with how the page already describes it"
+  },
+  "lobby-lights.jpg": {
+    "category": "building_interior",
+    "tags": ["lounge", "lobby", "evening", "lights", "interior"],
+    "alt": "The Sunrise Motel lounge in the evening, warm hanging lights over the low table",
+    "confidence": 0.7,
+    "verifiedBy": "filename",
+    "reason": "Name places it in the lounge/lobby inside the building"
+  },
+  "reception.jpg": {
+    "category": "reception",
+    "tags": ["reception", "welcome-desk", "staffed", "interior", "arrivals"],
+    "alt": "The welcome desk at Sunrise Motel, lit and staffed for arrivals",
+    "confidence": 0.8,
+    "verifiedBy": "filename",
+    "isCover": true,
+    "reason": "Reception is its own agreed category and the file name is unambiguous"
+  },
+  "garden-seating.jpg": {
+    "category": "amenity_garden",
+    "tags": ["garden", "seating", "outdoor", "tables"],
+    "alt": "Garden seating in the grounds of Sunrise Motel, tables under the trees",
+    "confidence": 0.75,
+    "verifiedBy": "filename",
+    "reason": "Name places it in the garden rather than indoors"
+  },
+  "food-chambo.jpg": {
+    "category": "food_dish",
+    "tags": ["food", "fish", "chambo", "chips", "grilled", "salad"],
+    "alt": "Whole grilled chambo with chips, tomato and onion salad at Sunrise Motel",
+    "confidence": 0.95,
+    "verifiedBy": "vision",
+    "reason": "Seen: a whole grilled fish with chips and salad on a plate — a real dish photograph with no text burned in"
+  },
+  "unwind-video-poster.jpg": {
+    "category": "event",
+    "tags": ["video-poster", "match-day", "sport", "screen", "entertainment"],
+    "alt": "The big screen at Sunrise Motel showing a live football match",
+    "confidence": 0.85,
+    "verifiedBy": "vision",
+    "reason": "Seen: a graphic of a match on the wall screen, built to sit behind the tour video — an event frame, not a room or a building"
+  },
+  "stay-accommodation-offer.jpg": {
+    "category": "other",
+    "tags": ["poster", "accommodation", "branded", "advert", "text-heavy"],
+    "alt": "Sunrise Motel accommodation poster with the booking number",
+    "confidence": 0.9,
+    "verifiedBy": "vision",
+    "reason": "Seen: a printed advert with the phone number burnt into the picture — it was standing in for a room photograph on the home page"
+  },
+  "stay-escape-to-serenity.jpg": {
+    "category": "other",
+    "tags": ["poster", "branded", "advert", "text-heavy", "exterior"],
+    "alt": "Sunrise Motel 'Escape to Serenity' poster with the booking number",
+    "confidence": 0.9,
+    "verifiedBy": "vision",
+    "reason": "Seen: an advert poster laid over an exterior shot — it was standing in for a room photograph, and its text cannot be read under a caption"
+  },
+  "unwind-pool-table.jpg": {
+    "category": "bar",
+    "tags": ["pool-table", "billiards", "lounge", "drinks", "not-swimming-pool"],
+    "alt": "The pool table in the Sunrise Motel bar lounge",
+    "confidence": 0.85,
+    "verifiedBy": "filename",
+    "reason": "A pool TABLE in the bar lounge — it must never be filed under the swimming-pool amenity, which is the exact confusion the owner reported"
+  },
+  "unwind-happy-hour-ice.jpg": {
+    "category": "bar",
+    "tags": ["happy-hour", "drinks", "ice", "beer", "bar"],
+    "alt": "Drinks on ice during happy hour at the Sunrise Motel bar",
+    "confidence": 0.8,
+    "verifiedBy": "filename",
+    "reason": "Drinks served at the bar rather than a plated dish"
+  },
+  "happy-hour-terrace.jpg": {
+    "category": "bar",
+    "tags": ["terrace", "happy-hour", "drinks", "outdoor", "seating"],
+    "alt": "The terrace at Sunrise Motel during happy hour, tables out under the evening sky",
+    "confidence": 0.78,
+    "verifiedBy": "filename",
+    "reason": "Happy-hour drinking terrace — the bar surface, not the restaurant menu"
+  },
+  "unwind-happy-hour-board.jpg": {
+    "category": "event",
+    "tags": ["happy-hour", "board", "prices", "wednesday", "announcement"],
+    "alt": "The happy hour price board at Sunrise Motel",
+    "confidence": 0.8,
+    "verifiedBy": "filename",
+    "reason": "A price board announcing the recurring happy hour — an event notice, not a dish"
+  },
+  "unwind-match-day-specials.jpg": {
+    "category": "event",
+    "tags": ["match-day", "specials", "sport", "big-screen", "braai"],
+    "alt": "The match-day specials board at Sunrise Motel",
+    "confidence": 0.8,
+    "verifiedBy": "filename",
+    "reason": "Announces what happens on match days — the event surface"
+  },
+  "unwind-braai-chef.jpg": {
+    "category": "restaurant",
+    "tags": ["braai", "chef", "grill", "outdoor-cooking", "kitchen"],
+    "alt": "The braai at Sunrise Motel with the chef working the grill",
+    "confidence": 0.82,
+    "verifiedBy": "filename",
+    "reason": "Braai cooking is kitchen work, so it belongs with the restaurant rather than the bar"
+  },
+  "night-terrace.jpg": {
+    "category": "restaurant",
+    "tags": ["terrace", "evening", "tables", "dining", "lights"],
+    "alt": "The Sunrise Motel terrace laid for dinner in the evening",
+    "confidence": 0.78,
+    "verifiedBy": "filename",
+    "reason": "Evening tables on the dining terrace"
+  },
+  "evening-tables.jpg": {
+    "category": "restaurant",
+    "tags": ["evening", "tables", "dining", "restaurant"],
+    "alt": "Tables set for the evening service at Sunrise Motel",
+    "confidence": 0.78,
+    "verifiedBy": "filename",
+    "reason": "Tables laid for dinner — the restaurant surface"
+  },
+  "garden-dinner.jpg": {
+    "category": "restaurant",
+    "tags": ["garden", "dinner", "tables", "outdoor", "dining"],
+    "alt": "Dinner laid out in the garden at Sunrise Motel",
+    "confidence": 0.78,
+    "verifiedBy": "filename",
+    "reason": "A laid dinner table, so the restaurant surface even though it is outdoors"
+  },
+  "drinks-poolside.jpg": {
+    "category": "bar",
+    "tags": ["drinks", "pool-table", "bar", "lounge"],
+    "alt": "Drinks beside the pool table in the Sunrise Motel bar lounge",
+    "confidence": 0.72,
+    "verifiedBy": "filename",
+    "needsReview": true,
+    "reason": "Reads as drinks at the pool table; confirm it is not a swimming pool before it is used on the amenities surface"
+  },
+  "workspace-coffee.jpg": {
+    "category": "restaurant",
+    "tags": ["coffee", "workspace", "wifi", "laptop", "snacks"],
+    "alt": "Coffee and a place to work at Sunrise Motel, with the Starlink Wi-Fi",
+    "confidence": 0.72,
+    "verifiedBy": "filename",
+    "reason": "Coffee and snacks service, so the kitchen's own surface",
+    "keepActive": true
+  },
+  "connect-coffee-snacks.jpg": {
+    "category": "building_interior",
+    "tags": ["board", "poster", "coffee", "starlink", "reception", "own-words"],
+    "alt": "Sunrise Motel's own board by reception: fuel up with Sunrise coffee, stay connected with fast Starlink internet, try our coffee and snacks",
+    "confidence": 0.93,
+    "verifiedBy": "vision",
+    "reason": "Seen: not a shop advert but the motel's OWN board by reception, in the owner's own words — so it belongs with the interior rather than waiting in `other`. The loose WhatsApp copy is the same picture and inherits this"
+  },
+  "braai-lawn.jpg": {
+    "category": "amenity_garden",
+    "tags": ["braai", "lawn", "garden", "outdoor", "grill"],
+    "alt": "The braai lawn in the Sunrise Motel garden",
+    "confidence": 0.75,
+    "verifiedBy": "filename",
+    "reason": "A lawn in the grounds where the braai is set up"
+  },
+  "match-day.jpg": {
+    "category": "event",
+    "tags": ["match-day", "sport", "big-screen", "crowd"],
+    "alt": "Match day at Sunrise Motel, the game on the big screen",
+    "confidence": 0.8,
+    "verifiedBy": "filename",
+    "reason": "Match days are events the bar hosts"
+  },
+  "breakfast-full.jpg": {
+    "category": "breakfast",
+    "tags": ["breakfast", "full", "eggs", "plate"],
+    "alt": "A full breakfast plate at Sunrise Motel",
+    "confidence": 0.75,
+    "verifiedBy": "filename",
+    "reason": "Breakfast has its own agreed category, so breakfast plates are filed there rather than with lunch and dinner dishes"
+  },
+  "breakfast-plate.jpg": {
+    "category": "breakfast",
+    "tags": ["breakfast", "plate", "eggs", "morning"],
+    "alt": "Breakfast served at Sunrise Motel",
+    "confidence": 0.75,
+    "verifiedBy": "filename",
+    "reason": "A breakfast plate, filed with the other breakfast photographs"
+  },
+  "breakfast-coffee.jpg": {
+    "category": "breakfast",
+    "tags": ["breakfast", "coffee", "morning", "cup"],
+    "alt": "Morning coffee at Sunrise Motel, brewed from Malawian beans",
+    "confidence": 0.75,
+    "verifiedBy": "filename",
+    "reason": "Coffee served at breakfast time, filed with breakfast"
+  },
+  "connect-hospitality-team.jpg": {
+    "category": "team_staff",
+    "tags": ["team", "staff", "hospitality", "service"],
+    "alt": "The Sunrise Motel hospitality team on the floor, ready to help",
+    "confidence": 0.8,
+    "verifiedBy": "filename",
+    "reason": "The name says the team, so it belongs on the team surface rather than a venue one"
+  }
+}

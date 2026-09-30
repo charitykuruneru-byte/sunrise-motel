@@ -232,6 +232,15 @@
 .admin-locked-card h2 { font-family: var(--serif); font-weight: 400; font-size: 24px; }
 .admin-locked-card p { color: var(--muted); font-size: 13px; }
 .admin-login-dialog { width: min(100%, 420px); }
+/* The one line that tells a guest who opened /admin by accident that the pop-up is
+   not holding the site hostage. */
+.admin-login-dismiss { margin-top: 12px; color: var(--muted); font-size: 11.5px; line-height: 1.6; }
+/* A landscape phone or a till screen is shorter than the dialog: centring it with
+   grid pushes its top out of reach of the scroll, so on a short viewport the dialog
+   starts at the top edge of the overlay and scrolls like everything else. */
+@media (max-height: 560px) {
+  .modal-overlay { align-content: start; }
+}
 .admin-inline-form { background: var(--ivory); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 16px; }
 .reminder-banner { display: flex; gap: 12px; align-items: center; margin: 12px 24px 0; padding: 12px 14px; background: #fff8e1; border: 1px solid #f0d060; border-radius: var(--radius-sm); font-size: 13px; }
 .reminder-banner p { color: #6d5b00; font-size: 12px; }
@@ -278,7 +287,10 @@
 }
 
 /* ================= STAY PAGE HERO (fixed + imagery) ================= */
-.stay-hero-backdrop { background-image: url("/images/deluxe-main.jpg"); }
+/* The hero is the page's first promise, so it is a room and not the street:
+   this used to be a photograph of the facade, which told a guest looking for a
+   bed nothing about the bed. Points at the Deluxe cover the run chose. */
+.stay-hero-backdrop { background-image: url("/media/organized/room_deluxe/listing-12.jpg"); }
 .stay-hero .hero-content-wrapper { max-width: 980px; }
 .stay-search-grid { grid-template-columns: 1.2fr 1.2fr 0.9fr 0.9fr; }
 .date-hint { display: block; margin-top: 6px; font-size: 10px; color: var(--muted); }

@@ -5,7 +5,7 @@ import { logBookingEvent } from "@/lib/booking-events";
 import { clientIp, logAudit } from "@/lib/audit";
 import { buildInvoicePdf, parseExtras } from "@/lib/invoice-pdf";
 import { publicBaseUrl, sendInvoiceEmail } from "@/lib/mail";
-import { readSession } from "@/lib/staff-auth";
+import { isSuperAdminRole, readSession } from "@/lib/staff-auth";
 import { nowDate } from "@/lib/time";
 import { asc, desc, eq, ilike, or } from "drizzle-orm";
 
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const actor = readSession(request);
+  const actor = await readSession(request);
   if (!actor) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   const actorLabel = `${actor.staffCode} — ${actor.name}`;
   try {
@@ -88,7 +88,7 @@ export async function PATCH(request: Request) {
     // --- Manager note ---
     if (body.action === "add_note") {
       if (!body.note?.trim()) return NextResponse.json({ error: "Note cannot be empty." }, { status: 400 });
-      await logBookingEvent(booking.id, booking.reference, "note", `${actorLabel}: ${body.note.trim()}`, "manager");
+      await logBookingEvent(booking.id, booking.reference, "note", `${actorLabel}: ${body.note.trim()}`, "manager", actor);
       await logAudit({
         action: "booking.note_added", entity: "booking", entityId: booking.id, reference: booking.reference,
         summary: `${actorLabel} note on ${booking.reference}: ${body.note.trim().slice(0, 200)}`,
@@ -135,7 +135,7 @@ export async function PATCH(request: Request) {
         if (booking.invoiceNumber) {
           await db.update(invoicesTable).set({ sentToEmail: email, sentAt: now, status: "sent" }).where(eq(invoicesTable.invoiceNumber, booking.invoiceNumber));
         }
-        await logBookingEvent(booking.id, booking.reference, "invoice_emailed", `Invoice ${booking.invoiceNumber} emailed to ${email}.`, "manager");
+        await logBookingEvent(booking.id, booking.reference, "invoice_emailed", `Invoice ${booking.invoiceNumber} emailed to ${email}.`, "manager", actor);
         await logAudit({
           action: "invoice.emailed", entity: "invoice", entityId: booking.invoiceNumber ?? booking.id, reference: booking.reference,
           summary: `Invoice ${booking.invoiceNumber} emailed to ${email} for ${booking.reference}.`,
@@ -203,9 +203,9 @@ export async function PATCH(request: Request) {
       : body.action === "confirm" ? "confirmed"
       : body.action === "cancel" ? "cancelled"
       : "status_changed";
-    await logBookingEvent(booking.id, booking.reference, action, notes.join(" · "), "manager");
+    await logBookingEvent(booking.id, booking.reference, action, notes.join(" · "), "manager", actor);
     await logAudit({
-      action: `booking.${action}`, entity: "booking", entityId: booking.id, reference: booking.reference,
+      action: action === "approved" ? "BOOKING_APPROVED" : action === "cancelled" ? "BOOKING_DECLINED" : `BOOKING_${action.toUpperCase()}`, entity: "booking", entityId: booking.id, reference: booking.reference,
       summary: notes.join(" · ") || `Booking ${booking.reference} updated by ${actorLabel}.`,
       actor: "manager", actorLabel, ip: clientIp(request), metadata: { ...update },
     });
@@ -253,9 +253,9 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const actor = readSession(request);
+  const actor = await readSession(request);
   if (!actor) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
-  if (actor.role !== "admin") return NextResponse.json({ error: "Only admins can delete bookings." }, { status: 403 });
+  if (!isSuperAdminRole(actor.role)) return NextResponse.json({ error: "Only Super Admins can delete bookings." }, { status: 403 });
   const actorLabel = `${actor.staffCode} — ${actor.name}`;
   try {
     const { searchParams } = new URL(request.url);
@@ -292,6 +292,7 @@ export async function DELETE(request: Request) {
         createdAt: booking.createdAt,
       },
     });
+    await logBookingEvent(booking.id, booking.reference, "deleted", `Booking deleted by ${actor.name} (${actor.email}).`, "manager", actor);
     await logBookingEvent(booking.id, booking.reference, "deleted", `Booking deleted by manager. Snapshot retained in audit log.`, "manager");
 
     await db.delete(invoicesTable).where(eq(invoicesTable.bookingRef, booking.reference));

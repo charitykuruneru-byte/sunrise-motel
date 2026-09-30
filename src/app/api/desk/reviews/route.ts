@@ -17,7 +17,7 @@
 
 import { NextResponse } from "next/server";
 import { clientIp, logAudit } from "@/lib/audit";
-import { deskActor, requireAdmin } from "@/lib/desk-auth";
+import { deskActor, requireRestaurantManager } from "@/lib/desk-auth";
 import {
   loadAllReviews,
   loadWaitlist,
@@ -30,7 +30,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const auth = deskActor(request);
+  const auth = await deskActor(request);
   if ("error" in auth) return auth.error;
   try {
     const [reviews, summary, waitlist] = await Promise.all([
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = deskActor(request, { write: true });
+  const auth = await deskActor(request, { write: true });
   if ("error" in auth) return auth.error;
   try {
     const body = (await request.json()) as {
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
       // ADDENDUM (authority matrix): moderating a review — publishing, hiding, featuring — is
       // admin only. Staff can see reviews and work the waitlist; they do not shape what the
       // public reads, and they certainly do not delete a bad review.
-      const denied = requireAdmin(auth.user);
+      const denied = requireRestaurantManager(auth.user);
       if (denied) return denied;
       if (!body.reviewId) return NextResponse.json({ error: "reviewId is required." }, { status: 400 });
       const row = await moderateReview({

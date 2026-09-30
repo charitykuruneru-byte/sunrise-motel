@@ -1,0 +1,50 @@
+=== every spelling is the same guest ===
+PASS  "0888 123 456" -> one phone                      got="+265888123456" expected="+265888123456"
+PASS  "0888123456" -> one phone                        got="+265888123456" expected="+265888123456"
+PASS  "+265 888 123 456" -> one phone                  got="+265888123456" expected="+265888123456"
+PASS  "+265888123456" -> one phone                     got="+265888123456" expected="+265888123456"
+PASS  "00265 888 123 456" -> one phone                 got="+265888123456" expected="+265888123456"
+PASS  "265 888 123 456" -> one phone                   got="+265888123456" expected="+265888123456"
+PASS  "888 123 456" -> one phone                       got="+265888123456" expected="+265888123456"
+PASS  "  0888-123-456  " -> one phone                  got="+265888123456" expected="+265888123456"
+PASS  all spellings collapse to ONE key                got=1 expected=1
+PASS  ...and it is the 9 significant digits            got="888123456" expected="888123456"
+PASS  every spelling matches every other               got=true expected=true
+
+=== a different number is a different guest ===
+PASS  one digit out is not the same person             got=false expected=false
+PASS  a different prefix is not the same person        got=false expected=false
+PASS  landline (trunk 0 dropped)                       got="+2651766000" expected="+2651766000"
+PASS  a foreign number keeps its own country           got="+447700900123" expected="+447700900123"
+
+=== values that are not numbers ===
+PASS  "n/a" has no phone key                           got=null expected=null
+PASS  "" has no phone key                              got=null expected=null
+PASS  "   " has no phone key                           got=null expected=null
+PASS  "ask at desk" has no phone key                   got=null expected=null
+PASS  "12345" has no phone key                         got=null expected=null
+PASS  "null" has no phone key                          got=null expected=null
+PASS  "undefined" has no phone key                     got=null expected=null
+PASS  two rows saying "n/a" are NOT the same guest     got=false expected=false
+PASS  but the text is still kept for the desk          got="n/a" expected="n/a"
+
+=== the desk reads numbers out loud ===
+PASS  last six digits, either spelling                 got="123456" expected="123456"
+PASS  ...and no false match                            got=false expected=false
+
+=== email: one address, one spelling ===
+PASS  trimmed + lower-cased                            got="john@example.com" expected="john@example.com"
+PASS  not an address -> null                           got=null expected=null
+PASS  blank -> null                                    got=null expected=null
+
+=== the live database: identities that are already split ===
+PASS  no duplicated email address(es)
+PASS  no duplicated phone number(s)
+
+=== the database agrees with the code ===
+PASS  SQL collapses the two spellings to one key       got=true expected=true
+PASS  ...and that key is the code's key                got="888123456" expected="888123456"
+      unique indexes on guests               guests_email_identity_unique, guests_phone_identity_unique
+      nothing to do: the database is clean AND both unique indexes are in place
+
+ALL CHECKS PASSED

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 // Daily bookings PDF (print) + revenue CSV (Excel) for the office desktop.
 export async function GET(request: Request) {
-  const user = readSession(request);
+  const user = await readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   const { searchParams } = new URL(request.url);
   const format = searchParams.get("format") === "csv" ? "csv" : "pdf";

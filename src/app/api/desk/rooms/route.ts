@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
  * screen the desk and the manager actually work from.
  */
 export async function GET(request: Request) {
-  const auth = deskActor(request);
+  const auth = await deskActor(request);
   if ("error" in auth) return auth.error;
   try {
     await ensureRoomsSeeded();
@@ -109,7 +109,7 @@ export async function GET(request: Request) {
  * working.
  */
 export async function PATCH(request: Request) {
-  const auth = deskActor(request, { write: true });
+  const auth = await deskActor(request, { write: true });
   if ("error" in auth) return auth.error;
   try {
     const body = (await request.json()) as {

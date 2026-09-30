@@ -248,7 +248,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadHome() {
         offlineView.visibility = View.GONE
-        webView.loadUrl(BuildConfig.BASE_URL)
+        webView.loadUrl(BuildConfig.BASE_URL.trimEnd('/') + BuildConfig.START_PATH)
     }
 
     // ADDITIVE: version check + push permission + FCM topic subscribe.

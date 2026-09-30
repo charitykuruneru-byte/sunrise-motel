@@ -5,18 +5,24 @@
 // instead of re-implementing it. Import from "@/lib/staff-auth" as before —
 // that module re-exports everything here.
 
-import { randomUUID, scrypt, timingSafeEqual } from "node:crypto";
+import { scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
+import bcrypt from "bcryptjs";
 
 const scryptAsync = promisify(scrypt);
 
 export async function hashPassword(password: string) {
-  const salt = randomUUID().replace(/-/g, "") + randomUUID().replace(/-/g, "");
-  const derived = (await scryptAsync(password, salt, 64)) as Buffer;
-  return { salt, hash: derived.toString("hex") };
+  return { salt: "bcrypt", hash: await bcrypt.hash(password, 12) };
 }
 
 export async function verifyPassword(password: string, salt: string, hash: string) {
+  if (/^\$2[aby]\$/.test(hash)) {
+    try {
+      return await bcrypt.compare(password, hash);
+    } catch {
+      return false;
+    }
+  }
   try {
     const derived = (await scryptAsync(password, salt, 64)) as Buffer;
     const expected = Buffer.from(hash, "hex");

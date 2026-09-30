@@ -15,7 +15,7 @@ const ESCALATE_AFTER_HOURS = 12;
 
 // GET: list bookings needing action (pending older than X) for the dashboard red dots.
 export async function GET(request: Request) {
-  const user = readSession(request);
+  const user = await readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   const now = nowDate();
   const rows = await db.select().from(bookings);
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
 
 // POST: send reminders for stale pending bookings + escalate to admin after 12h.
 export async function POST(request: Request) {
-  const user = readSession(request);
+  const user = await readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   try {
     const now = nowDate();

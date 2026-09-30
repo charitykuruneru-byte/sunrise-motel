@@ -29,7 +29,7 @@ export const dynamic = "force-dynamic";
  * no-show closes it too and hands the released dates to the waitlist.
  */
 export async function POST(request: Request) {
-  const auth = deskActor(request, { write: true });
+  const auth = await deskActor(request, { write: true });
   if ("error" in auth) return auth.error;
   try {
     const body = (await request.json()) as { bookingId?: string; action?: string; roomId?: string; reason?: string };
@@ -94,9 +94,10 @@ export async function POST(request: Request) {
         "status_changed",
         `${auth.label}: checked in to Room ${room.roomNumber}`,
         "manager",
+        auth.user,
       );
       await logAudit({
-        action: "booking.checked_in",
+        action: "BOOKING_CHECKED_IN",
         entity: "booking",
         entityId: booking.id,
         reference: booking.reference,
@@ -178,6 +179,7 @@ export async function POST(request: Request) {
         "status_changed",
         `${auth.label}: checked out${room ? ` from Room ${room.roomNumber}` : ""}`,
         "manager",
+        auth.user,
       );
 
       // ADDENDUM (two guest paths): the room's access dies with the stay. The QR card
@@ -192,7 +194,7 @@ export async function POST(request: Request) {
       const reviewRequest = await requestReview(booking.id);
 
       await logAudit({
-        action: "booking.checked_out",
+        action: "BOOKING_CHECKED_OUT",
         entity: "booking",
         entityId: booking.id,
         reference: booking.reference,
@@ -234,6 +236,7 @@ export async function POST(request: Request) {
         "status_changed",
         `${auth.label}: marked no-show (${body.reason ?? "did not arrive"})`,
         "manager",
+        auth.user,
       );
 
       // ADDENDUM (two guest paths + landing page): the stay is dead, so its room
@@ -251,7 +254,7 @@ export async function POST(request: Request) {
       });
 
       await logAudit({
-        action: "booking.no_show",
+        action: "BOOKING_NO_SHOW",
         entity: "booking",
         entityId: booking.id,
         reference: booking.reference,

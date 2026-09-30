@@ -1,5 +1,11 @@
 import { db } from "@/db";
 import { galleryImagesTable, menuItemsTable, postsTable, roomTypesTable } from "@/db/schema";
+// The pictures are read from the catalogue that `scripts/analyze-media.mjs` writes
+// after LOOKING at every file, and never typed out here again. This list used to be
+// typed by hand, and that is why a Standard room opened on a photograph of a deluxe
+// four-poster, a bar counter and the covered terrace — nothing on the row said which
+// room the picture actually was.
+import { MEDIA, photosOf } from "@/lib/media-catalog";
 
 /**
  * Seeds rooms, gallery, menu and posts if the room catalogue is empty.
@@ -10,6 +16,15 @@ export async function seedDatabaseIfEmpty() {
   try {
     const existingRooms = await db.select().from(roomTypesTable).limit(1);
     if (existingRooms.length > 0) return;
+
+    // The slide set of a room type: its own photographs, then the bathroom, which
+    // is the one picture every room here shares.
+    const bathroom = MEDIA.building_interior?.find((photo) => photo.src.endsWith("/bathroom.jpg"));
+    const roomSlides = (roomTypeId: string) => [
+      ...photosOf(roomTypeId).map((photo) => photo.src),
+      ...(bathroom ? [bathroom.src] : []),
+    ];
+    const shot = (category: string, index: number) => MEDIA[category]?.[index];
 
     await db.insert(roomTypesTable).values([
       {
@@ -24,7 +39,7 @@ export async function seedDatabaseIfEmpty() {
         size: "24 m²",
         badge: "Classic comfort",
         features: JSON.stringify(["Fast Wi-Fi / Starlink", "Hot water & walk-in shower", "Flat-screen TV", "Daily housekeeping", "Secure on-site parking"]),
-        images: JSON.stringify(["/images/hero-standard.jpg", "/images/deluxe-detail.jpg", "/images/listing-11.jpg", "/images/bathroom.jpg", "/images/room-layout.jpg"]),
+        images: JSON.stringify(roomSlides("standard")),
         isActive: true,
       },
       {
@@ -39,7 +54,7 @@ export async function seedDatabaseIfEmpty() {
         size: "32 m²",
         badge: "Guest favourite",
         features: JSON.stringify(["King bed & premium pillows", "Dedicated work desk", "Fast Wi-Fi / Starlink", "En-suite bathroom", "Tea & coffee station", "Breakfast option"]),
-        images: JSON.stringify(["/images/deluxe-main.jpg", "/images/deluxe-bed.jpg", "/images/deluxe-room.jpg", "/images/deluxe-detail.jpg", "/images/listing-12.jpg", "/images/bathroom.jpg"]),
+        images: JSON.stringify(roomSlides("deluxe")),
         isActive: true,
       },
       {
@@ -54,7 +69,7 @@ export async function seedDatabaseIfEmpty() {
         size: "30 m²",
         badge: "Colleagues & family",
         features: JSON.stringify(["Two comfortable single beds", "Fast Wi-Fi", "Writing desk & chair", "En-suite private bathroom", "Secure parking included"]),
-        images: JSON.stringify(["/images/twin-main.jpg", "/images/twin-view.jpg", "/images/twin-setup.jpg", "/images/room-layout.jpg", "/images/bathroom.jpg"]),
+        images: JSON.stringify(roomSlides("twin")),
         isActive: true,
       },
     ]);
@@ -79,16 +94,30 @@ export async function seedDatabaseIfEmpty() {
       { id: "menu-9", name: "Chilled Juices & Soft Drinks", category: "Drinks", description: "Cold sodas, sparkling water and freshly squeezed citrus juice.", price: 3500, imageUrl: "/images/drinks-poolside.jpg", isAvailable: true, isSpecial: false },
     ]);
 
+    // The nine room rows are built from that same catalogue, so the alt text under a
+    // row is always the sentence the run wrote about the picture actually held there.
+    const roomsGallery = [
+      { id: "gal-01", title: "Standard Room", photo: shot("room_standard", 0), caption: "Clean, comfortable accommodation in Area 5" },
+      { id: "gal-02", title: "The Deluxe", photo: shot("room_deluxe", 0), caption: "The four-poster bed and its drawn-back mosquito net" },
+      { id: "gal-03", title: "Twin Room", photo: shot("room_standard", 1), caption: "Two proper single beds for colleagues or friends" },
+      { id: "gal-04", title: "Deluxe — Bar Fridge", photo: shot("room_deluxe", 1), caption: "The net, the polished floor and the bar fridge" },
+      { id: "gal-05", title: "Twin — Made Up", photo: shot("room_standard", 2), caption: "Two singles under their nets, bathroom next door" },
+      { id: "gal-06", title: "En-suite Bathroom", photo: bathroom, caption: "Private bathroom with 24/7 hot water" },
+      { id: "gal-07", title: "Room Layout", photo: shot("room_standard", 3), caption: "Space to work and unwind" },
+      { id: "gal-08", title: "Deluxe — Across the Floor", photo: shot("room_deluxe", 2), caption: "The room seen whole, floorboard to net" },
+      { id: "gal-09", title: "Deluxe — En-suite Doorway", photo: shot("room_deluxe", 4), caption: "Rest well, wake up easy" },
+    ].map((row, index) => ({
+      id: row.id,
+      title: row.title,
+      category: "Rooms",
+      imageUrl: row.photo?.src ?? "",
+      altText: row.photo?.alt ?? row.title,
+      caption: row.caption,
+      displayOrder: index + 1,
+    }));
+
     await db.insert(galleryImagesTable).values([
-      { id: "gal-01", title: "Standard Room", category: "Rooms", imageUrl: "/images/hero-standard.jpg", altText: "Sunrise Motel standard room with queen bed", caption: "Clean, comfortable accommodation in Area 5", displayOrder: 1 },
-      { id: "gal-02", title: "Deluxe King Room", category: "Rooms", imageUrl: "/images/deluxe-main.jpg", altText: "Sunrise Motel deluxe king room", caption: "King bed, work desk and en-suite bathroom", displayOrder: 2 },
-      { id: "gal-03", title: "Twin Room", category: "Rooms", imageUrl: "/images/twin-main.jpg", altText: "Sunrise Motel twin room with two beds", caption: "Two proper single beds for colleagues or friends", displayOrder: 3 },
-      { id: "gal-04", title: "Deluxe — Bed Detail", category: "Rooms", imageUrl: "/images/deluxe-bed.jpg", altText: "Deluxe room bed and linen", caption: "Fresh linen and premium pillows", displayOrder: 4 },
-      { id: "gal-05", title: "Twin — Window View", category: "Rooms", imageUrl: "/images/twin-view.jpg", altText: "Twin room by the window", caption: "Bright, airy and quiet", displayOrder: 5 },
-      { id: "gal-06", title: "En-suite Bathroom", category: "Rooms", imageUrl: "/images/bathroom.jpg", altText: "Private bathroom with hot shower", caption: "Private bathroom with 24/7 hot water", displayOrder: 6 },
-      { id: "gal-07", title: "Room Layout", category: "Rooms", imageUrl: "/images/room-layout.jpg", altText: "Room layout with desk", caption: "Space to work and unwind", displayOrder: 7 },
-      { id: "gal-08", title: "Room Interior", category: "Rooms", imageUrl: "/images/listing-11.jpg", altText: "Sunrise Motel room interior", caption: "Comfort in every detail", displayOrder: 8 },
-      { id: "gal-09", title: "Room Interior II", category: "Rooms", imageUrl: "/images/listing-12.jpg", altText: "Sunrise Motel room interior", caption: "Rest well, wake up easy", displayOrder: 9 },
+      ...roomsGallery,
       { id: "gal-10", title: "Welcome Desk", category: "Property", imageUrl: "/images/reception.jpg", altText: "Reception desk with warm lighting", caption: "24-hour front desk — when you are here, you are family", displayOrder: 10 },
       { id: "gal-11", title: "Lounge Lights", category: "Property", imageUrl: "/images/lobby-lights.jpg", altText: "Lounge with warm hanging lights", caption: "Warm evenings in the lounge", displayOrder: 11 },
       { id: "gal-12", title: "Courtyard", category: "Property", imageUrl: "/images/courtyard.jpg", altText: "Outdoor courtyard", caption: "Open-air courtyard for drinks and conversation", displayOrder: 12 },

@@ -2,19 +2,19 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { staffTable } from "@/db/schema";
 import { clientIp, logAudit } from "@/lib/audit";
-import { cookieValue, getStaffByEmail, legacyAdminCookieValue, readSession, verifyPassword } from "@/lib/staff-auth";
+import { cookieValue, getStaffByEmail, readSession, verifyPassword } from "@/lib/staff-auth";
 import type { SessionRole } from "@/lib/staff-auth";
 import { nowDate } from "@/lib/time";
 import { eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
-function isAuthed(request: Request) {
-  return Boolean(readSession(request));
+async function isAuthed(request: Request) {
+  return Boolean(await readSession(request));
 }
 
 export async function GET(request: Request) {
-  const user = readSession(request);
+  const user = await readSession(request);
   return NextResponse.json({ authed: Boolean(user), user });
 }
 
@@ -24,66 +24,50 @@ export async function POST(request: Request) {
     const email = (body.email ?? "").trim().toLowerCase();
     const password = body.password ?? "";
 
-    // 1) Staff account login (preferred — gives per-staff audit IDs)
-    if (email) {
-      const staff = await getStaffByEmail(email);
-      if (!staff || !staff.isActive) {
-        await logAudit({ action: "auth.login_failed", entity: "auth", summary: `Failed login for ${email}.`, actor: "manager", ip: clientIp(request) });
-        return NextResponse.json({ error: "No active staff account for that email." }, { status: 401 });
-      }
-      const ok = await verifyPassword(password, staff.passwordSalt, staff.passwordHash);
-      if (!ok) {
-        await logAudit({ action: "auth.login_failed", entity: "auth", summary: `Failed login for ${staff.name} (${staff.staffCode}).`, actor: "manager", actorLabel: `${staff.staffCode} — ${staff.name}`, ip: clientIp(request) });
-        return NextResponse.json({ error: "Wrong password. Please try again." }, { status: 401 });
-      }
-      await db.update(staffTable).set({ lastLoginAt: nowDate() }).where(eq(staffTable.id, staff.id));
-      const res = NextResponse.json({
-        success: true,
-        user: { id: staff.id, staffCode: staff.staffCode, name: staff.name, email: staff.email, role: staff.role },
-      });
-      res.cookies.set(
-        "sunrise_session",
-        cookieValue({ id: staff.id, staffCode: staff.staffCode, name: staff.name, email: staff.email, role: staff.role as SessionRole }),
-        { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 12 },
-      );
+    if (!email || !password) {
+      return NextResponse.json({ error: "Enter your invitation email and password." }, { status: 400 });
+    }
+    const staff = await getStaffByEmail(email);
+    if (!staff) {
       await logAudit({
-        action: "auth.login", entity: "auth", entityId: staff.id,
-        summary: `${staff.role === "admin" ? "Admin" : `Staff ${staff.staffCode}`} — ${staff.name} signed in.`,
-        actor: "manager", actorLabel: `${staff.staffCode} — ${staff.name}`, ip: clientIp(request),
+        action: "LOGIN_FAILED", entity: "auth", targetEmail: email,
+        summary: `Failed staff login for ${email}.`, actor: "manager", actorLabel: email,
+        actorEmail: email, ip: clientIp(request), details: { reason: "unknown_email" },
       });
-      return res;
+      return NextResponse.json({ error: "Email or password is incorrect." }, { status: 401 });
     }
-
-    // 2) Legacy single-password login (ADMIN_PASSWORD) — kept for continuity, treated as admin
-    const expected = process.env.ADMIN_PASSWORD;
-    if (!expected) {
-      return NextResponse.json(
-        { error: "ADMIN_PASSWORD is not set on the server. Add it to .env and restart." },
-        { status: 500 },
-      );
-    }
-    if (password !== expected) {
+    if (!staff.isActive || staff.isDeleted) {
       await logAudit({
-        action: "auth.login_failed", entity: "auth",
-        summary: "Failed manager login attempt.", actor: "manager", ip: clientIp(request),
+        action: "LOGIN_FAILED", entity: "auth", targetId: staff.id, targetEmail: email,
+        summary: `Login blocked for deactivated account ${email}.`, actor: "manager", actorLabel: email,
+        actorId: staff.id, actorEmail: email, actorRole: staff.role, ip: clientIp(request), details: { reason: "deactivated" },
       });
-      return NextResponse.json({ error: "Wrong password. Please try again." }, { status: 401 });
+      return NextResponse.json({ error: "Your account has been deactivated. Contact Super Admin." }, { status: 403 });
     }
+    const ok = await verifyPassword(password, staff.passwordSalt, staff.passwordHash);
+    if (!ok) {
+      await logAudit({
+        action: "LOGIN_FAILED", entity: "auth", targetId: staff.id, targetEmail: email,
+        summary: `Failed login for ${staff.name} (${staff.staffCode}).`, actor: "manager",
+        actorLabel: `${staff.staffCode} — ${staff.name}`, actorId: staff.id, actorEmail: email,
+        actorRole: staff.role, ip: clientIp(request), details: { reason: "wrong_password" },
+      });
+      return NextResponse.json({ error: "Email or password is incorrect." }, { status: 401 });
+    }
+    await db.update(staffTable).set({ lastLoginAt: nowDate() }).where(eq(staffTable.id, staff.id));
     const res = NextResponse.json({
       success: true,
-      user: { id: "legacy-admin", staffCode: "ADM000", name: "Manager", email: "", role: "admin" as const },
+      user: { id: staff.id, staffCode: staff.staffCode, name: staff.name, email: staff.email, role: staff.role },
     });
-    res.cookies.set("sunrise_session", cookieValue({ id: "legacy-admin", staffCode: "ADM000", name: "Manager", email: "", role: "admin" }), {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 12,
-    });
-    // keep legacy cookie too so old sessions keep working — signed, so "=1" cannot be typed by hand
-    res.cookies.set("sunrise_admin", legacyAdminCookieValue(), { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 12 });
+    res.cookies.set(
+      "sunrise_session",
+      cookieValue({ id: staff.id, staffCode: staff.staffCode, name: staff.name, email: staff.email, role: staff.role as SessionRole }),
+      { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 12, secure: process.env.NODE_ENV === "production" },
+    );
     await logAudit({
-      action: "auth.login", entity: "auth",
-      summary: "Manager signed in to the portal.", actor: "manager", ip: clientIp(request),
+      action: "LOGIN_SUCCESS", entity: "auth", entityId: staff.id, targetId: staff.id, targetEmail: staff.email,
+      summary: `${staff.role} ${staff.name} signed in.`, actor: "manager", actorLabel: staff.name,
+      actorId: staff.id, actorEmail: staff.email, actorRole: staff.role, ip: clientIp(request),
     });
     return res;
   } catch {
@@ -92,7 +76,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const user = readSession(request);
+  const user = await readSession(request);
   const res = NextResponse.json({ success: true });
   res.cookies.set("sunrise_session", "", { httpOnly: true, path: "/", maxAge: 0 });
   res.cookies.set("sunrise_admin", "", { httpOnly: true, path: "/", maxAge: 0 });

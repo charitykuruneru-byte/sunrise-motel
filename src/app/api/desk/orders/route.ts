@@ -19,7 +19,7 @@ function waitingMinutes(placedAt: Date | string, now: Date) {
  * waiting-time clock, plus the history and the voids.
  */
 export async function GET(request: Request) {
-  const auth = deskActor(request);
+  const auth = await deskActor(request);
   if ("error" in auth) return auth.error;
   try {
     const now = nowDate();
@@ -66,7 +66,7 @@ export async function GET(request: Request) {
  * disappears, so the reason is mandatory and recorded.
  */
 export async function PATCH(request: Request) {
-  const auth = deskActor(request, { write: true });
+  const auth = await deskActor(request, { write: true });
   if ("error" in auth) return auth.error;
   try {
     const body = (await request.json()) as { orderId?: string; action?: string; reason?: string; itemId?: string };

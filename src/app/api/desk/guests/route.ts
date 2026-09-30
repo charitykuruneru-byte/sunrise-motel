@@ -3,8 +3,9 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { bookings, guestAccountsTable, guestsTable, roomsTable } from "@/db/schema";
 import { clientIp, logAudit } from "@/lib/audit";
-import { deskActor, requireAdmin } from "@/lib/desk-auth";
-import { activateAtDesk, inviteGuestAccount, registerGuestAccount, resendActivation } from "@/lib/guest-account";
+import { deskActor, requireSuperAdmin } from "@/lib/desk-auth";
+import { resendActivation } from "@/lib/guest-account";
+import { inviteCheckedInGuest } from "@/lib/guest-invitations";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
  * state, so the desk can see "invited, not activated" at a glance.
  */
 export async function GET(request: Request) {
-  const auth = deskActor(request);
+  const auth = await deskActor(request);
   if ("error" in auth) return auth.error;
   try {
     const [guests, accounts, allBookings, rooms] = await Promise.all([
@@ -89,7 +90,7 @@ export async function GET(request: Request) {
  * service messages).
  */
 export async function POST(request: Request) {
-  const auth = deskActor(request, { write: true });
+  const auth = await deskActor(request, { write: true });
   if ("error" in auth) return auth.error;
   try {
     const body = (await request.json()) as {
@@ -108,40 +109,22 @@ export async function POST(request: Request) {
       if (!body.bookingId) return NextResponse.json({ error: "bookingId is required." }, { status: 400 });
       const [booking] = await db.select().from(bookings).where(eq(bookings.id, body.bookingId)).limit(1);
       if (!booking) return NextResponse.json({ error: "Booking not found." }, { status: 404 });
-      const result = await inviteGuestAccount({
+      const result = await inviteCheckedInGuest({
         booking,
-        login: body.login ?? booking.email,
-        actorLabel: auth.label,
+        email: body.login ?? booking.email ?? "",
+        actor: auth.user,
         request,
-        channel: body.channel,
       });
       return NextResponse.json({ success: true, result });
     }
 
-    // THE FRONT DESK IS THE DOORWAY (guest-auth rework): the desk types the guest's
-    // email, the SYSTEM chooses the password, and it comes back here ONCE for the
-    // desk to hand over on the printed card. Registering is staff work, like inviting
-    // was — only disabling, muting or re-consenting an account below is admin work.
     if (action === "register") {
-      if (!body.bookingId) return NextResponse.json({ error: "bookingId is required." }, { status: 400 });
-      const [booking] = await db.select().from(bookings).where(eq(bookings.id, body.bookingId)).limit(1);
-      if (!booking) return NextResponse.json({ error: "Booking not found." }, { status: 404 });
-      const loginEmail = (body.login ?? booking.email ?? "").trim().toLowerCase();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginEmail)) {
-        return NextResponse.json(
-          { error: "Type the email address the guest will sign in with — it is their sign-in name." },
-          { status: 400 },
-        );
-      }
-      const result = await registerGuestAccount({ booking, loginEmail, actorLabel: auth.label, request });
-      return NextResponse.json({ success: true, result });
+      return NextResponse.json({ error: "Direct registration is disabled. Send an invitation after check-in." }, { status: 410 });
     }
 
-    // ADDENDUM (staff dashboard §10.4–§10.5): disabling, locking, muting an account and changing
-    // marketing consent are admin-only. The gate sits BEFORE the lookup, so a staff session always
-    // gets 403 whether or not the account exists — the desk never learns anything from trying.
+    // The gate sits BEFORE the lookup so operational staff cannot manage account access.
     if (["set_status", "set_consent"].includes(action)) {
-      const denied = requireAdmin(auth.user);
+      const denied = requireSuperAdmin(auth.user);
       if (denied) return denied;
     }
 
@@ -165,12 +148,7 @@ export async function POST(request: Request) {
     }
 
     if (action === "activate_at_desk") {
-      const password = (body.password ?? "").trim();
-      if (password.length < 8) {
-        return NextResponse.json({ error: "Use a password of at least 8 characters." }, { status: 400 });
-      }
-      await activateAtDesk({ account, password, actorLabel: auth.label, request });
-      return NextResponse.json({ success: true });
+      return NextResponse.json({ error: "Password setup must use the account's one-time invitation link." }, { status: 410 });
     }
 
     if (action === "set_status") {

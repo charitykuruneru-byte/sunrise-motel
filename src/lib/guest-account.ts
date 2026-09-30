@@ -13,7 +13,7 @@ import { bookings, guestAccountsTable, roomsTable } from "@/db/schema";
 import { clientIp, logAudit } from "@/lib/audit";
 import { issueToken, setGuestPassword } from "@/lib/guest-auth";
 import { findOrCreateGuest } from "@/lib/hotel";
-import { publicBaseUrl } from "@/lib/mail";
+import { guestAppDownloadUrl, publicBaseUrl } from "@/lib/mail";
 import { notifyByEmail, notifyBySms } from "@/lib/notify";
 
 export type InviteResult = {
@@ -59,6 +59,7 @@ export async function inviteGuestAccount(opts: {
     : await db.select().from(guestAccountsTable).where(eq(guestAccountsTable.loginPhone, booking.phone)).limit(1);
 
   const base = publicBaseUrl(opts.request);
+  const downloadUrl = guestAppDownloadUrl(opts.request);
   const channel = opts.channel ?? (email ? "email" : "sms");
 
   // --- 3b. Returning guest — link the stay, issue no new password. ---
@@ -77,8 +78,9 @@ export async function inviteGuestAccount(opts: {
         `<p>Hello ${booking.guestName},</p>` +
         `<p>Your stay at <strong>Sunrise Motel</strong> (${booking.reference}) is active — open the app to ` +
         `see your room number, your room bill and to order food to your room.</p>` +
+        `<p><a href="${downloadUrl}">Download the Sunrise Motel guest app</a> for Android.</p>` +
         `<p><a href="${base}/app">Open the Sunrise guest app</a></p>`,
-      text: `Your stay at Sunrise Motel (${booking.reference}) is active. Open ${base}/app to see your room.`,
+      text: `Your stay at Sunrise Motel (${booking.reference}) is active. Open ${base}/app to see your room. Download the guest app: ${downloadUrl}`,
       template: "guest_stay_linked",
       guestId: guest.id,
       bookingId: booking.id,
@@ -144,9 +146,10 @@ export async function inviteGuestAccount(opts: {
         `<li>order food and drinks to your room</li>` +
         `<li>message the front desk without coming down</li></ul>` +
         `<p><a href="${activationLink}">Set my password</a> — single-use, valid for 7 days.</p>` +
+        `<p><a href="${downloadUrl}">Download the Sunrise Motel guest app</a> for Android.</p>` +
         `<p>Booking ${booking.reference} · ${booking.checkIn} → ${booking.checkOut} · ${booking.roomType}</p>` +
         `<p>If you would rather not install anything, everything is still available at the desk and on WhatsApp.</p>`,
-      text: `Set your Sunrise Motel guest password: ${activationLink} (single-use, 7 days). Booking ${booking.reference}.`,
+      text: `Set your Sunrise Motel guest password: ${activationLink} (single-use, 7 days). Download the guest app: ${downloadUrl}. Booking ${booking.reference}.`,
       template: "guest_activation",
       guestId: guest.id,
       bookingId: booking.id,
@@ -205,12 +208,13 @@ export async function resendActivation(opts: {
     sentTo: opts.account.loginEmail ?? opts.account.loginPhone,
   });
   const base = publicBaseUrl(opts.request);
+  const downloadUrl = guestAppDownloadUrl(opts.request);
   const link = `${base}/activate?token=${token.token}`;
   const result = await notifyByEmail({
     to: opts.account.loginEmail,
     subject: "Your Sunrise Motel guest app link (resent)",
-    html: `<p>Hello ${opts.guestName},</p><p>Here is a fresh link to set your password:</p><p><a href="${link}">Set my password</a></p><p>Single-use, valid for 7 days.</p>`,
-    text: `Sunrise Motel guest app link: ${link}`,
+    html: `<p>Hello ${opts.guestName},</p><p>Here is a fresh link to set your password:</p><p><a href="${link}">Set my password</a></p><p>Single-use, valid for 7 days.</p><p><a href="${downloadUrl}">Download the Sunrise Motel guest app</a> for Android.</p>`,
+    text: `Sunrise Motel guest app link: ${link}. Download the guest app: ${downloadUrl}`,
     template: "guest_activation_resent",
     guestId: opts.account.guestId,
   });

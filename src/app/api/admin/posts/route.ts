@@ -5,7 +5,7 @@ import { postsTable } from "@/db/schema";
 import { clientIp, logAudit } from "@/lib/audit";
 import { seedDatabaseIfEmpty } from "@/db/seed";
 import { readSession } from "@/lib/staff-auth";
-import { requireAdmin } from "@/lib/desk-auth";
+import { requireRestaurantManager } from "@/lib/desk-auth";
 import { desc, eq } from "drizzle-orm";
 
 export async function GET() {
@@ -20,11 +20,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const user = readSession(request);
+  const user = await readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   // ADDENDUM (authority matrix): posts are public content, so publishing, pausing and deleting one
   // is admin-only. A staff session is the front desk — it reads posts, it does not write them.
-  const denied = requireAdmin(user);
+  const denied = requireRestaurantManager(user);
   if (denied) return denied;
   try {
     const body = (await request.json()) as {
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       .returning();
 
     await logAudit({
-      action: "post.published", entity: "post", entityId: newPost.id,
+      action: "ACTIVITY_POSTED", entity: "post", entityId: newPost.id,
       summary: `Post published: ${newPost.title} (${newPost.category}).`,
       actor: "manager", ip: clientIp(request), metadata: { title: newPost.title, category: newPost.category },
     });
@@ -72,9 +72,9 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const user = readSession(request);
+  const user = await readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
-  const denied = requireAdmin(user);
+  const denied = requireRestaurantManager(user);
   if (denied) return denied;
   try {
     const { searchParams } = new URL(request.url);
@@ -85,7 +85,7 @@ export async function DELETE(request: Request) {
 
     await db.delete(postsTable).where(eq(postsTable.id, id));
     await logAudit({
-      action: "post.deleted", entity: "post", entityId: id,
+      action: "ACTIVITY_DELETED", entity: "post", entityId: id,
       summary: `Post removed (id ${id}).`, actor: "manager", ip: clientIp(request),
     });
     return NextResponse.json({ success: true, message: "Post removed successfully." });
@@ -96,9 +96,9 @@ export async function DELETE(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const user = readSession(request);
+  const user = await readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
-  const denied = requireAdmin(user);
+  const denied = requireRestaurantManager(user);
   if (denied) return denied;
   try {
     const body = (await request.json()) as { id: string; isActive: boolean };
@@ -113,7 +113,7 @@ export async function PATCH(request: Request) {
       .returning();
 
     await logAudit({
-      action: body.isActive ? "post.activated" : "post.deactivated", entity: "post", entityId: body.id,
+      action: body.isActive ? "ACTIVITY_ACTIVATED" : "ACTIVITY_PAUSED", entity: "post", entityId: body.id,
       summary: `Post ${body.isActive ? "activated" : "deactivated"} (id ${body.id}).`,
       actor: "manager", ip: clientIp(request),
     });

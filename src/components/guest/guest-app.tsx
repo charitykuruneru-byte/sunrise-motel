@@ -134,15 +134,8 @@ export default function GuestApp() {
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [signInError, setSignInError] = useState("");
-  /**
-   * ONE popup with ONE job: signing in with the email and password the front desk
-   * handed over. Accounts are registered at the counter, so there is no self-serve
-   * tab to offer — the page says where the password comes from and the sheet asks
-   * for it. `/app?signup=1` (the old no-account link, still out there on printed
-   * cards and confirmation screens) opens the same sheet with that explanation shown.
-   */
   const [authOpen, setAuthOpen] = useState(false);
-  const [deskNotice, setDeskNotice] = useState(false);
+  const [inviteNotice, setInviteNotice] = useState(false);
 
   // ---- What's on + the two unread badges (Part 3.1/3.5) --------------------
   // Exactly two tabs carry a badge — What's on and Messages. More than two and
@@ -193,13 +186,10 @@ export default function GuestApp() {
   }, [load]);
 
   useEffect(() => {
-    // Old links (booking confirmation, /track, printed cards) point at /app?signup=1.
-    // There is nowhere to sign yourself up any more, so the sheet opens on the sign-in
-    // form with the one thing those guests need to read: the desk registers the
-    // account and hands over the password.
-    const wanted = new URLSearchParams(window.location.search).get("signup");
-    if (wanted === "1" || wanted === "true") {
-      setDeskNotice(true);
+    const params = new URLSearchParams(window.location.search);
+    const wanted = params.get("signup");
+    if (wanted === "1" || wanted === "true" || params.get("message") === "invite-only") {
+      setInviteNotice(true);
       setAuthOpen(true);
     }
   }, []);
@@ -242,6 +232,7 @@ export default function GuestApp() {
       });
       const data = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Could not sign in.");
+      setAuthOpen(false);
       await load();
     } catch (error) {
       setSignInError(error instanceof Error ? error.message : "Could not sign in.");
@@ -269,15 +260,11 @@ export default function GuestApp() {
             See your room number, follow your room bill, order food to your room and message the front desk.
           </p>
 
-          {/* WHERE THE ACCOUNT COMES FROM — the desk, and it says so plainly, so
-              nobody hunts for a "create an account" button that deliberately does
-              not exist. One button (sign in) and the way to ask, nothing else. */}
+          {/* Accounts are invitation-only; the desk creates a guest account after check-in. */}
           <div className="mt-4 rounded border border-[var(--line)] bg-[var(--ivory)] p-3 text-xs text-[var(--muted)]">
-            <p className="font-semibold text-[var(--ink)]">Sign in with the details from the front desk</p>
+            <p className="font-semibold text-[var(--ink)]">Guest accounts are by invitation</p>
             <p className="mt-1">
-              Every guest account is registered at the counter: the desk takes your email, the system sets the
-              password, and they hand it to you on a card. No account yet? Ask at reception — it takes a minute, and
-              you can change the password to your own afterwards.
+              After check-in, the front desk can capture your email and send your secure account setup link.
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <button
@@ -338,47 +325,44 @@ export default function GuestApp() {
                 <X size={20} />
               </button>
               <div className="modal-sheet-header">
-                <span className="eyebrow">
-                  <span className="eyebrow-line" /> WELCOME BACK
-                </span>
+                <span className="eyebrow"><span className="eyebrow-line" /> WELCOME BACK</span>
                 <h2>Sign in</h2>
-                <p>
-                  Use the email and password the front desk gave you — your room number, your running bill and the
-                  desk&apos;s replies are on the other side of this window.
-                </p>
+                <p>Use the email and password for your guest account to see your stay, bill and messages from the desk.</p>
               </div>
 
-              {deskNotice && (
-                <p className="mt-4 rounded border border-[var(--line)] bg-[var(--ivory)] p-3 text-xs text-[var(--muted)]">
-                  Accounts are registered at the front desk: ask at reception, give them your email, and they will hand
-                  you the password the system set. Then sign in here.
+              {inviteNotice && (
+                <p className="mt-4 rounded border border-[var(--line)] bg-[var(--ivory)] p-3 text-sm text-[var(--muted)]" role="status">
+                  Account creation is by invitation only. Contact the front desk after check-in to request your guest setup email.
                 </p>
               )}
-
-          <form onSubmit={signIn} className="mt-4 space-y-3">
-            <label className="block text-sm font-semibold">
-              Email or phone
-              <input
-                className="mt-1 w-full rounded border border-[var(--line)] px-3 py-2 font-normal"
-                value={login}
-                onChange={(e) => setLogin(e.target.value)}
-                placeholder="you@example.com"
-              />
-            </label>
-            <label className="block text-sm font-semibold">
-              Password
-              <input
-                className="mt-1 w-full rounded border border-[var(--line)] px-3 py-2 font-normal"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </label>
-            {signInError && <p className="rounded border border-red-300 bg-red-50 p-2 text-sm text-red-700">{signInError}</p>}
-            <button className="admin-btn admin-btn-primary w-full justify-center" type="submit" disabled={busy}>
-              {busy ? <Loader2 size={14} className="animate-spin" /> : null} Sign in
-            </button>
-          </form>
+              <form onSubmit={signIn} className="mt-4 space-y-3">
+                <label className="block text-sm font-semibold">
+                  Email or phone
+                  <input
+                    className="mt-1 w-full rounded border border-[var(--line)] px-3 py-2 font-normal"
+                    value={login}
+                    onChange={(e) => setLogin(e.target.value)}
+                    autoComplete="username"
+                    placeholder="you@example.com"
+                    required
+                  />
+                </label>
+                <label className="block text-sm font-semibold">
+                  Password
+                  <input
+                    className="mt-1 w-full rounded border border-[var(--line)] px-3 py-2 font-normal"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
+                    required
+                  />
+                </label>
+                {signInError && <p className="rounded border border-red-300 bg-red-50 p-2 text-sm text-red-700">{signInError}</p>}
+                <button className="admin-btn admin-btn-primary w-full justify-center" type="submit" disabled={busy}>
+                  {busy ? <Loader2 size={14} className="animate-spin" /> : null} Sign in
+                </button>
+              </form>
             </div>
           </div>
         )}

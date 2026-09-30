@@ -50,6 +50,13 @@ import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import SafeImage from "@/components/safe-image";
 import SiteNav from "@/components/site-nav";
 import { SunriseLogo } from "@/components/sunrise-logo";
+// The photographs of this property, as the run that looked at every file decided
+// them. Imported rather than typed out here so a room card, a slide and the hero
+// strip can never drift back to a picture that is of some other room.
+import { photosOf } from "@/lib/media-catalog";
+
+/** The picture a room card falls back to when the row has no photo of its own. */
+const roomFallback = (roomTypeId: string) => photosOf(roomTypeId)[0]?.src ?? photosOf("standard")[0]?.src ?? "";
 
 /**
  * One dish as the guest reads it. ADDENDUM (staff dashboard §15.1): supplied by the server from
@@ -474,9 +481,9 @@ export function StayPage() {
           {/* Related room imagery — tap to preview */}
           <div className="stay-hero-photos">
             {[
-              { src: "/images/deluxe-main.jpg", label: "Deluxe King", sub: "Guest favourite" },
-              { src: "/images/hero-standard.jpg", label: "Standard Queen", sub: "Real listing photo" },
-              { src: "/images/twin-main.jpg", label: "Twin Room", sub: "For two guests" },
+              { src: "/media/organized/room_deluxe/listing-12.jpg", label: "Deluxe King", sub: "Guest favourite" },
+              { src: "/media/organized/room_standard/691294046.jpg", label: "Standard Queen", sub: "Real listing photo" },
+              { src: "/media/organized/room_standard/twin-main.jpg", label: "Twin Room", sub: "For two guests" },
             ].map((p) => (
               <button key={p.src} type="button" className="stay-hero-photo" onClick={scrollToRooms} aria-label={`See ${p.label} availability`}>
                 <img src={p.src} alt={`${p.label} at Sunrise Motel`} loading="eager" />
@@ -508,10 +515,10 @@ export function StayPage() {
             <article key={room.id} className={`room-card-structured sell-card ${room.isSoldOut ? "card-sold-out" : ""}`}>
               <div className="room-photo-header sell-photo">
                 <img
-                  src={(room.images && room.images[0]) || "/images/hero-standard.jpg"}
+                  src={(room.images && room.images[0]) || roomFallback(room.id)}
                   alt={`${room.name} at Sunrise Motel`}
                   loading="lazy"
-                  onError={(e) => { e.currentTarget.src = "/images/hero-standard.jpg"; }}
+                  onError={(e) => { e.currentTarget.src = roomFallback(room.id); }}
                 />
                 <div className="photo-tag-overlay">
                   <span className={`availability-chip ${room.isSoldOut ? "chip-sold-out" : room.availableCount === 1 ? "chip-low" : "chip-available"}`}>
@@ -604,9 +611,9 @@ export function StayPage() {
             </div>
             <div className="slideshow-viewport">
               <img
-                src={activeSlideshow.images[slideIdx] || "/images/hero-standard.jpg"}
+                src={activeSlideshow.images[slideIdx] || roomFallback(activeSlideshow.id)}
                 alt={`${activeSlideshow.name} — photo ${slideIdx + 1} of ${activeSlideshow.images.length}`}
-                onError={(e) => { e.currentTarget.src = "/images/hero-standard.jpg"; }}
+                onError={(e) => { e.currentTarget.src = roomFallback(activeSlideshow.id); }}
               />
               <button className="slide-nav-btn prev-btn" onClick={() => setSlideIdx((prev) => (prev - 1 + activeSlideshow.images.length) % activeSlideshow.images.length)} aria-label="Previous photo">
                 <ChevronLeft size={24} />
@@ -618,7 +625,7 @@ export function StayPage() {
             <div className="slideshow-thumbnails-row">
               {activeSlideshow.images.map((img: string, i: number) => (
                 <button key={img} className={`thumbnail-btn ${i === slideIdx ? "active" : ""}`} onClick={() => setSlideIdx(i)}>
-                  <img src={img} alt="" onError={(e) => { e.currentTarget.src = "/images/hero-standard.jpg"; }} />
+                  <img src={img} alt="" onError={(e) => { e.currentTarget.src = roomFallback(activeSlideshow.id); }} />
                 </button>
               ))}
             </div>
@@ -1042,10 +1049,10 @@ export function UnwindPage() {
       hour: "12pm",
       when: "Saturdays · 12:00 — 20:00",
       title: "Braai, Pool & Big Screen",
-      detail: "The courtyard grill all afternoon, the pool table in the bar, and the big screen for the late kick-off.",
+      detail: "The courtyard grill all afternoon, the bar and its big screen for the late kick-off — and the pool table between rounds.",
       tag: "Walk in — no booking needed",
-      img: "/images/unwind-pool-table.jpg",
-      alt: "The pool table in the Sunrise Motel bar set up for a game",
+      img: "/media/organized/bar/cute-and-cozy-place-friendly-1.jpg",
+      alt: "Inside the Sunrise Motel bar: the counter, its wooden stools and the big screen over the bottles",
     },
     {
       day: "SUN",
@@ -1280,22 +1287,9 @@ export function UnwindPage() {
         <div className="section-head">
           <span className="eyebrow"><span className="eyebrow-line" /> THE BOARD AT THE BAR</span>
           <h2>What is pinned up this month</h2>
-          <p>The same notices that hang by the entrance, kept here so you can read them before you set off.</p>
+          <p>The same notices that hang by the entrance, kept here so you can read them before you set off — and the terrace they look out on.</p>
         </div>
         <div className="exp-posters">
-          <figure className="exp-poster">
-            <SafeImage
-              src="/images/unwind-match-day-specials.jpg"
-              alt="Sunrise Motel match-day menu: platters for two and five, meat and chicken options, starches and full meals, with the orders number"
-              width={900}
-              height={1200}
-              fallbackLabel="Match-day snack menu"
-            />
-            <figcaption>
-              <strong>Match-day snack menu</strong>
-              <small>Platters for two or five — meatballs, calamari, samosa, bajias and far far — plus burgers, hot dogs and chips.</small>
-            </figcaption>
-          </figure>
           <figure className="exp-poster">
             <SafeImage
               src="/images/unwind-happy-hour-board.jpg"
@@ -1320,19 +1314,6 @@ export function UnwindPage() {
             <figcaption>
               <strong>On the terrace</strong>
               <small>The courtyard seating, the long tables under the trees — and the drinks kept cold behind the bar.</small>
-            </figcaption>
-          </figure>
-          <figure className="exp-poster">
-            <SafeImage
-              src="/images/unwind-pool-table.jpg"
-              alt="The pool table with the balls racked on it in the Sunrise Motel bar"
-              width={900}
-              height={1200}
-              fallbackLabel="The pool table"
-            />
-            <figcaption>
-              <strong>Play pool as you enjoy your drink</strong>
-              <small>The bar&apos;s own invitation, and the table is free — first to rack up plays.</small>
             </figcaption>
           </figure>
         </div>
@@ -1673,13 +1654,13 @@ export function ConnectPage() {
         <div className="section-head">
           <span className="eyebrow"><span className="eyebrow-line" /> THE BOARD BY RECEPTION</span>
           <h2>What we advertise on our own walls</h2>
-          <p>The three boards guests photograph most often, kept here where you can read them properly.</p>
+          <p>The boards guests photograph most often, kept here where you can read them properly.</p>
         </div>
         <div className="exp-posters">
           <figure className="exp-poster">
             <SafeImage
-              src="/images/connect-coffee-snacks.jpg"
-              alt="Sunrise Motel board reading fuel up with Sunrise coffee, stay connected with fast Starlink internet, try our coffee and snacks"
+              src="/media/organized/building_interior/connect-coffee-snacks.jpg"
+              alt="Sunrise Motel's own board by reception: fuel up with Sunrise coffee, stay connected with fast Starlink internet, try our coffee and snacks"
               width={900}
               height={1200}
               fallbackLabel="Coffee and Starlink"
@@ -1687,19 +1668,6 @@ export function ConnectPage() {
             <figcaption>
               <strong>Coffee &amp; Starlink</strong>
               <small>Our own promise, word for word: fast Starlink internet and a cup of coffee in a quiet, productive space.</small>
-            </figcaption>
-          </figure>
-          <figure className="exp-poster">
-            <SafeImage
-              src="/images/connect-facilities.jpg"
-              alt="Sunrise Motel facilities board listing breakfast, dinner, bar, pool table and Wi-Fi, with the motel telephone number"
-              width={642}
-              height={800}
-              fallbackLabel="Our facilities"
-            />
-            <figcaption>
-              <strong>Our facilities</strong>
-              <small>Breakfast, dinner, the bar, the pool table and Wi-Fi — the list on the gate board, in the same order.</small>
             </figcaption>
           </figure>
           <figure className="exp-poster">

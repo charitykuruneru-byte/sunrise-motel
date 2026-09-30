@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, integer, pgTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 
 export const roomTypesTable = pgTable("room_types", {
   id: varchar("id", { length: 64 }).primaryKey(),
@@ -133,13 +133,46 @@ export const staffTable = pgTable("staff", {
   name: varchar("name", { length: 160 }).notNull(),
   email: varchar("email", { length: 180 }).notNull().unique(),
   phone: varchar("phone", { length: 40 }),
-  role: varchar("role", { length: 16 }).notNull().default("staff"), // admin | staff
+  role: varchar("role", { length: 32 }).notNull().default("staff"),
   passwordHash: text("password_hash").notNull(),
   passwordSalt: text("password_salt").notNull(),
   isActive: boolean("is_active").notNull().default(true),
+  invitedBy: varchar("invited_by", { length: 36 }),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  uniqueIndex("staff_email_identity_unique").on(sql`lower(${table.email})`),
+]);
+
+export const invitationsTable = pgTable("invitations", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  email: varchar("email", { length: 180 }).notNull(),
+  name: varchar("name", { length: 160 }).notNull(),
+  role: varchar("role", { length: 32 }).notNull(),
+  accountType: varchar("account_type", { length: 16 }).notNull().default("staff"), // staff | guest
+  invitedById: varchar("invited_by_id", { length: 36 }).notNull(),
+  invitedByName: varchar("invited_by_name", { length: 160 }).notNull(),
+  invitedByEmail: varchar("invited_by_email", { length: 180 }).notNull(),
+  invitedByRole: varchar("invited_by_role", { length: 32 }).notNull(),
+  guestId: varchar("guest_id", { length: 36 }),
+  bookingId: varchar("booking_id", { length: 36 }),
+  tokenHash: varchar("token_hash", { length: 64 }),
+  status: varchar("status", { length: 16 }).notNull().default("pending"), // pending | accepted | expired | revoked | failed
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  deliveryError: text("delivery_error"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("invitations_active_email_unique")
+    .on(sql`lower(${table.email})`)
+    .where(sql`${table.status} in ('pending', 'failed')`),
+  uniqueIndex("invitations_token_hash_unique")
+    .on(table.tokenHash)
+    .where(sql`${table.tokenHash} is not null`),
+]);
 
 // Append-only audit trail so every booking can be followed by reference
 export const bookingEventsTable = pgTable("booking_events", {
@@ -149,6 +182,10 @@ export const bookingEventsTable = pgTable("booking_events", {
   action: varchar("action", { length: 64 }).notNull(), // created, status_changed, room_assigned, payment_recorded, invoice_emailed, note
   note: text("note"),
   actor: varchar("actor", { length: 64 }).notNull().default("system"), // guest, manager, system
+  actorId: varchar("actor_id", { length: 36 }),
+  actorName: varchar("actor_name", { length: 160 }),
+  actorEmail: varchar("actor_email", { length: 180 }),
+  actorRole: varchar("actor_role", { length: 32 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -163,8 +200,14 @@ export const auditLogTable = pgTable("audit_log", {
   summary: text("summary"),
   actor: varchar("actor", { length: 32 }).notNull().default("system"), // guest | manager | system
   actorLabel: varchar("actor_label", { length: 160 }),
+  actorId: varchar("actor_id", { length: 36 }),
+  actorEmail: varchar("actor_email", { length: 180 }),
+  actorRole: varchar("actor_role", { length: 32 }),
+  targetId: varchar("target_id", { length: 64 }),
+  targetEmail: varchar("target_email", { length: 180 }),
   ip: varchar("ip", { length: 64 }),
   metadataJson: text("metadata_json").default("{}"),
+  details: jsonb("details").$type<Record<string, unknown>>(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -268,7 +311,11 @@ export const guestAccountsTable = pgTable("guest_accounts", {
   signupSource: varchar("signup_source", { length: 24 }).notNull().default("desk"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  uniqueIndex("guest_accounts_email_identity_unique")
+    .on(sql`lower(${table.loginEmail})`)
+    .where(sql`${table.loginEmail} is not null and ${table.loginEmail} <> ''`),
+]);
 
 // One row per signed-in device, so "sign out of all devices" is possible.
 //

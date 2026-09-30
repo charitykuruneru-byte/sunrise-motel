@@ -36,11 +36,13 @@ import {
   Star,
   Users,
   Utensils,
+  Volume2,
+  VolumeX,
   Waves,
   Wifi,
   X,
 } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import InstallAppButton from "@/components/install-app";
 import InstallAppPopup from "@/components/InstallAppPopup";
@@ -49,6 +51,7 @@ import SafeImage from "@/components/safe-image";
 import SiteNav from "@/components/site-nav";
 import StickyStayBar from "@/components/sticky-stay-bar";
 import { PageLoadingSplash, SunriseFullLogo } from "@/components/sunrise-logo";
+import { HERO_IMAGE, HERO_VIDEO } from "@/lib/media-catalog";
 
 // The landing page's own design system, imported HERE and not in the root layout
 // so it rides only on the route that needs it: every rule inside is `hp-`-
@@ -141,8 +144,8 @@ const WAYS = [
     body: "Rooms with space to exhale — Standard, Deluxe and Twin, from MWK 85 000 a night.",
     cta: "Explore rooms",
     href: "/stay",
-    img: "/images/deluxe-main.jpg",
-    alt: "A Deluxe room at Sunrise Motel: king bed, work desk and a window onto the garden",
+    img: "/media/organized/room_deluxe/listing-12.jpg",
+    alt: "A Deluxe room at Sunrise Motel: the four-poster bed under its mosquito net, net drawn back over the pillows",
     icon: BedDouble,
   },
   {
@@ -195,23 +198,16 @@ const SHOWCASE_FILTERS = ["Everything", "Stay", "Dine", "Unwind", "Connect", "Th
 const SHOWCASE: { src: string; alt: string; title: string; caption: string; chapter: ShowcaseChapter }[] = [
   // --- Stay -----------------------------------------------------------------
   {
-    src: "/images/deluxe-main.jpg",
-    alt: "The Deluxe room at Sunrise Motel: a king bed, a work desk and a window onto the garden",
+    src: "/media/organized/room_deluxe/listing-12.jpg",
+    alt: "The four-poster double bed in a Sunrise Motel deluxe room, with the mosquito net drawn back",
     title: "The Deluxe",
-    caption: "King bed, a proper desk and tea and coffee by the window — 32 m² for a slow weekend or a working week.",
+    caption: "A four-poster bed under a drawn-back net, polished floors and room either side of it — 32 m² for a slow weekend.",
     chapter: "Stay",
   },
   {
-    src: "/images/stay-escape-to-serenity.jpg",
-    alt: "A quiet, freshly made room at Sunrise Motel waiting for the night",
-    title: "Escape to serenity",
-    caption: "Ten rooms, five minutes off Mzimba Road — the quiet end of a working day.",
-    chapter: "Stay",
-  },
-  {
-    src: "/images/stay-accommodation-offer.jpg",
-    alt: "The accommodation offer at Sunrise Motel listing the room types and rates",
-    title: "The accommodation offer",
+    src: "/media/organized/room_standard/691294046.jpg",
+    alt: "A standard room at Sunrise Motel: the double bed with its wardrobe and armchair on polished wooden floors",
+    title: "The Standard",
     caption: "Standard, Deluxe and Twin, from MWK 85 000 a night — the rate you are quoted is the rate you pay.",
     chapter: "Stay",
   },
@@ -283,17 +279,17 @@ const SHOWCASE: { src: string; alt: string; title: string; caption: string; chap
     chapter: "Unwind",
   },
   {
-    src: "/images/unwind-match-day-specials.jpg",
-    alt: "The match-day specials notice at Sunrise Motel: platters, meat and chicken options and starches",
+    src: "/media/organized/event/match-day.jpg",
+    alt: "Guests watching a football match on the big screen at Sunrise Motel",
     title: "Match day on the big screen",
     caption: "Platters, drinks specials and the game — the one night the bar is louder than the road.",
     chapter: "Unwind",
   },
   {
-    src: "/images/unwind-pool-table.jpg",
-    alt: "The pool table in the bar at Sunrise Motel",
-    title: "The pool table",
-    caption: "Between drinks, this settles the argument about who was right.",
+    src: "/media/organized/bar/520576151.jpg",
+    alt: "The bar at Sunrise Motel: guests at the counter under the SuperSport and Manchester United flags",
+    title: "The bar, after work",
+    caption: "Stools at the counter, the shelf behind it and the big screen above — where the evening starts.",
     chapter: "Unwind",
   },
   {
@@ -313,10 +309,10 @@ const SHOWCASE: { src: string; alt: string; title: string; caption: string; chap
     chapter: "Connect",
   },
   {
-    src: "/images/connect-coffee-snacks.jpg",
-    alt: "Coffee and snacks brought to a table at Sunrise Motel",
-    title: "Coffee and something small",
-    caption: "Brought to the table, so nobody has to pack the laptop up to order.",
+    src: "/media/organized/building_interior/connect-coffee-snacks.jpg",
+    alt: "Sunrise Motel's own board by reception: fuel up with Sunrise coffee, stay connected with fast Starlink internet, try our coffee and snacks",
+    title: "Coffee & Starlink, in our own words",
+    caption: "The board by reception says it in one line: the coffee, the fast Starlink and the quiet table to use them at.",
     chapter: "Connect",
   },
   {
@@ -350,22 +346,6 @@ const SHOWCASE: { src: string; alt: string; title: string; caption: string; chap
     chapter: "The property",
   },
 ];
-
-/**
- * THE TOUR (Part 2.3b) — the same seventy-six seconds that sit on /unwind, moved
- * up to the first screenful after the welcome, because "what does it look like
- * inside" is the question a photograph cannot answer. `preload="none"` is the
- * point of it: nothing is fetched until the guest presses play, so a video can
- * never quietly spend a prepaid bundle (Part 5.4).
- */
-const TOUR = {
-  src: "/media/sunrise-tour-480p.mp4",
-  poster: "/images/unwind-video-poster.jpg",
-  width: 852,
-  height: 478,
-  alt: "A short tour of Sunrise Motel: the restaurant, the bar, match days and the rooms",
-  length: "1 min 16 s",
-};
 
 export default function HomePage() {
   const [checkIn, setCheckIn] = useState(isoPlus(1));
@@ -484,6 +464,55 @@ export default function HomePage() {
 
   // NOTE: the reviews fetch and the `?checkIn=&checkOut=` prefill live below, after the
   // state they depend on is declared.
+
+  // ---- The hero film (§2.3) -------------------------------------------------
+  // The property's own tour of the grounds, playing silently behind the words.
+  // Muted is not a preference here, it is the price of autoplay in every browser;
+  // the loop is what makes it footage rather than a video someone has to babysit.
+  // Two things are deliberate. First, the photograph underneath stays the real
+  // hero: if the file is missing, the codec is one this phone will not play, or
+  // the guest taps Pause, what is left is still a finished hero and not a black
+  // rectangle — `src` is held in state only so a failed load can put the
+  // photograph back on top for good. Second, 8 MB is a week of somebody's airtime,
+  // so the film is HELD BACK until the browser has told us the connection is a
+  // cheap one — the first paint is the photograph for everybody, which is the only
+  // way a metered or Save-Data phone is certain never to start the download. Those
+  // guests, and anyone whose device asks for reduced motion, keep the photograph
+  // and a Play button; the file moves only if they ask for it.
+  const heroVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [heroVideoSrc, setHeroVideoSrc] = useState<string | null>(HERO_VIDEO?.src ?? null);
+  const [heroFilmHeld, setHeroFilmHeld] = useState(true); // poster first, Play on request
+  const [heroPlaying, setHeroPlaying] = useState(false);
+  const [heroMuted, setHeroMuted] = useState(true);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const connection = (
+      navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }
+    ).connection;
+    // No Network Information API (Safari, iOS) means we cannot know, and a guest
+    // who came to look at the hotel should not be punished for that: autoplay.
+    const metered =
+      !!connection && (connection.saveData === true || /^(slow-2g|2g|3g)$/.test(connection.effectiveType ?? ""));
+    if (reducedMotion || metered) return;
+    setHeroFilmHeld(false);
+    setHeroPlaying(true);
+  }, []);
+
+  useEffect(() => {
+    const film = heroVideoRef.current;
+    if (!film || heroFilmHeld) return;
+    film.muted = heroMuted;
+    if (!heroPlaying) {
+      film.pause();
+      return;
+    }
+    film.play().catch(() => {
+      /* the browser said no (autoplay policy, or a background tab) — the
+         photograph stays exactly where it is and nothing else changes */
+    });
+  }, [heroPlaying, heroMuted, heroFilmHeld, heroVideoSrc]);
 
   // ---- The showcase slideshow (§2.5b) ---------------------------------------
   // One photograph at a time, of this property, playing by itself. Three things
@@ -707,19 +736,80 @@ export default function HomePage() {
       <SiteNav active="Home" bookingHref="#hp-availability" showStickyBar={false} />
 
       <main id="hp-main">
-        {/* HERO — one strong photograph, left-aligned, never centred (redesign §2.3).
-            It is the only eagerly loaded image on the page. */}
+        {/* HERO — the property's own footage with its own photograph behind it,
+            left-aligned, never centred (redesign §2.3). The photograph is the
+            only eagerly loaded image on the page and it is also the film's
+            poster, so the first thing painted is a finished hero either way. */}
         <section className="hp-hero">
           <SafeImage
-            src="/images/hero-standard.jpg"
-            alt="A room wing at Sunrise Motel at golden hour, with the garden and the braai area behind it"
-            width={1920}
-            height={1080}
+            src={HERO_IMAGE?.src ?? null}
+            alt={HERO_IMAGE?.alt ?? "The Sunrise Motel facade and its sign, with potted plants along the veranda"}
+            width={HERO_IMAGE?.width ?? 1400}
+            height={HERO_IMAGE?.height ?? 800}
             priority
             imgClassName="hp-hero-img"
             fallbackLabel="Sunrise Motel · Area 5, Lilongwe"
           />
+          {heroVideoSrc && !heroFilmHeld ? (
+            <video
+              ref={heroVideoRef}
+              className="hp-hero-video"
+              src={heroVideoSrc}
+              poster={HERO_IMAGE?.src}
+              autoPlay
+              muted={heroMuted}
+              loop
+              playsInline
+              preload="auto"
+              aria-hidden="true"
+              tabIndex={-1}
+              onError={() => {
+                /* a file this device will not decode is dropped for the rest of
+                   the visit: the photograph stays and no data is spent twice */
+                setHeroVideoSrc(null);
+              }}
+            />
+          ) : null}
           <div className="hp-hero-scrim" aria-hidden="true" />
+          {heroVideoSrc ? (
+            <div className="hp-hero-media-controls">
+              {heroFilmHeld ? (
+                <button
+                  type="button"
+                  className="hp-hero-media-btn"
+                  onClick={() => {
+                    setHeroFilmHeld(false);
+                    setHeroPlaying(true);
+                  }}
+                  aria-label="Play the short film of the property"
+                >
+                  <Play size={13} />
+                  <span>Play film</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="hp-hero-media-btn"
+                  onClick={() => setHeroPlaying((playing) => !playing)}
+                  aria-label={heroPlaying ? "Pause the film in the background" : "Play the film"}
+                >
+                  {heroPlaying ? <Pause size={13} /> : <Play size={13} />}
+                  <span>{heroPlaying ? "Pause" : "Play"}</span>
+                </button>
+              )}
+              {!heroFilmHeld ? (
+                <button
+                  type="button"
+                  className="hp-hero-media-btn"
+                  onClick={() => setHeroMuted((muted) => !muted)}
+                  aria-label={heroMuted ? "Turn the sound on" : "Mute the film"}
+                >
+                  {heroMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
+                  <span>{heroMuted ? "Sound on" : "Mute"}</span>
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           <div className="hp-hero-inner hp-wrap">
             <p className="hp-hero-eyebrow hp-anim hp-anim-1">Area 5 · Lilongwe · Mzimba Road</p>
             <h1 className="hp-h1 hp-anim hp-anim-2">A warm room, a full plate, and a quiet evening.</h1>
@@ -875,47 +965,6 @@ export default function HomePage() {
                 </div>
               </div>
             </Reveal>
-          </div>
-        </section>
-
-        {/* SUNRISE IN A MINUTE (Part 2.3b) — the tour, immediately under the
-            welcome. It is the question a photograph cannot answer, and it is
-            deliberately cheap to ignore: `preload="none"` means a guest who
-            scrolls past it downloads nothing at all, and the caption says so. */}
-        <section className="hp-section hp-section--tight hp-video" aria-labelledby="hp-video-heading">
-          <div className="hp-wrap">
-            <div className="hp-head-row">
-              <div className="hp-head">
-                <p className="hp-eyebrow">Sunrise in a minute</p>
-                <h2 className="hp-h2" id="hp-video-heading">See it before you book it</h2>
-                <span className="hp-rule" aria-hidden="true" />
-                <p className="hp-sub">
-                  Seventy-six seconds through the gate: the restaurant, the bar, match day on the big screen, and what a
-                  room looks like when you stay the night. Sound on when you press play.
-                </p>
-              </div>
-              <a className="hp-more" href="/unwind">More of the property <MoveRight size={15} /></a>
-            </div>
-
-            <figure className="hp-video-stage">
-              <video
-                controls
-                playsInline
-                preload="none"
-                poster={TOUR.poster}
-                width={TOUR.width}
-                height={TOUR.height}
-                aria-label={TOUR.alt}
-              >
-                <source src={TOUR.src} type="video/mp4" />
-                This browser cannot play the video — every place it shows is photographed on this page and in the
-                gallery.
-              </video>
-              <figcaption className="hp-video-foot">
-                <span><Clock3 size={13} /> {TOUR.length} · front desk, kitchen, bar and rooms</span>
-                <span><ShieldCheck size={13} /> Downloaded only when you tap play — it never spends data on its own</span>
-              </figcaption>
-            </figure>
           </div>
         </section>
 

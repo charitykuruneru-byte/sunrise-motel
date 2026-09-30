@@ -6,6 +6,7 @@ import { clientIp, logAudit } from "@/lib/audit";
 import { consumeToken, peekToken, setGuestPassword } from "@/lib/guest-auth";
 import { OTP_MAX_ATTEMPTS, OTP_RESEND_SECONDS, OTP_TTL_MINUTES, resendOtp, verifyOtp } from "@/lib/guest-otp";
 import { notifyByEmail } from "@/lib/notify";
+import { guestAppDownloadUrl } from "@/lib/mail";
 import { samePhone } from "@/lib/phone";
 import { malawiStamp } from "@/lib/time";
 
@@ -178,16 +179,18 @@ export async function POST(request: Request) {
       ip: clientIp(request),
       metadata: { at: malawiStamp() },
     });
+    const downloadUrl = guestAppDownloadUrl(request);
     await notifyByEmail({
       to: account.loginEmail,
       subject: "Your Sunrise Motel guest app is ready",
       html:
         "<p>Your password is set and your account is active.</p>" +
         "<p>Sign in to see your room number, your room bill, to order food to your room and to message the front desk.</p>" +
+        `<p><a href="${downloadUrl}">Download the Sunrise Motel guest app</a> for Android.</p>` +
         "<p>You stay signed in on your phone — you will not be asked for this password again unless you sign out yourself.</p>",
       text:
         "Your Sunrise Motel guest account is active. Sign in to see your room, bill and to order to your room. " +
-        "You stay signed in until you sign out.",
+        `Download the guest app: ${downloadUrl}. You stay signed in until you sign out.`,
       template: "guest_activation_complete",
       guestId: account.guestId,
     });

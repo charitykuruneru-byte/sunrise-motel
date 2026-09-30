@@ -17,7 +17,7 @@ const OPEN = ["open", "assigned", "in_progress"];
  * room is never sold to anyone else.
  */
 export async function GET(request: Request) {
-  const auth = deskActor(request);
+  const auth = await deskActor(request);
   if ("error" in auth) return auth.error;
   try {
     const [tasks, rooms] = await Promise.all([
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
 
 /** Create a task (the desk can log one on a guest's behalf, e.g. by phone). */
 export async function POST(request: Request) {
-  const auth = deskActor(request, { write: true });
+  const auth = await deskActor(request, { write: true });
   if ("error" in auth) return auth.error;
   try {
     const body = (await request.json()) as {
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
  * when the work cannot be finished now.
  */
 export async function PATCH(request: Request) {
-  const auth = deskActor(request, { write: true });
+  const auth = await deskActor(request, { write: true });
   if ("error" in auth) return auth.error;
   try {
     const body = (await request.json()) as {

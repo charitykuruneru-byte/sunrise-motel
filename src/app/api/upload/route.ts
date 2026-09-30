@@ -33,7 +33,7 @@ async function storeInDatabase(file: File, user: SessionUser, safe: string) {
 // Postgres when Blob is not configured. Managers pick from laptop/phone and always
 // get a URL back — no URL typing.
 export async function POST(request: Request) {
-  const user = readSession(request);
+  const user = await readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   try {
     const form = await request.formData();

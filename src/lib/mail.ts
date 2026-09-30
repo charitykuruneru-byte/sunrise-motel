@@ -22,6 +22,10 @@ export function publicBaseUrl(request?: Request) {
   return "";
 }
 
+export function guestAppDownloadUrl(request?: Request) {
+  return `${publicBaseUrl(request)}/download#guest-app`;
+}
+
 export type MailAttachment = { filename: string; content: Buffer; contentType: string };
 
 export async function sendMail(opts: {
@@ -31,6 +35,29 @@ export async function sendMail(opts: {
   text?: string;
   attachments?: MailAttachment[];
 }) {
+  const resendKey = process.env.RESEND_API_KEY;
+  if (resendKey) {
+    const from = process.env.EMAIL_FROM || process.env.SMTP_FROM || "Sunrise Motel <noreply@sunrisemotel.mw>";
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from,
+        to: Array.isArray(opts.to) ? opts.to : [opts.to],
+        subject: opts.subject,
+        html: opts.html,
+        text: opts.text,
+        attachments: opts.attachments?.map((attachment) => ({
+          filename: attachment.filename,
+          content: attachment.content.toString("base64"),
+          content_type: attachment.contentType,
+        })),
+      }),
+    });
+    if (!response.ok) return { sent: false as const, reason: `Resend rejected the email (HTTP ${response.status}). Check the API key, sender domain and recipient.` };
+    return { sent: true as const };
+  }
+
   const host = process.env.SMTP_HOST;
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
@@ -38,7 +65,7 @@ export async function sendMail(opts: {
     return {
       sent: false as const,
       reason:
-        "SMTP is not configured (set SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM). The PDF invoice remains downloadable and shareable on WhatsApp.",
+        "Email is not configured (set RESEND_API_KEY or SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM).",
     };
   }
   const mod = (await import("nodemailer")) as unknown as {

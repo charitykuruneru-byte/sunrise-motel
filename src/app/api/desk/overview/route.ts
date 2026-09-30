@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
  * arrivals / departures / in-house lists.
  */
 export async function GET(request: Request) {
-  const auth = deskActor(request);
+  const auth = await deskActor(request);
   if ("error" in auth) return auth.error;
   try {
     await ensureRoomsSeeded();

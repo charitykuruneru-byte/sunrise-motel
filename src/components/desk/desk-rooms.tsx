@@ -1,9 +1,8 @@
 "use client";
 
-import { BedDouble, Loader2, LogIn, LogOut, UserPlus, XCircle } from "lucide-react";
+import { BedDouble, Loader2, LogIn, LogOut, XCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import RoomAccessCardPanel, { type RoomAccessCard } from "./room-card";
-import GuestCredentialsPanel, { type GuestCredentials } from "./guest-credentials-card";
 import { api, BTN, BTN_DANGER, BTN_PRIMARY, CARD, INPUT, money, ROOM_STATE_LABEL, ROOM_STATE_STYLE } from "./shared";
 
 type RoomRow = {
@@ -45,8 +44,6 @@ export default function DeskRooms({
   const [oooUntil, setOooUntil] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [roomCard, setRoomCard] = useState<RoomAccessCard | null>(null);
-  /** The password the SYSTEM chose, held in memory only until the card is printed. */
-  const [credentials, setCredentials] = useState<GuestCredentials | null>(null);
 
   const load = useCallback(async () => {
     const data = await api<{ rooms: RoomRow[] }>("/api/desk/rooms");
@@ -113,76 +110,30 @@ export default function DeskRooms({
       });
     });
 
-  /**
-   * THE FRONT DESK IS THE DOORWAY (see desk-guests.tsx): the desk types the email,
-   * the SYSTEM picks the password, and it comes back once for the card that is handed
-   * over. `invite` is still here for the guest who would rather be emailed a link and
-   * choose a password themselves — it is no longer the way in, just an option.
-   */
-  const register = (room: RoomRow) =>
-    run("Account registered — hand over the sign-in card.", async () => {
-      const email = inviteEmail.trim();
-      if (!email) throw new Error("Type the email address the guest will sign in with.");
-      const data = await api<{
-        result: {
-          loginEmail: string;
-          password: string | null;
-          existingAccount: boolean;
-          roomNumber: string | null;
-          checkOut: string | null;
-          emailSent: boolean;
-          emailReason: string | null;
-        };
-      }>("/api/desk/guests", {
-        method: "POST",
-        body: JSON.stringify({ action: "register", bookingId: room.occupant!.bookingId, login: email }),
-      });
-      setCredentials({
-        guestName: room.occupant?.guestName ?? "Guest",
-        loginEmail: data.result.loginEmail,
-        password: data.result.password,
-        roomNumber: data.result.roomNumber,
-        checkOut: data.result.checkOut,
-        guestPhone: room.occupant?.phone ?? null,
-        emailSent: data.result.emailSent,
-        emailReason: data.result.emailReason,
-      });
-    });
-
   const invite = (bookingId: string) =>
-    run("Guest account created — the activation email has been sent (or the code is shown for you to read out).", async () => {
+    run("Guest invitation sent. They can set their own password from the email.", async () => {
+      const email = inviteEmail.trim();
+      if (!email) throw new Error("Capture the guest's email after check-in.");
       const data = await api<{
         result: {
-          activationLink: string | null;
-          activationOtp: string | null;
           existingAccount: boolean;
           emailSent: boolean;
           emailReason: string | null;
         };
       }>("/api/desk/guests", {
         method: "POST",
-        body: JSON.stringify({ action: "invite", bookingId, login: inviteEmail || undefined }),
+        body: JSON.stringify({ action: "invite", bookingId, login: email }),
       });
       if (data.result.existingAccount) {
-        setToast("This guest already has an account — the stay is linked and they were told it is active.");
+        setToast("Returning guest — stay linked to the existing account; no duplicate account created.");
       } else if (!data.result.emailSent) {
-        setToast(
-          `Invitation saved but not emailed (${data.result.emailReason ?? "SMTP unavailable"}). Code to read out: ${data.result.activationOtp ?? "—"}`,
-        );
+        setToast(`Invitation saved, but email failed (${data.result.emailReason ?? "SMTP unavailable"}). Ask an Administrator to resend after email is restored.`);
       }
     });
 
   const floors = [...new Set(map.map((room) => room.floor ?? "—"))].sort();
   return (
     <div className="space-y-4">
-      {credentials && (
-        <section>
-          <GuestCredentialsPanel credentials={credentials} />
-          <button className={`${BTN} mt-2`} type="button" onClick={() => setCredentials(null)}>
-            Done — the guest has the details
-          </button>
-        </section>
-      )}
       {roomCard && (
         <section>
           <RoomAccessCardPanel card={roomCard} />
@@ -321,18 +272,21 @@ export default function DeskRooms({
                   >
                     <XCircle size={13} /> No-show
                   </button>
-                  <button className={BTN_PRIMARY} disabled={busy} onClick={() => register(selected)}>
-                    <UserPlus size={13} /> Register + show password
-                  </button>
-                  <button className={BTN} disabled={busy} onClick={() => invite(selected.occupant!.bookingId)}>
-                    Email a link instead
-                  </button>
-                  <input
-                    className={`${INPUT} max-w-[220px]`}
-                    placeholder="email the guest signs in with"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                  />
+                  {selected.occupant.status === "checked_in" && !selected.occupant.appAccount && (
+                    <>
+                      <input
+                        className={`${INPUT} max-w-[220px]`}
+                        type="email"
+                        required
+                        placeholder="guest email after check-in"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                      />
+                      <button className={BTN} disabled={busy} onClick={() => invite(selected.occupant!.bookingId)}>
+                        Email guest setup link
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>

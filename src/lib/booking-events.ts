@@ -8,6 +8,7 @@ export async function logBookingEvent(
   action: string,
   note?: string | null,
   actor: "guest" | "manager" | "system" = "system",
+  actorInfo?: { id?: string | null; name?: string | null; email?: string | null; role?: string | null },
 ) {
   try {
     await db.insert(bookingEventsTable).values({
@@ -17,6 +18,10 @@ export async function logBookingEvent(
       action,
       note: note ?? null,
       actor,
+      actorId: actorInfo?.id ?? null,
+      actorName: actorInfo?.name ?? null,
+      actorEmail: actorInfo?.email ?? null,
+      actorRole: actorInfo?.role ?? null,
     });
   } catch (error) {
     console.error("Failed to log booking event", error);

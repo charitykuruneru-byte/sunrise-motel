@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "guest_accounts_email_identity_unique" ON "guest_accounts" USING btree (lower("login_email")) WHERE "guest_accounts"."login_email" is not null and "guest_accounts"."login_email" <> '';
