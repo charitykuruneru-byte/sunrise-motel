@@ -823,7 +823,7 @@ Writing stays admin-only at `/api/admin/posts`.
 **Proving the media flow works.** `npm run verify:media` (→ `scripts/verify-media-flow.mjs`) signs in,
 uploads a real file to `/api/upload`, adds it to the gallery **with alt text**, publishes a post that
 uses it, reads the public feed back to confirm the image survived, then deletes both again. It needs a
-running server (`http://127.0.0.1:3000` by default, pass a URL to override) and prints one
+running server (`http://127.0.0.1:3112` by default, pass a URL to override) and prints one
 PASS/FAIL line per step:
 
 ```
@@ -1108,40 +1108,40 @@ npx drizzle-kit migrate    # applies them to sunrise_db
 ### 16.3 Every-day run
 
 ```powershell
-npm run dev -- --port 3000 --hostname 127.0.0.1
-# open http://localhost:3000        health: http://localhost:3000/api/health  →  { "ok": true }
+npm run dev                      # package.json pins --port 3112 — the ONE dev port
+# open http://localhost:3112        health: http://localhost:3112/api/health  →  { "ok": true }
 ```
 
-Clean seed data appears on the first `/api/availability` hit (§4.11). Port 3000 must be free — if a
+Clean seed data appears on the first `/api/availability` hit (§4.11). Port 3112 must be free — if a
 previous server lingers:
 
 ```powershell
-Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
+Get-NetTCPConnection -LocalPort 3112 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
 ```
 
 ### 16.4 End-to-end smoke test (PowerShell)
 
 ```powershell
 # Availability for a window
-Invoke-RestMethod 'http://localhost:3000/api/availability?checkIn=2026-10-01&checkOut=2026-10-03'
+Invoke-RestMethod 'http://localhost:3112/api/availability?checkIn=2026-10-01&checkOut=2026-10-03'
 
 # Create a booking (see RUN_LOCALLY.md for the full payload)
 $b = @{ roomTypeId='standard'; checkIn='2026-10-10'; checkOut='2026-10-12'; guestName='Test Guest'; phone='+265991000000'; adults=2 } | ConvertTo-Json
-$r = Invoke-RestMethod -Uri http://localhost:3000/api/bookings -Method POST -Body $b -ContentType 'application/json'
+$r = Invoke-RestMethod -Uri http://localhost:3112/api/bookings -Method POST -Body $b -ContentType 'application/json'
 $r.booking.reference          # SM-…
 
 # Track it (reference + phone)
 $t = @{ reference=$r.booking.reference; phone='+265991000000' } | ConvertTo-Json
-Invoke-RestMethod -Uri http://localhost:3000/api/track -Method POST -Body $t -ContentType 'application/json'
+Invoke-RestMethod -Uri http://localhost:3112/api/track -Method POST -Body $t -ContentType 'application/json'
 
 # Download the pro-forma PDF
-Invoke-WebRequest -Uri ("http://localhost:3000/api/invoices/" + $r.booking.reference) -OutFile invoice.pdf
+Invoke-WebRequest -Uri ("http://localhost:3112/api/invoices/" + $r.booking.reference) -OutFile invoice.pdf
 ```
 
 ### 16.5 Sharing a local server temporarily
 
 `powershell -ExecutionPolicy Bypass -File ./share-tunnel.ps1` starts a Cloudflare quick tunnel
-(downloading `bin/cloudflared.exe` on first use) in front of `127.0.0.1:3000`. To keep email links
+(downloading `bin/cloudflared.exe` on first use) in front of `127.0.0.1:3112`. To keep email links
 correct while sharing, set `PUBLIC_APP_URL` to the tunnel URL in `.env` and restart. **Tunnel URLs
 expire** — never bake one into the Android app.
 
@@ -2633,7 +2633,7 @@ Both were found by checking the claims in the table above against the code inste
 | **The desk cannot edit the menu** | Sold out is a toggle. A wrong price or a missing dish still needs a developer **or** a database change, because no admin Menu screen exists | The dish is closed off sale rather than left wrong; the real fix is Part 32 §4.9 (build the Menu tab) |
 | **The audit trail is readable by staff** | A staff session *can* read the audit trail, because Part 32 asks for it to be visible to the desk. It cannot change or delete a row — nothing in the codebase does | If the trail should be admin-only, that is a one-line change in `src/app/api/admin/audit/route.ts` |
 | **The auditor role is new and thin** | `auditor` can read and cannot write, but there is no auditor-specific screen — the role simply satisfies the existing reads | It is enough for the stated purpose (external review, the owner's accountant) |
-| **The verification suite runs against a live server** | `scripts/addenda-verify.mjs` needs a server on `localhost:3000` and a signed-in session to mint its cookies | Run `npm run build` then `npm start`, then `node scripts/addenda-verify.mjs` in a second terminal. Its only writes are `menu_items.is_available` and one room's housekeeping state — both toggled and put back |
+| **The verification suite runs against a live server** | `scripts/addenda-verify.mjs` needs a server on `localhost:3112` and a signed-in session to mint its cookies | Run `npm run build` then `npm start`, then `node scripts/addenda-verify.mjs` in a second terminal. Its only writes are `menu_items.is_available` and one room's housekeeping state — both toggled and put back |
 | **A stale `.next` can 404 every nested route** | If `.next` is left behind by two concurrent `next` processes, the generated `.next/dev/types/routes.d.ts` can be written half-finished. `next build` then dies on `Unterminated regular expression literal`, and in dev every `/api/a/b` route answers **404** while `next start` from a good build is unaffected | `rm -rf .next` and rebuild. Never run `next dev` and `next build` at the same time. Nothing in `src/` is wrong when this happens |
 
 ---
@@ -2669,7 +2669,7 @@ home page and every inner page (`PageFrame` in `experience-pages.tsx`) render it
 | Mobile drawer | the six items, then a divider, then Track booking / Get the app / Order to your room / Manager portal, then call + WhatsApp | `.site-primary-nav` under 900 px |
 | Mobile sticky bar | Check availability + WhatsApp, on every page | `.site-sticky-bar` |
 
-Rules the component enforces: **relative links only** (nothing points at `localhost:3000`), the current
+Rules the component enforces: **relative links only** (nothing points at `localhost:3112`), the current
 page is marked with `aria-current="page"` and `.is-active`, the logo links Home *and* the Home label
 still exists, exactly one primary button per view, the manager portal never competes with it, and every
 tap target is at least 44 px. The old flat row and the four-item mobile bottom bar are gone.

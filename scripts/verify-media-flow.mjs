@@ -19,7 +19,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-const BASE = process.argv[2] ?? process.env.BASE_URL ?? "http://127.0.0.1:3000";
+const BASE = process.argv[2] ?? process.env.BASE_URL ?? "http://127.0.0.1:3112";
 
 function envValue(key) {
   if (process.env[key]) return process.env[key];

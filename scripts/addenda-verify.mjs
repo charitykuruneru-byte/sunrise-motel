@@ -4,7 +4,7 @@
 import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 
-const BASE = process.env.VERIFY_BASE ?? "http://127.0.0.1:3000";
+const BASE = process.env.VERIFY_BASE ?? "http://127.0.0.1:3112";
 
 const env = Object.fromEntries(
   readFileSync(".env", "utf8")

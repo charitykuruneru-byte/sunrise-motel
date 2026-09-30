@@ -10,6 +10,7 @@ import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { bookings, reviewsTable, waitlistTable } from "@/db/schema";
 import { logAudit } from "@/lib/audit";
+import { publicBaseUrl } from "@/lib/mail";
 import { notifyByEmail } from "@/lib/notify";
 import { formatMalawiDate } from "@/lib/time";
 
@@ -95,7 +96,11 @@ export async function requestReview(bookingId: string) {
     .where(eq(reviewsTable.bookingId, bookingId))
     .limit(1);
   if (already.length > 0) return { sent: false as const, reason: "This guest has already reviewed this stay." };
-  const base = process.env.PUBLIC_BASE_URL ?? "http://localhost:3000";
+  // PUBLIC_BASE_URL still wins when it is set; otherwise this uses the same
+  // resolver as every other email in the app (PUBLIC_APP_URL -> NEXT_PUBLIC_APP_URL
+  // -> request host) whose only local fallback is the ONE dev port, 3112.
+  // It used to fall back to localhost:3000, which shipped dead links to guests.
+  const base = process.env.PUBLIC_BASE_URL || publicBaseUrl() || "http://localhost:3112";
   const link = `${base}/review?reference=${encodeURIComponent(booking.reference)}`;
   const result = await notifyByEmail({
     to: booking.email,
@@ -219,7 +224,7 @@ export async function notifyWaitlistForDates(opts: {
         gte(waitlistTable.checkOut, opts.checkIn),
       ),
     );
-  const base = process.env.PUBLIC_BASE_URL ?? "http://localhost:3000";
+  const base = process.env.PUBLIC_BASE_URL || publicBaseUrl() || "http://localhost:3112";
   const reached: string[] = [];
   for (const entry of waiting) {
     await notifyByEmail({

@@ -29,7 +29,7 @@
  *   npm run verify:preview -- --staff-pass <p> --guest-pass <p>
  *
  * Options:
- *   --base http://127.0.0.1:3000   the running site (default: PUBLIC_APP_URL in .env)
+ *   --base http://127.0.0.1:3112   the running site (default: PUBLIC_APP_URL in .env)
  *   --db local|neon|both|postgres://...   where to look for the preview rows (default: both)
  *
  * Read-only: it signs in, reads, and never writes a row. The sign-ins are visible
@@ -45,7 +45,7 @@ const arg = (name) => {
 // The default is the local site on purpose: PUBLIC_APP_URL in .env is a Cloudflare
 // quick tunnel, and a quick tunnel gets a new hostname every restart, so an old one
 // resolves to nothing. Pass --base https://... to test a public address.
-const base = (arg("--base") ?? "http://127.0.0.1:3000").replace(/\/$/, "");
+const base = (arg("--base") ?? "http://127.0.0.1:3112").replace(/\/$/, "");
 const dbFlag = arg("--db") ?? "both";
 const STAFF_EMAIL = "preview.desk@sunrisemotel.local";
 const GUEST_EMAIL = "preview.guest@sunrisemotel.local";

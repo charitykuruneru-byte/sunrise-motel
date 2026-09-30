@@ -10,7 +10,7 @@ import "./animations.css";
 /**
  * The absolute origin every relative URL in `metadata` is resolved against — the
  * OpenGraph picture in particular. Without it Next falls back to
- * `http://localhost:3000` at build time (it warns about exactly that), so a link
+ * `http://localhost:3112` at build time (it warns about exactly that), so a link
  * shared to WhatsApp or Facebook spent its whole life pointing at a picture that
  * only exists on the developer's laptop: no thumbnail, no preview.
  *
@@ -24,7 +24,7 @@ const siteUrl = (() => {
     process.env.PUBLIC_APP_URL,
     process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : undefined,
     process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined,
-    "http://localhost:3000",
+    "http://localhost:3112",
   ];
   for (const candidate of candidates) {
     if (!candidate) continue;
@@ -34,7 +34,7 @@ const siteUrl = (() => {
       /* try the next candidate */
     }
   }
-  return new URL("http://localhost:3000");
+  return new URL("http://localhost:3112");
 })();
 
 export const metadata: Metadata = {

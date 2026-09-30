@@ -1,4 +1,4 @@
-http://localhost:3000
+http://localhost:3112
 RUN_LOCALLY.md
 # Sunrise Motel — run on localhost (Windows)
 
@@ -60,27 +60,27 @@ npx drizzle-kit migrate    # creates the 7 tables in sunrise_db
 ## Run (every time)
 ```powershell
 cd c:\Users\datcom3\Documents\sunraisehotles
-npm run dev -- --port 3000 --hostname 127.0.0.1
-# open http://localhost:3000
+npm run dev                      # package.json pins --port 3112 — the ONE dev port
+# open http://localhost:3112
 ```
-Health check: `http://localhost:3000/api/health` → `{"ok":true}`
+Health check: `http://localhost:3112/api/health` → `{"ok":true}`
 
 ## Verify booking end-to-end (PowerShell)
 ```powershell
-Invoke-RestMethod 'http://localhost:3000/api/availability?checkIn=2026-10-01&checkOut=2026-10-03'
+Invoke-RestMethod 'http://localhost:3112/api/availability?checkIn=2026-10-01&checkOut=2026-10-03'
 $b = @{ roomTypeId='standard'; checkIn='2026-10-10'; checkOut='2026-10-12'; guestName='Test Guest'; phone='+265991000000'; adults=2 } | ConvertTo-Json
-$r = Invoke-RestMethod -Uri http://localhost:3000/api/bookings -Method POST -Body $b -ContentType 'application/json'
+$r = Invoke-RestMethod -Uri http://localhost:3112/api/bookings -Method POST -Body $b -ContentType 'application/json'
 $t = @{ reference=$r.booking.reference; phone='+265991000000' } | ConvertTo-Json
-Invoke-RestMethod -Uri http://localhost:3000/api/track -Method POST -Body $t -ContentType 'application/json'
-Invoke-WebRequest -Uri ("http://localhost:3000/api/invoices/" + $r.booking.reference)  # PDF
+Invoke-RestMethod -Uri http://localhost:3112/api/track -Method POST -Body $t -ContentType 'application/json'
+Invoke-WebRequest -Uri ("http://localhost:3112/api/invoices/" + $r.booking.reference)  # PDF
 ```
 
 ## Notes / gotchas fixed
 - Your old `app_db` database holds a *different* project (students/colleges tables). This site now uses a fresh `sunrise_db` so migrations don't clash.
 - `drizzle.config.json` points at `sunrise_db` and `out: ./drizzle`.
 - `next.config.ts` sets `turbopack.root` to silence the "multiple lockfiles" workspace warning.
-- Port 3000 must be free. Kill leftovers with:
+- Port 3112 must be free (it is the only dev port this project uses). Kill leftovers with:
 ```powershell
-Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
+Get-NetTCPConnection -LocalPort 3112 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
 ```
 - Stop the dev server with Ctrl+C in its terminal.
