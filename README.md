@@ -2739,3 +2739,49 @@ content, and the guest app finally shows the same what's-on feed as the website.
 truthful: when a row in §58 is closed, move it out of that table rather than leaving a sentence that is
 no longer true.*
 
+---
+
+## 59. The two alerts the site sends by itself ✅
+
+Everything else in this repository waits to be asked. These two do not — they are the only messages
+the site originates, and both are deliberately narrow, because a channel that shouts stops being read.
+
+**1. Publishing an activity post alerts subscribers — automatically.** `POST /api/admin/posts` now
+calls `sendWebPush()` itself, so there is no second step to remember and no way for the two to drift
+apart. Two brakes are built in and named in the reply, not hidden:
+
+| Brake | Why | What the portal shows you |
+| --- | --- | --- |
+| At most one publish alert per 10 minutes (`PUBLISH_PUSH_LAST_AT`) | Editing three posts in a row must not machine-gun everyone | *Post published — alert: Held back: a post was announced minutes ago…* |
+| A push failure never blocks the publish | The post is the product; the alert is a bonus | *Post published — alert could not be sent… the post is live regardless* |
+
+The toast in `src/app/admin/page.tsx` repeats the exact count the server reported
+(*“— alert sent to 1 device”*, or *“— no device has alerts on yet”*), so “did anything go out?” is
+answered by the portal rather than guessed. The Firebase checkbox next to it is untouched and still
+independent: Firebase reaches the **installed Android app**, Web Push reaches **browsers and the
+installed web app**. Neither channel can double-send into the other.
+
+**2. A once-a-day “rooms free tonight” digest** — `GET /api/cron/availability-digest`, scheduled at
+**16:00 Malawi time** by `crons` in `vercel.json` (`0 14 * * *`). It counts free rooms for tonight with
+the same arithmetic as the site's own availability bar, then refuses to send unless all three hold:
+
+* at least one room is genuinely free tonight (`free > 0`),
+* the number **changed** since the previous digest (`DIGEST_LAST_COUNT`),
+* nothing has been sent yet **today** (`DIGEST_LAST_SENT_ON`).
+
+So a quiet Tuesday produces silence, not a notification saying nothing happened. The manager can send
+it by hand from **Admin → Notifications** (*Send “rooms free tonight” alert now* → `?force=1`), which
+skips the day/changed guards but still will not announce a fully booked night — that path requires a
+manager session, while the scheduled path is guarded by the three conditions themselves (the endpoint
+is harmless to call: it cannot send twice in a day).
+
+**Honest limits of this section.** None of it reaches anybody until a person opts in — footer →
+**Get alerts** (or the same block on `/download`); until then the portals honestly say
+`devices: 0`. Vercel runs crons on the project's own schedule, so if the schedule is edited in the
+dashboard rather than in `vercel.json` the two will disagree. And the trigger for the digest is a
+cron, not an event: it fires at 16:00 local, not the instant a cancellation arrives.
+
+**To turn either off, no code change is needed:** delete the `PUBLISH_PUSH_LAST_AT` /
+`DIGEST_LAST_SENT_ON` / `DIGEST_LAST_COUNT` rows to reset their memory, or remove the `crons` entry
+from `vercel.json` to stop the daily digest entirely.
+

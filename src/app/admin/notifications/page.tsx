@@ -65,6 +65,39 @@ export default function NotificationsAdminPage() {
     }
   }
 
+  // The "rooms free tonight" digest — the one message the site sends on its own.
+  // Vercel calls the same endpoint daily (see crons in vercel.json); this button is
+  // how a manager checks it in daylight instead of waiting for 16:00 and hoping.
+  const [digestBusy, setDigestBusy] = useState(false);
+  async function sendDigest() {
+    setDigestBusy(true);
+    setState({ tone: "idle", text: "" });
+    try {
+      const res = await fetch("/api/cron/availability-digest?force=1");
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        reason?: string;
+        sent?: boolean;
+        delivered?: number;
+        devices?: number;
+        freeTonight?: number;
+      };
+      if (!res.ok) throw new Error(data.error || "Digest failed.");
+      if (data.reason) {
+        setState({ tone: "warn", text: data.reason });
+      } else {
+        setState({
+          tone: data.delivered ? "ok" : "warn",
+          text: `Digest sent to ${data.delivered ?? 0} of ${data.devices ?? 0} subscribed device(s) — ${data.freeTonight ?? 0} room(s) free tonight.`,
+        });
+      }
+    } catch (err) {
+      setState({ tone: "err", text: err instanceof Error ? err.message : "Digest failed." });
+    } finally {
+      setDigestBusy(false);
+    }
+  }
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
@@ -179,6 +212,21 @@ export default function NotificationsAdminPage() {
           >
             {webPushBusy ? "Sending…" : "Send test web push (browsers & installed web app)"}
           </button>
+          <button
+            type="button"
+            className="admin-btn admin-btn-secondary"
+            style={{ width: "100%", justifyContent: "center" }}
+            onClick={sendDigest}
+            disabled={busy || testing || digestBusy}
+          >
+            {digestBusy ? "Sending…" : 'Send "rooms free tonight" alert now'}
+          </button>
+          <p style={{ fontSize: 13, opacity: 0.75, margin: "4px 0 0" }}>
+            The site sends this by itself every day at 16:00 Malawi time — but only if a room is
+            actually free tonight and the number changed since the last one. This button skips
+            those two checks (it still won&apos;t announce a fully booked night). Publishing an
+            activity post alerts subscribers automatically too, at most once every 10 minutes.
+          </p>
           <button type="submit" className="btn-submit-booking-request" disabled={busy || testing || !title.trim() || !body.trim()}>
             {busy ? "Sending…" : "Send to All App Users"}
           </button>

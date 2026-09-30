@@ -7,7 +7,53 @@ import { clientIp, logAudit } from "@/lib/audit";
 import { seedDatabaseIfEmpty } from "@/db/seed";
 import { readSession } from "@/lib/staff-auth";
 import { requireRestaurantManager } from "@/lib/desk-auth";
+import { setting, setSetting } from "@/lib/settings";
+import { sendWebPush } from "@/lib/web-push";
 import { desc, eq } from "drizzle-orm";
+
+/**
+ * A post that nobody hears about is a diary entry. So publishing one pings every
+ * browser/installed-web-app that opted in to alerts — automatically, no second step.
+ *
+ * Two deliberate brakes, because an alert channel that shouts stops being read:
+ *   * at most one publish alert per 10 minutes (editing a batch must not machine-gun
+ *     everyone), and
+ *   * the announcement never blocks the publish — if push is down, the post still goes
+ *     live and the reply says why nothing was sent.
+ */
+const PUBLISH_PUSH_COOLDOWN_MS = 10 * 60 * 1000;
+
+async function announcePost(post: { id: string; title: string; detail: string; imageUrl: string | null }, request: Request) {
+  try {
+    const lastAt = Number(await setting("PUBLISH_PUSH_LAST_AT")) || 0;
+    const sinceMs = Date.now() - lastAt;
+    if (lastAt > 0 && sinceMs < PUBLISH_PUSH_COOLDOWN_MS) {
+      const minutes = Math.ceil((PUBLISH_PUSH_COOLDOWN_MS - sinceMs) / 60000);
+      return { delivered: 0, devices: 0, reason: `Held back: a post was announced minutes ago (next allowed in ~${minutes} min).` };
+    }
+    const result = await sendWebPush({
+      title: post.title,
+      body: post.detail.slice(0, 160),
+      url: "/unwind",
+      tag: "sunrise-post",
+    });
+    await setSetting("PUBLISH_PUSH_LAST_AT", String(Date.now()));
+    await logAudit({
+      action: "push.published",
+      entity: "post",
+      entityId: post.id,
+      summary: `Alert for "${post.title}": delivered to ${result.sent} of ${result.devices} subscribed device(s).`,
+      actor: "system",
+      actorLabel: "automatic on publish",
+      ip: clientIp(request),
+      metadata: { ...result },
+    });
+    return { delivered: result.sent, devices: result.devices, reason: result.reason };
+  } catch (error) {
+    console.error("Publish alert failed:", error);
+    return { delivered: 0, devices: 0, reason: "Alert could not be sent — the post is live regardless." };
+  }
+}
 
 export async function GET() {
   try {
@@ -65,9 +111,12 @@ export async function POST(request: Request) {
       actor: "manager", ip: clientIp(request), metadata: { title: newPost.title, category: newPost.category },
     });
 
+    // Automatic: everyone who opted in to alerts on this site hears about it now.
+    const push = await announcePost(newPost, request);
+
     revalidateLiveContent();
 
-    return NextResponse.json({ post: newPost }, { status: 201 });
+    return NextResponse.json({ post: newPost, push }, { status: 201 });
   } catch (error) {
     console.error("Failed to add post:", error);
     return NextResponse.json({ error: "Could not add post." }, { status: 500 });

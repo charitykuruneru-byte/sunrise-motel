@@ -72,6 +72,15 @@ async function databaseIsAuthoritative(): Promise<boolean> {
   return (await load()).get(SOURCE_KEY)?.trim().toLowerCase() === "db";
 }
 
+/** Write (or overwrite) one setting, and forget the cache so the next read sees it. */
+export async function setSetting(key: string, value: string) {
+  await db
+    .insert(appSettingsTable)
+    .values({ key, value, updatedAt: new Date() })
+    .onConflictDoUpdate({ target: appSettingsTable.key, set: { value, updatedAt: new Date() } });
+  forgetSettings();
+}
+
 /** Drop the cache — call after writing a setting so the next read sees it. */
 export function forgetSettings() {
   cache = null;

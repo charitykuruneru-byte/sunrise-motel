@@ -467,6 +467,17 @@ export default function AdminPage() {
     if (data.post) {
       setPosts((prev) => [data.post, ...prev]);
       setShowAddPost(false);
+      // The post itself is already live and already alerted every subscribed device
+      // (the API does that automatically) — this line just tells the truth about it.
+      const push: { delivered?: number; devices?: number; reason?: string } = data.push || {};
+      const alertNote =
+        push.delivered
+          ? ` — alert sent to ${push.delivered} device${push.delivered === 1 ? "" : "s"}`
+          : push.reason
+            ? ` — alert: ${push.reason}`
+            : push.devices === 0
+              ? " — no device has alerts on yet (footer → Get alerts)"
+              : "";
       // Additive: optionally broadcast this post to all installed apps.
       if (notifyAppUsers) {
         try {
@@ -481,13 +492,13 @@ export default function AdminPage() {
             }),
           });
           const ndata = await nres.json().catch(() => ({}));
-          notify(ndata.delivered ? "Post published + app users notified" : "Post published (push not configured — see /admin/notifications)");
+          notify(ndata.delivered ? "Post published + app users notified" : `Post published${alertNote} (app push not configured — see /admin/notifications)`);
         } catch {
-          notify("Post published (push failed — see /admin/notifications)");
+          notify(`Post published${alertNote} (app push failed — see /admin/notifications)`);
         }
         setNotifyAppUsers(false);
       } else {
-        notify("Post published");
+        notify(`Post published${alertNote}`);
       }
       setPost({ title: "", category: "Event", day: "SAT", date: "26", time: "12:00 — 20:00", detail: "", priceTag: "", imageUrl: "" });
       router.refresh();
