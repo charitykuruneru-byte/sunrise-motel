@@ -22,7 +22,16 @@ function toApplicationServerKey(base64: string) {
   return Uint8Array.from([...raw].map((char) => char.charCodeAt(0)));
 }
 
-export default function PushOptIn({ className = "" }: { className?: string }) {
+export default function PushOptIn({
+  className = "",
+  heading,
+  intro,
+}: {
+  className?: string;
+  heading?: string;
+  /** Shown only when the opt-in is actually available — so a box never appears with no way to act. */
+  intro?: string;
+}) {
   const [status, setStatus] = useState<Status>("checking");
   const [note, setNote] = useState("");
 
@@ -113,21 +122,28 @@ export default function PushOptIn({ className = "" }: { className?: string }) {
   if (status === "checking" || status === "unsupported" || status === "hidden") return null;
 
   return (
-    <div className={`push-opt-in ${className}`.trim()}>
-      <button
-        type="button"
-        className={`push-opt-in-btn ${status === "on" ? "is-on" : ""}`}
-        onClick={status === "on" ? disable : enable}
-        disabled={status === "busy" || status === "blocked"}
-      >
-        {status === "busy" ? <Loader2 size={14} className="animate-spin" /> : status === "on" ? <BellRing size={14} /> : status === "blocked" ? <BellOff size={14} /> : <Bell size={14} />}
-        {status === "busy" ? "Working…" : status === "on" ? "Alerts on" : status === "blocked" ? "Alerts blocked" : "Get alerts"}
-      </button>
-      <span className="push-opt-in-note">
-        {status === "blocked"
-          ? "Notifications are blocked for this site — allow them in the browser's site settings, then reload."
-          : note || "New offers and rooms free tonight, straight to this phone. Off by default — one tap to change."}
-      </span>
-    </div>
+    <section className={`push-opt-in ${className}`.trim()}>
+      {/* The heading and the intro live INSIDE this component on purpose: when the
+          server has no VAPID keys nothing renders at all, so no page can end up with
+          a "How to get alerts" box that has no button under it. */}
+      {heading && <p className="push-opt-in-heading">{heading}</p>}
+      {intro && <p className="push-opt-in-intro">{intro}</p>}
+      <div className="push-opt-in-row">
+        <button
+          type="button"
+          className={`push-opt-in-btn ${status === "on" ? "is-on" : ""}`}
+          onClick={status === "on" ? disable : enable}
+          disabled={status === "busy" || status === "blocked"}
+        >
+          {status === "busy" ? <Loader2 size={14} className="animate-spin" /> : status === "on" ? <BellRing size={14} /> : status === "blocked" ? <BellOff size={14} /> : <Bell size={14} />}
+          {status === "busy" ? "Working…" : status === "on" ? "Alerts on" : status === "blocked" ? "Alerts blocked" : "Get alerts"}
+        </button>
+        <span className="push-opt-in-note">
+          {status === "blocked"
+            ? "Notifications are blocked for this site — allow them in the browser's site settings, then reload."
+            : note || "New offers and rooms free tonight, straight to this phone. Off by default — one tap to change."}
+        </span>
+      </div>
+    </section>
   );
 }

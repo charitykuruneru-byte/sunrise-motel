@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import PushOptIn from "@/components/push-opt-in";
 
 // Live data: never prerendered — see src/lib/revalidate.ts
 export const dynamic = "force-dynamic";
@@ -46,6 +47,14 @@ export default function DownloadPage() {
           <p style={{ marginTop: 10, fontSize: 12, color: "var(--muted)" }}>
             Android Chrome: open the portal, tap ⋮, then choose Install app or Add to Home screen. iPhone Safari: tap Share, then Add to Home Screen.
           </p>
+        </div>
+
+        <div className="extras-calculator-box" style={{ marginTop: 16, paddingBottom: 6 }}>
+          <PushOptIn
+            className="push-opt-in--light"
+            heading="Alerts: offers and rooms free tonight"
+            intro="Turn these on and we tell you the moment the desk publishes something new, or a room frees up for tonight. One tap on, one tap off — no account needed, and nothing is ever sent that is not actually on this site."
+          />
         </div>
 
         <p className="no-account-guarantee" style={{ marginTop: 14 }}>
