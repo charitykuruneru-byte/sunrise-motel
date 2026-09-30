@@ -12,8 +12,9 @@ const GUEST_APK = "https://github.com/charitykuruneru-byte/sunrise-motel/release
 export const INVITEE_TTL_DAYS = 7;
 export const INVITEE_TTL_HOURS = INVITEE_TTL_DAYS * 24;
 
-/** "super_admin" → "Super Admin" — for subjects and body copy. */
+/** "admin" → "Administrator", "super_admin" → "Super Admin" — the same words the portal shows. */
 export function roleLabel(role: string) {
+  if (role === "admin") return "Administrator";
   return role
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
