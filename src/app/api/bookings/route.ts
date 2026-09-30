@@ -9,6 +9,7 @@ import { findOrCreateGuest } from "@/lib/hotel";
 import { adminAlertHtml, guestEmailHtml, sendInvoiceEmail, sendMail } from "@/lib/mail";
 import { bookingMath, nextBookingNumber } from "@/lib/pricing";
 import { malawiShortDate, malawiYear, nowDate } from "@/lib/time";
+import { setting } from "@/lib/settings";
 import { and, eq, ne, sql } from "drizzle-orm";
 import { revalidateLiveContent } from "@/lib/revalidate";
 
@@ -250,8 +251,11 @@ export async function POST(request: Request) {
         }
       }
       const staffGroup = process.env.STAFF_WHATSAPP_GROUP;
-      const staffNotify = (process.env.STAFF_NOTIFY_EMAILS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-      const notifyTargets = [...new Set([...staffNotify, ...(process.env.ADMIN_EMAIL ? [process.env.ADMIN_EMAIL as string] : [])])];
+      // Env first, then the database (src/lib/settings.ts) — so a booking alert still
+      // reaches the office on a deployment whose environment nobody can edit.
+      const staffNotify = (await setting("STAFF_NOTIFY_EMAILS")).split(",").map((s) => s.trim()).filter(Boolean);
+      const adminEmail = await setting("ADMIN_EMAIL");
+      const notifyTargets = [...new Set([...staffNotify, ...(adminEmail ? [adminEmail] : [])])];
       if (notifyTargets.length > 0) {
         await sendMail({
           to: notifyTargets,

@@ -11,6 +11,7 @@ export const metadata: Metadata = {
 };
 
 const GUEST_APK = "https://github.com/charitykuruneru-byte/sunrise-motel/releases/latest/download/SunriseMotel.apk";
+const MANAGER_APK = "https://github.com/charitykuruneru-byte/sunrise-motel/releases/latest/download/SunriseManager.apk";
 
 export default function DownloadPage() {
   return (
@@ -39,13 +40,20 @@ export default function DownloadPage() {
         <div id="manager-app" className="extras-calculator-box" style={{ marginTop: 16 }}>
           <div className="extras-header"><strong>Sunrise Manager — manager app</strong></div>
           <p style={{ fontSize: 13, color: "var(--muted)" }}>
-            Install the staff portal from your browser. It opens as Sunrise Manager and uses the same staff sign-in.
+            The desk and the office: arrivals, room map, orders, issues, money and the guest register. Same staff
+            sign-in as the portal.
           </p>
-          <a href="/admin" className="btn-submit-booking-request" style={{ marginTop: 14, textDecoration: "none" }}>
-            Open Sunrise Manager
+          <a href={MANAGER_APK} className="btn-submit-booking-request" style={{ marginTop: 14, textDecoration: "none" }}>
+            Download SunriseManager.apk
           </a>
           <p style={{ marginTop: 10, fontSize: 12, color: "var(--muted)" }}>
-            Android Chrome: open the portal, tap ⋮, then choose Install app or Add to Home screen. iPhone Safari: tap Share, then Add to Home Screen.
+            Package com.sunrisemotel.admin · or install the portal from your browser: Android Chrome → ⋮ → Install app;
+            iPhone Safari → Share → Add to Home Screen.
+          </p>
+          <p style={{ marginTop: 10, fontSize: 12, color: "var(--muted)" }}>
+            <strong>Already installed an older copy?</strong> The first builds were signed with a test key, so Android
+            cannot upgrade them in place: uninstall the old icon once, then install this one. From this version on,
+            every update installs straight over the top.
           </p>
         </div>
 

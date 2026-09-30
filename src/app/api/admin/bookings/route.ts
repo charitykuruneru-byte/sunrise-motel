@@ -9,6 +9,7 @@ import { isSuperAdminRole, readSession } from "@/lib/staff-auth";
 import { nowDate } from "@/lib/time";
 import { asc, desc, eq, ilike, or } from "drizzle-orm";
 import { revalidateLiveContent } from "@/lib/revalidate";
+import { setting } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -218,7 +219,7 @@ export async function PATCH(request: Request) {
     // Notify guest + admin on approve/confirm/cancel/follow-up
     try {
       const base = publicBaseUrl(request);
-      const adminEmail = process.env.ADMIN_EMAIL;
+      const adminEmail = await setting("ADMIN_EMAIL");
       const subjectMap: Record<string, string> = {
         approved: `Sunrise Motel — booking ${booking.reference} approved`,
         confirmed: `Sunrise Motel — booking ${booking.reference} confirmed`,

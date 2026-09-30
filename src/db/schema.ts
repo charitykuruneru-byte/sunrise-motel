@@ -672,6 +672,17 @@ export const pushSubscriptionsTable = pgTable("push_subscriptions", {
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+// Settings that live in the database, so a deployment can be configured from
+// inside the product instead of from a hosting dashboard. ENV ALWAYS WINS (see
+// src/lib/settings.ts) — this is the fallback for a deployment whose owner has no
+// way to edit environment variables, which is exactly the situation that left
+// production without web-push keys and SMTP credentials.
+export const appSettingsTable = pgTable("app_settings", {
+  key: varchar("key", { length: 64 }).primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export type RoomType = typeof roomTypesTable.$inferSelect;
 export type Post = typeof postsTable.$inferSelect;
 export type MenuItem = typeof menuItemsTable.$inferSelect;
@@ -679,3 +690,4 @@ export type GalleryImage = typeof galleryImagesTable.$inferSelect;
 export type Invoice = typeof invoicesTable.$inferSelect;
 export type UploadedImage = typeof uploadedImagesTable.$inferSelect;
 export type PushSubscriptionRow = typeof pushSubscriptionsTable.$inferSelect;
+export type AppSetting = typeof appSettingsTable.$inferSelect;

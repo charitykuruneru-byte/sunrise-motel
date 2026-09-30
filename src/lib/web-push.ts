@@ -15,6 +15,8 @@ import { db } from "@/db";
 import { pushSubscriptionsTable } from "@/db/schema";
 import { randomUUID } from "node:crypto";
 
+import { setting, settings } from "@/lib/settings";
+
 export type PushMessage = {
   title: string;
   body: string;
@@ -32,30 +34,38 @@ export type PushResult = {
   reason?: string;
 };
 
-export function webPushConfigured() {
-  return Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+/** The VAPID keypair: env first, then the database (see src/lib/settings.ts). */
+async function vapidKeys() {
+  const values = await settings("VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT");
+  return {
+    publicKey: values.VAPID_PUBLIC_KEY,
+    privateKey: values.VAPID_PRIVATE_KEY,
+    subject: values.VAPID_SUBJECT || "mailto:admin@sunrisemotel.mw",
+  };
 }
 
-export function vapidPublicKey() {
-  return process.env.VAPID_PUBLIC_KEY ?? "";
+export async function webPushConfigured() {
+  const keys = await vapidKeys();
+  return Boolean(keys.publicKey && keys.privateKey);
+}
+
+export async function vapidPublicKey() {
+  return (await vapidKeys()).publicKey;
 }
 
 type StoredSubscription = { endpoint: string; keys: { p256dh: string; auth: string } };
 
 async function loadWebPush() {
+  const keys = await vapidKeys();
   const mod = (await import("web-push")) as unknown as { default?: typeof import("web-push") } & typeof import("web-push");
   const webpush = mod.default ?? mod;
-  webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || "mailto:admin@sunrisemotel.mw",
-    process.env.VAPID_PUBLIC_KEY as string,
-    process.env.VAPID_PRIVATE_KEY as string,
-  );
+  webpush.setVapidDetails(keys.subject, keys.publicKey, keys.privateKey);
   return webpush;
 }
 
 /** Send one message to every subscribed device, pruning the ones that are gone. */
 export async function sendWebPush(message: PushMessage): Promise<PushResult> {
-  if (!webPushConfigured()) {
+  if (!(await webPushConfigured())) {
     return { sent: 0, pruned: 0, failed: 0, devices: 0, reason: "Web push is not configured — set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY." };
   }
   const webpush = await loadWebPush();

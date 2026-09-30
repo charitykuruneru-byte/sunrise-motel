@@ -9,5 +9,5 @@ export const dynamic = "force-dynamic";
  * yet, `configured: false` lets the UI say so instead of failing silently.
  */
 export async function GET() {
-  return NextResponse.json({ configured: webPushConfigured(), publicKey: vapidPublicKey() });
+  return NextResponse.json({ configured: await webPushConfigured(), publicKey: await vapidPublicKey() });
 }

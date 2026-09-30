@@ -14,7 +14,7 @@ type Body = { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
  * tell "Chrome on Android" from "Safari on iPhone" without any extra input.
  */
 export async function POST(request: Request) {
-  if (!webPushConfigured()) {
+  if (!(await webPushConfigured())) {
     return NextResponse.json({ error: "Alerts are not switched on yet." }, { status: 503 });
   }
   const body = (await request.json().catch(() => ({}))) as Body;

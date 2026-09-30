@@ -2,6 +2,8 @@
 // (guest track links, manager portal links). Reads the live tunnel URL from
 // PUBLIC_APP_URL (preferred, not NEXT_PUBLIC_ so secrets stay server-side),
 // falls back to NEXT_PUBLIC_APP_URL, and never returns localhost on Vercel.
+import { settings } from "@/lib/settings";
+
 export function publicBaseUrl(request?: Request) {
   const fromEnv =
     process.env.PUBLIC_APP_URL ||
@@ -35,9 +37,24 @@ export async function sendMail(opts: {
   text?: string;
   attachments?: MailAttachment[];
 }) {
-  const resendKey = process.env.RESEND_API_KEY;
+  // Credentials come from the environment when they are there, and from the
+  // database otherwise (src/lib/settings.ts) — so a deployment can be given a
+  // mailbox without anyone editing a hosting dashboard.
+  const config = await settings(
+    "RESEND_API_KEY",
+    "EMAIL_FROM",
+    "SMTP_FROM",
+    "SMTP_HOST",
+    "SMTP_PORT",
+    "SMTP_SECURE",
+    "SMTP_USER",
+    "SMTP_PASS",
+    "FROM_NAME",
+    "FROM_EMAIL",
+  );
+  const resendKey = config.RESEND_API_KEY;
   if (resendKey) {
-    const from = process.env.EMAIL_FROM || process.env.SMTP_FROM || "Sunrise Motel <noreply@sunrisemotel.mw>";
+    const from = config.EMAIL_FROM || config.SMTP_FROM || "Sunrise Motel <noreply@sunrisemotel.mw>";
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
@@ -58,9 +75,9 @@ export async function sendMail(opts: {
     return { sent: true as const };
   }
 
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const host = config.SMTP_HOST;
+  const user = config.SMTP_USER;
+  const pass = config.SMTP_PASS;
   if (!host || !user || !pass) {
     return {
       sent: false as const,
@@ -68,11 +85,17 @@ export async function sendMail(opts: {
         "Email is not configured (set RESEND_API_KEY or SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM).",
     };
   }
-  const transporter = await smtpTransport(host, user, pass);
+  const transporter = await smtpTransport({
+    host,
+    port: Number(config.SMTP_PORT || 587),
+    secure: config.SMTP_SECURE === "true",
+    user,
+    pass,
+  });
   const from =
-    process.env.SMTP_FROM ||
-    (process.env.FROM_NAME && process.env.FROM_EMAIL
-      ? `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`
+    config.SMTP_FROM ||
+    (config.FROM_NAME && config.FROM_EMAIL
+      ? `${config.FROM_NAME} <${config.FROM_EMAIL}>`
       : `Sunrise Motel <${user}>`);
   try {
     await sendWithRetry(transporter, {
@@ -109,9 +132,8 @@ let smtpTransportCache: { fingerprint: string; transport: SmtpSender } | null = 
 
 const RETRYABLE_SMTP_CODES = new Set(["ECONNRESET", "ETIMEDOUT", "ESOCKET", "ECONNECTION", "EPIPE", "EAI_AGAIN"]);
 
-async function smtpTransport(host: string, user: string, pass: string): Promise<SmtpSender> {
-  const port = Number(process.env.SMTP_PORT || 587);
-  const secure = process.env.SMTP_SECURE === "true";
+async function smtpTransport(options: { host: string; port: number; secure: boolean; user: string; pass: string }): Promise<SmtpSender> {
+  const { host, port, secure, user, pass } = options;
   const fingerprint = `${host}|${port}|${secure}|${user}`;
   if (smtpTransportCache && smtpTransportCache.fingerprint === fingerprint) return smtpTransportCache.transport;
   const mod = (await import("nodemailer")) as unknown as {

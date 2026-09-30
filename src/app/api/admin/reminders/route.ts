@@ -8,6 +8,7 @@ import { publicBaseUrl, sendMail } from "@/lib/mail";
 import { readSession, sessionLabel } from "@/lib/staff-auth";
 import { nowDate } from "@/lib/time";
 import { revalidateLiveContent } from "@/lib/revalidate";
+import { setting } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
     const now = nowDate();
     const rows = await db.select().from(bookings).where(and(ne(bookings.status, "cancelled"), eq(bookings.status, "pending")));
     const staff = await db.select().from(staffTable);
-    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminEmail = await setting("ADMIN_EMAIL");
     let reminded = 0;
     let escalated = 0;
     for (const b of rows) {

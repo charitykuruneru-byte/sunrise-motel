@@ -35,5 +35,5 @@ export async function POST(request: Request) {
     metadata: { sent: result.sent, pruned: result.pruned, failed: result.failed, devices },
   });
 
-  return NextResponse.json({ ...result, devices, configured: webPushConfigured() });
+  return NextResponse.json({ ...result, devices, configured: await webPushConfigured() });
 }
