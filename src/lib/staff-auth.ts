@@ -52,11 +52,33 @@ export function nextStaffCode(existing: string[]) {
 
 /**
  * Production requires a strong SESSION_SECRET; only local development has a fallback.
+ *
+ * If production is missing it, we do NOT refuse to sign anyone in: that failed
+ * *after* a correct password was verified (`/api/admin/login` answered HTTP 500),
+ * which locked the whole manager portal out of the live site. Instead the key is
+ * derived from a secret the deployment already holds, so cookies still cannot be
+ * forged without it — whoever knows the database URL already has the data itself.
+ * This is a stop-gap, not a substitute: it warns on every cold start until
+ * SESSION_SECRET is set. Changing the secret (either direction) signs everyone out
+ * once, which is exactly what you want after a rotation.
  */
+let warnedAboutDerivedSessionSecret = false;
+
 function sessionSecret() {
   const configured = process.env.SESSION_SECRET;
   if (configured && configured.length >= 32) return configured;
   if (process.env.NODE_ENV === "production") {
+    const databaseUrl = process.env.DATABASE_URL;
+    if (databaseUrl) {
+      if (!warnedAboutDerivedSessionSecret) {
+        warnedAboutDerivedSessionSecret = true;
+        console.warn(
+          "[auth] SESSION_SECRET is unset (or shorter than 32 characters) — deriving the session key from DATABASE_URL. " +
+            "Set SESSION_SECRET in the hosting environment and redeploy; that signs everyone out once.",
+        );
+      }
+      return createHmac("sha256", "sunrise-motel/session-fallback/v1").update(databaseUrl).digest("base64url");
+    }
     throw new Error("SESSION_SECRET must be configured with at least 32 characters in production.");
   }
   return "sunrise-motel-local-dev-secret";
