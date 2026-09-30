@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { bookings, roomsTable, roomTypesTable } from "@/db/schema";
 import { isManagerRole, readSession } from "@/lib/staff-auth";
+import { ensureRoomsSeeded } from "@/lib/hotel";
 import { blocksBetween } from "@/lib/room-blocks";
 import { malawiDatePart } from "@/lib/time";
 
@@ -31,6 +32,12 @@ export async function GET(request: Request) {
   const from = searchParams.get("from") ?? malawiDatePart();
   const days = Math.min(60, Math.max(7, Number(searchParams.get("days")) || 30));
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from)) return NextResponse.json({ error: "Use a date like 2026-10-01." }, { status: 400 });
+
+  // The grid is drawn per PHYSICAL room. Those rows are created by the desk console on
+  // first use, which meant a fresh deployment had room types but no rooms to draw — so
+  // the calendar, the board and blocking all looked empty. Seed them here too; the
+  // helper is idempotent and returns immediately once they exist.
+  await ensureRoomsSeeded();
 
   const start = new Date(`${from}T00:00:00Z`);
   const windowDays: string[] = [];

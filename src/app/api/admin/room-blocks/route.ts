@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { roomBlocksTable, roomsTable } from "@/db/schema";
 import { clientIp, logAudit } from "@/lib/audit";
+import { ensureRoomsSeeded } from "@/lib/hotel";
 import { isManagerRole, readSession } from "@/lib/staff-auth";
 import { malawiDatePart } from "@/lib/time";
 
@@ -41,6 +42,9 @@ export async function POST(request: Request) {
     }
     if (endDate <= startDate) return NextResponse.json({ error: "The last night must be after the first." }, { status: 400 });
 
+    // A block names a physical room, and on a deployment where the desk console has never
+    // been opened those rows do not exist yet. Idempotent.
+    await ensureRoomsSeeded();
     const [room] = await db.select().from(roomsTable).where(eq(roomsTable.roomNumber, roomNumber)).limit(1);
     if (!room) return NextResponse.json({ error: "No room with that number." }, { status: 404 });
     if (!REASONS.includes(body.reason ?? "maintenance")) return NextResponse.json({ error: "Choose a valid reason." }, { status: 400 });

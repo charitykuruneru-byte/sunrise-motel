@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { roomsTable, serviceTasksTable } from "@/db/schema";
 import { clientIp, logAudit } from "@/lib/audit";
 import { readSession } from "@/lib/staff-auth";
-import { ROOM_STATES } from "@/lib/hotel";
+import { ROOM_STATES, ensureRoomsSeeded } from "@/lib/hotel";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +20,9 @@ const BOARD_KINDS = ["cleaning", "towels", "linen", "maintenance", "amenity", "o
 export async function GET(request: Request) {
   const user = await readSession(request);
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+  // Same reason as the calendar: the board lists physical rooms, and on a deployment where
+  // nobody has opened the desk console yet those rows do not exist. Idempotent.
+  await ensureRoomsSeeded();
   const [rooms, tasks] = await Promise.all([
     db.select().from(roomsTable).orderBy(roomsTable.roomNumber),
     db
