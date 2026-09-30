@@ -227,6 +227,15 @@
 .feed-card-img { position: relative; height: 168px; background: #f2ede6; }
 .feed-card-img img { width: 100%; height: 100%; object-fit: cover; }
 .feed-card-tag { position: absolute; top: 10px; left: 10px; background: var(--orange); color: var(--ink); font-size: 9px; font-weight: 800; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; }
+/* The NEW chip — rendered by src/components/new-badge.tsx while an item is inside
+   NEW_WINDOW_HOURS (48 h), on the promo cards, the /unwind feed and the guest app's
+   What's on tab. It sits opposite the category tag so it never covers it. */
+.new-chip { display: inline-flex; align-items: center; gap: 5px; background: #f28c18; color: #171513; font-size: 9px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; box-shadow: 0 1px 6px rgba(23, 21, 19, 0.18); }
+.new-chip::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: #171513; }
+.new-chip--corner { position: absolute; top: 10px; right: 10px; }
+/* The "free tonight" line in the hero's availability bar. */
+.hp-tonight { display: inline-flex; align-items: center; gap: 7px; margin: 0 0 10px; padding: 6px 12px; border-radius: 999px; background: rgba(242, 140, 24, 0.14); border: 1px solid rgba(242, 140, 24, 0.4); color: var(--ink); font-size: 13px; font-weight: 700; text-decoration: none; }
+.hp-tonight:hover { background: rgba(242, 140, 24, 0.22); }
 .feed-card-body { padding: 14px; display: flex; gap: 12px; }
 .feed-date-block { width: 46px; flex: 0 0 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-right: 1px solid var(--line); padding-right: 10px; }
 .feed-date-block small { color: var(--orange-deep); font-size: 9px; font-weight: 800; letter-spacing: 0.08em; }

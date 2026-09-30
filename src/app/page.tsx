@@ -44,6 +44,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import InstallAppButton from "@/components/install-app";
 import InstallAppPopup from "@/components/InstallAppPopup";
+import { NewBadge } from "@/components/new-badge";
 import Reveal from "@/components/reveal";
 import SafeImage from "@/components/safe-image";
 import SiteNav from "@/components/site-nav";
@@ -82,7 +83,7 @@ type RoomData = {
   images: string[];
 };
 
-type PostData = { id: string; title: string; category: string; day: string | null; date: string | null; time: string | null; detail: string; priceTag: string | null; imageUrl: string | null; isActive: boolean };
+type PostData = { id: string; title: string; category: string; day: string | null; date: string | null; time: string | null; detail: string; priceTag: string | null; imageUrl: string | null; createdAt?: string; isActive: boolean };
 /** One photograph as /api/admin/gallery returns it (its GET is public read). */
 type GalleryImageData = { id: string; title: string; category: string; imageUrl: string; altText: string; caption: string | null };
 /** A published review exactly as /api/reviews returns it. */
@@ -365,6 +366,11 @@ export default function HomePage() {
   // stayed there for ever because `finally` had already cleared the spinner.
   const [roomsError, setRoomsError] = useState("");
   const [posts, setPosts] = useState<PostData[]>([]);
+  // "Is anything free tonight?" is the first question a traveller asks, so the
+  // hero answers it before they touch the date fields: tonight's own count,
+  // fetched once. Shown only when there IS a room — never a discouraging zero,
+  // and never a number that did not come out of the book.
+  const [tonightFree, setTonightFree] = useState<number | null>(null);
 
   const [slideshow, setSlideshow] = useState<{ room: RoomData; index: number } | null>(null);
 
@@ -416,6 +422,27 @@ export default function HomePage() {
   useEffect(() => {
     fetchAvailability(checkIn, checkOut);
   }, [checkIn, checkOut]);
+
+  // Tonight's numbers, independent of the dates the guest has picked. A silent
+  // failure is correct here: this strip is a bonus, and a broken extra call must
+  // never touch the availability bar the guest is actually using.
+  useEffect(() => {
+    const inDate = isoPlus(0);
+    const outDate = isoPlus(1);
+    let cancelled = false;
+    fetch(`/api/availability?checkIn=${inDate}&checkOut=${outDate}`, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { rooms?: RoomData[] } | null) => {
+        if (cancelled || !data?.rooms) return;
+        setTonightFree(data.rooms.reduce((sum, room) => sum + room.availableCount, 0));
+      })
+      .catch(() => {
+        /* the availability bar below still reports the real answer */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // ---- The gallery strip, the app banner, the promos (redesign §2.7-§2.11) ----
   // All three read data the property already publishes; none of them is a
@@ -766,6 +793,13 @@ export default function HomePage() {
               </span>
             </div>
 
+            {tonightFree !== null && tonightFree > 0 && (
+              <a className="hp-tonight" href="#rooms-section">
+                <span className="hp-dot" />
+                {tonightFree === 1 ? "1 room free tonight" : `${tonightFree} rooms free tonight`} — two taps and it is yours
+              </a>
+            )}
+
             <div className="hp-avail-fields">
               <div className="hp-field">
                 <label htmlFor="hp-checkin">Check-in</label>
@@ -1084,6 +1118,7 @@ export default function HomePage() {
                       <div className="img-placeholder">{post.category}</div>
                     )}
                     <span className="hp-promo-cat">{post.category}</span>
+                    <NewBadge publishedAt={post.createdAt} className="new-chip new-chip--corner" />
                     {post.priceTag && <span className="hp-promo-price">{post.priceTag}</span>}
                   </div>
                   <div className="hp-promo-body">

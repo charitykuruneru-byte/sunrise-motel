@@ -3,6 +3,7 @@
 import { CalendarDays, Loader2, MessageCircle, RefreshCw, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import SafeImage from "@/components/safe-image";
+import { NewBadge } from "@/components/new-badge";
 import { whatsappLink } from "@/components/site-nav";
 
 /**
@@ -133,6 +134,7 @@ export function WhatsOnFeed({
                 fallbackLabel={post.category || "Sunrise Motel"}
               />
               <span className="feed-card-tag">{post.category}</span>
+              <NewBadge publishedAt={post.createdAt} className="new-chip new-chip--corner" />
             </div>
             <div className="feed-card-body">
               <div className="feed-date-block">
