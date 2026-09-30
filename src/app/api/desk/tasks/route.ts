@@ -5,6 +5,7 @@ import { roomsTable, serviceTasksTable } from "@/db/schema";
 import { clientIp, logAudit } from "@/lib/audit";
 import { deskActor } from "@/lib/desk-auth";
 import { taskDueBy } from "@/lib/hotel";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +91,7 @@ export async function POST(request: Request) {
       actorLabel: auth.label,
       ip: clientIp(request),
     });
+    revalidateLiveContent();
     return NextResponse.json({ success: true, task });
   } catch (error) {
     console.error("Task create failed", error);
@@ -169,6 +171,7 @@ export async function PATCH(request: Request) {
         actorLabel: auth.label,
         ip: clientIp(request),
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true, outOfOrder: true });
     } else {
       return NextResponse.json({ error: `Unknown action "${action}".` }, { status: 400 });
@@ -184,6 +187,7 @@ export async function PATCH(request: Request) {
       actorLabel: auth.label,
       ip: clientIp(request),
     });
+    revalidateLiveContent();
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Task update failed", error);

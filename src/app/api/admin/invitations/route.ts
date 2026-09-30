@@ -6,6 +6,7 @@ import { auditLogTable, guestAccountsTable, invitationsTable, staffTable } from 
 import { clientIp, logAudit } from "@/lib/audit";
 import { sendInvitationEmail } from "@/lib/invitation-email";
 import { isManagerRole, isSuperAdminRole, readSession } from "@/lib/staff-auth";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -173,6 +174,7 @@ export async function POST(request: Request) {
       targetEmail: email,
       details: { role, accountType: "staff", invitedBy: user.id, emailSent: delivery.sent, reason: delivery.sent ? undefined : delivery.reason },
     });
+    revalidateLiveContent();
     return NextResponse.json({ success: true, invitationId: invitation.id, emailSent: delivery.sent, reason: delivery.sent ? null : delivery.reason }, { status: 201 });
   } catch (error) {
     console.error("Staff invitation failed", error);
@@ -202,6 +204,7 @@ export async function PATCH(request: Request) {
       const delivery = await emailInvitation(request, refreshed!, token);
       await db.update(invitationsTable).set({ status: delivery.sent ? "pending" : "failed", deliveryError: delivery.sent ? null : delivery.reason ?? "Email failed", updatedAt: new Date() }).where(eq(invitationsTable.id, invitation.id));
       await audit(request, user, { action: delivery.sent ? "INVITE_RESENT" : "EMAIL_FAILED", invitationId: invitation.id, targetEmail: invitation.email, details: { role: invitation.role, emailSent: delivery.sent, reason: delivery.sent ? undefined : delivery.reason } });
+      revalidateLiveContent();
       return NextResponse.json({ success: true, emailSent: delivery.sent, reason: delivery.sent ? null : delivery.reason });
     }
 
@@ -212,6 +215,7 @@ export async function PATCH(request: Request) {
       if (!INVITABLE_ROLES.includes(role)) return fail("Choose a valid role.", 400);
       await db.update(staffTable).set({ role }).where(eq(staffTable.id, target.id));
       await audit(request, user, { action: "ROLE_CHANGED", targetId: target.id, targetEmail: target.email, details: { oldRole: target.role, newRole: role } });
+      revalidateLiveContent();
       return NextResponse.json({ success: true });
     }
     if (body.action === "activate" || body.action === "deactivate" || body.action === "delete") {
@@ -230,6 +234,7 @@ export async function PATCH(request: Request) {
         await db.update(staffTable).set({ isActive: false, isDeleted: true, deletedAt: new Date() }).where(eq(staffTable.id, target.id));
         await audit(request, user, { action: "USER_DELETED", targetId: target.id, targetEmail: target.email });
       }
+      revalidateLiveContent();
       return NextResponse.json({ success: true });
     }
     return fail("Unknown user action.", 400);
@@ -249,5 +254,6 @@ export async function DELETE(request: Request) {
   if (!invitation || !["pending", "failed", "expired"].includes(invitation.status)) return fail("Invitation not found or already accepted.", 404);
   await db.update(invitationsTable).set({ status: "revoked", tokenHash: null, updatedAt: new Date() }).where(eq(invitationsTable.id, id));
   await audit(request, auth.user, { action: "INVITE_REVOKED", invitationId: id, targetEmail: invitation.email, details: { role: invitation.role } });
+  revalidateLiveContent();
   return NextResponse.json({ success: true });
 }

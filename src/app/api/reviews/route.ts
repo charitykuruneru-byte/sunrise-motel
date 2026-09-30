@@ -24,6 +24,7 @@ import { resolveGuestContext } from "@/lib/guest-context";
 import { loadPublishedReviews, reviewSummary, submitReview } from "@/lib/reviews";
 import { phoneTail } from "@/lib/phone";
 import { malawiDatePart } from "@/lib/time";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -149,6 +150,7 @@ export async function POST(request: Request) {
         ip: clientIp(request),
         metadata: { bookingId },
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true, updated: true, review: { id: existing.id, rating: updated?.rating } });
     }
 
@@ -172,6 +174,7 @@ export async function POST(request: Request) {
       ip: clientIp(request),
       metadata: { bookingId, collectedVia },
     });
+    revalidateLiveContent();
     return NextResponse.json({ success: true, review: { id: review.id, rating: review.rating } });
   } catch (error) {
     console.error("Could not save the review", error);

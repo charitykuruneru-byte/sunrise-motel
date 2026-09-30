@@ -4,6 +4,7 @@ import { bookings, roomTypesTable } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { clientIp, logAudit } from "@/lib/audit";
 import { isMotelManagerRole, readSession } from "@/lib/staff-auth";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,7 @@ export async function POST(request: Request) {
       summary: `${user.name} added room/service ${room.name} @ MWK ${room.rate.toLocaleString()}/night.`,
       actor: "manager", actorLabel: `${user.staffCode} — ${user.name}`, ip: clientIp(request),
     });
+    revalidateLiveContent();
     return NextResponse.json({ room }, { status: 201 });
   } catch (err) {
     console.error("Add room failed", err);
@@ -80,6 +82,7 @@ export async function PATCH(request: Request) {
       summary: `${user.name} updated room/service ${room.name}.`,
       actor: "manager", actorLabel: `${user.staffCode} — ${user.name}`, ip: clientIp(request),
     });
+    revalidateLiveContent();
     return NextResponse.json({ room });
   } catch (err) {
     console.error("Update room failed", err);
@@ -103,6 +106,7 @@ export async function DELETE(request: Request) {
         summary: `${user.name} hid room/service ${id} (live bookings exist — deactivated).`,
         actor: "manager", actorLabel: `${user.staffCode} — ${user.name}`, ip: clientIp(request),
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true, deactivated: true });
     }
     await db.delete(roomTypesTable).where(eq(roomTypesTable.id, id));
@@ -111,6 +115,7 @@ export async function DELETE(request: Request) {
       summary: `${user.name} removed room/service ${id}.`,
       actor: "manager", actorLabel: `${user.staffCode} — ${user.name}`, ip: clientIp(request),
     });
+    revalidateLiveContent();
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("Remove room failed", err);

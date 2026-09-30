@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import GuestApp from "@/components/guest/guest-app";
 
+// Live data: never prerendered — see src/lib/revalidate.ts
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Your stay | Sunrise Motel guest app",
   description:

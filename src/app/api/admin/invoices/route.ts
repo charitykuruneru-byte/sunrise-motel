@@ -6,6 +6,7 @@ import { clientIp, logAudit } from "@/lib/audit";
 import { malawiYear, nowDate } from "@/lib/time";
 import { isMotelManagerRole, readSession } from "@/lib/staff-auth";
 import { desc, eq } from "drizzle-orm";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 // ADDENDUM (Part 27 §B5): a manual invoice is an admin act — it issues a numbered document
 // that is not tied to a booking (a day workspace, a function deposit, a corporate charge).
@@ -83,6 +84,7 @@ export async function POST(request: Request) {
       actor: "manager", ip: clientIp(request), metadata: { totalAmount: newInvoice.totalAmount },
     });
 
+    revalidateLiveContent();
     return NextResponse.json({ invoice: newInvoice }, { status: 201 });
   } catch (error) {
     console.error("Failed to create invoice:", error);

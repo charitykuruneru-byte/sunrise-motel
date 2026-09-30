@@ -9,6 +9,7 @@ import { notifyByEmail } from "@/lib/notify";
 import { guestAppDownloadUrl } from "@/lib/mail";
 import { samePhone } from "@/lib/phone";
 import { malawiStamp } from "@/lib/time";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -121,6 +122,7 @@ export async function POST(request: Request) {
     if (body.action === "send_code") {
       const result = await resendOtp({ tokenId: row.id, request });
       if (!result.ok) return NextResponse.json({ error: result.reason }, { status: 429 });
+      revalidateLiveContent();
       return NextResponse.json({
         success: true,
         channel: result.channel,
@@ -156,6 +158,7 @@ export async function POST(request: Request) {
     }
 
     const verified = await verifyOtp({ tokenId: row.id, code: body.code });
+    revalidateLiveContent();
     if (!verified.ok) return NextResponse.json({ error: verified.reason }, { status: verified.status });
 
     const consumed = await consumeToken(token, row.purpose);
@@ -194,6 +197,7 @@ export async function POST(request: Request) {
       template: "guest_activation_complete",
       guestId: account.guestId,
     });
+    revalidateLiveContent();
     return NextResponse.json({ success: true, status: "active" });
   } catch (error) {
     console.error("Activation failed", error);

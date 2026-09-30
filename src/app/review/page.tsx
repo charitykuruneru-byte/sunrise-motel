@@ -3,6 +3,9 @@ import Link from "next/link";
 import ReviewForm from "@/components/guest/review-form";
 import "./review.css";
 
+// Live data: never prerendered — see src/lib/revalidate.ts
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Rate your stay | Sunrise Motel",
   description:

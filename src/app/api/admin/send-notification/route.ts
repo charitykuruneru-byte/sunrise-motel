@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { clientIp, logAudit } from "@/lib/audit";
 import { isManagerRole, readSession, sessionLabel } from "@/lib/staff-auth";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,7 @@ export async function POST(request: Request) {
     })();
 
   if (!serviceAccount || !projectId) {
+    revalidateLiveContent();
     return NextResponse.json(
       {
         queued: true,
@@ -86,6 +88,7 @@ export async function POST(request: Request) {
       metadata: { topic: "all_users", dryRun, messageId, successCount, url, imageUrl: imageUrl || null },
       details: { recipientCount: successCount ?? null, topic: "all_users", dryRun },
     });
+    revalidateLiveContent();
     return NextResponse.json({ queued: true, delivered: true, dryRun, messageId, successCount });
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);

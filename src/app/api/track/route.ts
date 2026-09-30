@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { bookingEventsTable, bookings } from "@/db/schema";
 import { asc, eq } from "drizzle-orm";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
 
     const events = await db.select().from(bookingEventsTable).where(eq(bookingEventsTable.bookingId, booking.id)).orderBy(asc(bookingEventsTable.createdAt));
 
+    revalidateLiveContent();
     return NextResponse.json({
       booking: {
         reference: booking.reference,

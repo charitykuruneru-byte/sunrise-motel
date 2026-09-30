@@ -5,6 +5,7 @@ import { auditLogTable, staffTable } from "@/db/schema";
 import { clientIp, logAudit } from "@/lib/audit";
 import { notifyInPortal } from "@/lib/notify";
 import { sendMail } from "@/lib/mail";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -55,5 +56,6 @@ export async function POST(request: Request) {
       text: `A user requested a new setup invitation for ${email}. Verify the request in the Admin portal.`,
     }).catch(() => ({ sent: false as const }));
   }
+  revalidateLiveContent();
   return NextResponse.json({ success: true, message: "Your request has been sent to the Administrator. They will verify it before sending another invitation." }, { status: 202 });
 }

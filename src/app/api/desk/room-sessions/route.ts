@@ -24,6 +24,7 @@ import { deskActor } from "@/lib/desk-auth";
 import { roomForBooking } from "@/lib/hotel";
 import { publicBaseUrl } from "@/lib/mail";
 import { ROOM_PIN_RULES, closeRoomSessions, openRoomSession, rotateRoomPin } from "@/lib/room-session";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -120,6 +121,7 @@ export async function POST(request: Request) {
         // Never the digits — only that a new PIN exists.
         metadata: { roomNumber: rotated.session.roomNumber },
       });
+      revalidateLiveContent();
       return NextResponse.json({
         success: true,
         pin: rotated.pin,
@@ -152,6 +154,7 @@ export async function POST(request: Request) {
         actorLabel: auth.label,
         ip: clientIp(request),
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true, closed: true });
     }
 
@@ -168,6 +171,7 @@ export async function POST(request: Request) {
         actorLabel: auth.label,
         ip: clientIp(request),
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true });
     }
 
@@ -205,6 +209,7 @@ export async function POST(request: Request) {
         ip: clientIp(request),
         metadata: { roomNumber },
       });
+      revalidateLiveContent();
       return NextResponse.json({
         success: true,
         pin: opened.pin,

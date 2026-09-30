@@ -11,6 +11,7 @@ import { publicBaseUrl } from "@/lib/mail";
 import { notifyWaitlistForDates, requestReview } from "@/lib/reviews";
 import { closeRoomSessions, openRoomSession } from "@/lib/room-session";
 import { malawiDatePart } from "@/lib/time";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -131,6 +132,7 @@ export async function POST(request: Request) {
         // The PIN itself never reaches a log — only the fact that one exists.
         metadata: { roomNumber: room.roomNumber, sessionId: opened.session.id, pinIssued: true },
       });
+      revalidateLiveContent();
       return NextResponse.json({
         success: true,
         roomNumber: room.roomNumber,
@@ -204,6 +206,7 @@ export async function POST(request: Request) {
         ip: clientIp(request),
         metadata: { invoiceNumber: invoice?.invoiceNumber ?? null, balanceDue: invoice?.balanceDue ?? 0 },
       });
+      revalidateLiveContent();
       return NextResponse.json({
         success: true,
         invoice,
@@ -266,6 +269,7 @@ export async function POST(request: Request) {
         ip: clientIp(request),
         metadata: { waitlistNotified: waitlist.notified },
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true, roomAccessClosed: true, waitlistNotified: waitlist.notified });
     }
 

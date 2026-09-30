@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import DeskConsole from "@/components/desk/desk-console";
 
+// Live data: never prerendered — see src/lib/revalidate.ts
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Front desk & admin console | Sunrise Motel",
   description: "Arrivals, room map, orders, guest issues, payments and folios in one place.",

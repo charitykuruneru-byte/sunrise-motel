@@ -15,6 +15,7 @@ import { deskActor } from "@/lib/desk-auth";
 import { folioTotals } from "@/lib/hotel";
 import { logNotification } from "@/lib/notify";
 import { nowDate } from "@/lib/time";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -192,6 +193,7 @@ export async function POST(request: Request) {
         actorLabel: auth.label,
         ip: clientIp(request),
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true, message });
     }
 
@@ -221,6 +223,7 @@ export async function POST(request: Request) {
         actorLabel: auth.label,
         ip: clientIp(request),
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true });
     }
     if (action === "resolve") {
@@ -252,6 +255,7 @@ export async function POST(request: Request) {
         actorLabel: auth.label,
         ip: clientIp(request),
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true });
     }
 
@@ -280,6 +284,7 @@ export async function POST(request: Request) {
         actorLabel: auth.label,
         ip: clientIp(request),
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true });
     }
 
@@ -298,6 +303,7 @@ export async function POST(request: Request) {
         actorLabel: auth.label,
         ip: clientIp(request),
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true, status });
     }
 

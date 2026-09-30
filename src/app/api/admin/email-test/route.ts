@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isSuperAdminRole, readSession } from "@/lib/staff-auth";
 import { sendMail } from "@/lib/mail";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -23,5 +24,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ sent: false, error: outcome.reason }, { status: 502 });
   }
 
+  revalidateLiveContent();
   return NextResponse.json({ sent: true, recipient: user.email });
 }

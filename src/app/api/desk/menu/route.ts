@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { menuItemsTable } from "@/db/schema";
 import { clientIp, logAudit } from "@/lib/audit";
 import { deskActor } from "@/lib/desk-auth";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +83,7 @@ export async function POST(request: Request) {
       metadata: { name: item.name, category: item.category, isAvailable: body.isAvailable },
     });
 
+    revalidateLiveContent();
     return NextResponse.json({ success: true, id: item.id, name: item.name, isAvailable: body.isAvailable });
   } catch (error) {
     console.error("Desk menu update failed", error);

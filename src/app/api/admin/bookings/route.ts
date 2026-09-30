@@ -8,6 +8,7 @@ import { publicBaseUrl, sendInvoiceEmail } from "@/lib/mail";
 import { isSuperAdminRole, readSession } from "@/lib/staff-auth";
 import { nowDate } from "@/lib/time";
 import { asc, desc, eq, ilike, or } from "drizzle-orm";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -94,6 +95,7 @@ export async function PATCH(request: Request) {
         summary: `${actorLabel} note on ${booking.reference}: ${body.note.trim().slice(0, 200)}`,
         actor: "manager", actorLabel, ip: clientIp(request),
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true });
     }
 
@@ -141,10 +143,12 @@ export async function PATCH(request: Request) {
           summary: `Invoice ${booking.invoiceNumber} emailed to ${email} for ${booking.reference}.`,
           actor: "manager", ip: clientIp(request), metadata: { to: email },
         });
+        revalidateLiveContent();
         return NextResponse.json({ success: true, sent: true, message: `Invoice emailed to ${email} with the PDF attached.` });
       }
 
       await logBookingEvent(booking.id, booking.reference, "invoice_email_failed", `Email to ${email} not sent: ${outcome.reason}`, "system");
+      revalidateLiveContent();
       return NextResponse.json({ success: false, sent: false, message: outcome.reason, pdfUrl: `/api/invoices/${booking.reference}` }, { status: 202 });
     }
 
@@ -179,6 +183,7 @@ export async function PATCH(request: Request) {
       if (paid >= booking.totalAmount && !body.status) update.status = "confirmed";
     }
 
+    revalidateLiveContent();
     if (Object.keys(update).length === 0) return NextResponse.json({ booking });
 
     update.updatedAt = nowDate();
@@ -245,6 +250,7 @@ export async function PATCH(request: Request) {
       console.error("Status notification failed (booking kept):", notifyErr);
     }
 
+    revalidateLiveContent();
     return NextResponse.json({ booking: updated });
   } catch (error) {
     console.error("Failed to update booking:", error);
@@ -298,6 +304,7 @@ export async function DELETE(request: Request) {
     await db.delete(invoicesTable).where(eq(invoicesTable.bookingRef, booking.reference));
     await db.delete(bookingEventsTable).where(eq(bookingEventsTable.bookingId, id));
     await db.delete(bookings).where(eq(bookings.id, id));
+    revalidateLiveContent();
     return NextResponse.json({ success: true, message: `Booking ${booking.reference} deleted and its rooms released.` });
   } catch (error) {
     console.error("Failed to delete booking:", error);

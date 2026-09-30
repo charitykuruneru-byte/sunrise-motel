@@ -7,6 +7,7 @@ import { logBookingEvent } from "@/lib/booking-events";
 import { deskActor, requireMotelManager } from "@/lib/desk-auth";
 import { buildFolioInvoice } from "@/lib/folio-invoice";
 import { logNotification } from "@/lib/notify";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -118,6 +119,7 @@ export async function POST(request: Request) {
         })
         .returning();
       const result = await applyVerifiedAmount(booking.id, amount, auth.label, request, auth.user);
+      revalidateLiveContent();
       return NextResponse.json({ success: true, payment, booking: result });
     }
 
@@ -154,6 +156,7 @@ export async function POST(request: Request) {
         ip: clientIp(request),
         metadata: { channel: payment.channel, amount: payment.amount, bookingConfirmed: result?.confirmed ?? false },
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true, booking: result });
     }
     if (action === "reject") {
@@ -187,6 +190,7 @@ export async function POST(request: Request) {
         actorLabel: auth.label,
         ip: clientIp(request),
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true });
     }
 

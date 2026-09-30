@@ -7,6 +7,7 @@ import { clientIp, logAudit } from "@/lib/audit";
 import { publicBaseUrl, sendMail } from "@/lib/mail";
 import { readSession, sessionLabel } from "@/lib/staff-auth";
 import { nowDate } from "@/lib/time";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +84,7 @@ export async function POST(request: Request) {
     }
     void isNull;
     void lt;
+    revalidateLiveContent();
     return NextResponse.json({ reminded, escalated });
   } catch (err) {
     console.error("Reminders failed", err);

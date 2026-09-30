@@ -6,6 +6,7 @@ import { clientIp, logAudit } from "@/lib/audit";
 import { GUEST_AUTH_HINT, resolveGuestContext } from "@/lib/guest-context";
 import { taskDueBy } from "@/lib/hotel";
 import { logNotification } from "@/lib/notify";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,7 @@ export async function POST(request: Request) {
       metadata: { kind, priority, channel: ctx.channel },
     });
 
+    revalidateLiveContent();
     return NextResponse.json({ success: true, task });
   } catch (error) {
     console.error("Guest request failed", error);

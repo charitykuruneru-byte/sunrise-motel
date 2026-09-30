@@ -24,6 +24,7 @@ import { clientIp, logAudit } from "@/lib/audit";
 import { accountUpgradeNudge, type GuestContext } from "@/lib/guest-context";
 import { folioTotals, roomForBooking, serviceWindow } from "@/lib/hotel";
 import { ROOM_PIN_RULES, clearRoomCookie, readRoomSession, setRoomCookie, startRoomSession } from "@/lib/room-session";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -216,6 +217,7 @@ export async function POST(request: Request) {
       reference: body.reference ?? null,
       phone: body.phone ?? null,
     });
+    revalidateLiveContent();
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
 
     await logAudit({

@@ -10,6 +10,7 @@ import { adminAlertHtml, guestEmailHtml, sendInvoiceEmail, sendMail } from "@/li
 import { bookingMath, nextBookingNumber } from "@/lib/pricing";
 import { malawiShortDate, malawiYear, nowDate } from "@/lib/time";
 import { and, eq, ne, sql } from "drizzle-orm";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -282,6 +283,7 @@ export async function POST(request: Request) {
       console.error("Auto-email after booking failed (booking kept):", mailError);
     }
 
+    revalidateLiveContent();
     return NextResponse.json(
       {
         booking: {

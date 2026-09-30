@@ -13,6 +13,7 @@ import { clientIp, logAudit } from "@/lib/audit";
 import { deskActor } from "@/lib/desk-auth";
 import { ensureRoomsSeeded, folioTotals, roomIsFree, ROOM_STATES } from "@/lib/hotel";
 import { malawiDatePart } from "@/lib/time";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -172,6 +173,7 @@ export async function PATCH(request: Request) {
         ip: clientIp(request),
         metadata: { roomNumber: room.roomNumber, roomId: room.id },
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true, roomNumber: room.roomNumber });
     }
 
@@ -208,6 +210,7 @@ export async function PATCH(request: Request) {
       ip: clientIp(request),
       metadata: { state: patch.state ?? room.state },
     });
+    revalidateLiveContent();
     return NextResponse.json({ success: true, roomNumber: room.roomNumber, state: patch.state ?? room.state });
   } catch (error) {
     console.error("Room update failed", error);

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { revalidatePath } from "next/cache";
+import { revalidateLiveContent } from "@/lib/revalidate";
 import { NextResponse } from "next/server";
 import { clientIp, logAudit } from "@/lib/audit";
 import { isManagerRole, readSession } from "@/lib/staff-auth";
@@ -41,11 +41,7 @@ export async function POST(request: Request) {
       actor: "manager", ip: clientIp(request), metadata: { size: file.size, type: file.type },
     });
 
-    revalidatePath("/");
-    revalidatePath("/stay");
-    revalidatePath("/gallery");
-    revalidatePath("/dine");
-    revalidatePath("/admin");
+    revalidateLiveContent();
 
     return NextResponse.json({ url: `/api/uploads/${name}`, name }, { status: 201 });
   } catch (error) {

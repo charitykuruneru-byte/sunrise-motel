@@ -8,6 +8,7 @@ import { appOrigin } from "@/lib/invitation-email";
 import { notifyByEmail } from "@/lib/notify";
 import { hashPassword } from "@/lib/password";
 import { nextStaffCode } from "@/lib/staff-auth";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -197,6 +198,7 @@ export async function POST(request: Request) {
         details: { template: "account_ready", reason: delivery.reason },
       });
     }
+    revalidateLiveContent();
     return NextResponse.json({ success: true, accountType: invitation.accountType, emailSent: delivery.sent, loginUrl });
   } catch (error) {
     console.error("Invitation setup failed", error);

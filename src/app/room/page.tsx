@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import RoomSessionApp from "@/components/guest/room-session-app";
 
+// Live data: never prerendered — see src/lib/revalidate.ts
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Your room | Sunrise Motel",
   description:

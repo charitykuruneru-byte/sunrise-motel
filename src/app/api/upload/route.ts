@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidateLiveContent } from "@/lib/revalidate";
 import { put } from "@vercel/blob";
 import { randomUUID } from "node:crypto";
 import { db } from "@/db";
@@ -49,11 +49,7 @@ export async function POST(request: Request) {
     if (process.env.BLOB_READ_WRITE_TOKEN) {
       try {
         const blob = await put(`sunrise/${Date.now()}-${safe}`, file, { access: "public" });
-        revalidatePath("/");
-        revalidatePath("/stay");
-        revalidatePath("/gallery");
-        revalidatePath("/dine");
-        revalidatePath("/admin");
+        revalidateLiveContent();
         return NextResponse.json({ url: blob.url, storage: "blob" }, { status: 201 });
       } catch (error) {
         console.error("Blob upload failed — storing in Postgres instead", error);
@@ -62,11 +58,7 @@ export async function POST(request: Request) {
 
     // Fallback: keep the image in Postgres so the upload still succeeds.
     const stored = await storeInDatabase(file, user, safe);
-    revalidatePath("/");
-    revalidatePath("/stay");
-    revalidatePath("/gallery");
-    revalidatePath("/dine");
-    revalidatePath("/admin");
+    revalidateLiveContent();
     return NextResponse.json(
       { url: `/api/images/${stored.id}`, name: stored.filename, storage: "database" },
       { status: 201 },

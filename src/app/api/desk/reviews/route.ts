@@ -26,6 +26,7 @@ import {
   reviewSummary,
   submitReview,
 } from "@/lib/reviews";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -85,6 +86,7 @@ export async function POST(request: Request) {
         actorLabel: auth.label,
       });
       if (!row) return NextResponse.json({ error: "Review not found." }, { status: 404 });
+      revalidateLiveContent();
       return NextResponse.json({ success: true, review: row });
     }
 
@@ -120,6 +122,7 @@ export async function POST(request: Request) {
         actorLabel: auth.label,
         ip: clientIp(request),
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true, review });
     }
 
@@ -130,6 +133,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Give the dates that have opened up." }, { status: 400 });
       }
       const result = await notifyWaitlistForDates({ checkIn, checkOut });
+      revalidateLiveContent();
       return NextResponse.json({ success: true, ...result });
     }
 

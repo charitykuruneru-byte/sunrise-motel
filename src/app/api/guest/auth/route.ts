@@ -14,6 +14,7 @@ import {
   setGuestPassword,
 } from "@/lib/guest-auth";
 import { OTP_RESEND_SECONDS, latestOtpToken, maskContact } from "@/lib/guest-otp";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -280,6 +281,7 @@ export async function PATCH(request: Request) {
         ip: clientIp(request),
       });
     }
+    revalidateLiveContent();
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Profile update failed", error);

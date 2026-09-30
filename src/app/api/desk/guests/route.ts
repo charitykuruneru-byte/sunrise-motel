@@ -6,6 +6,7 @@ import { clientIp, logAudit } from "@/lib/audit";
 import { deskActor, requireSuperAdmin } from "@/lib/desk-auth";
 import { resendActivation } from "@/lib/guest-account";
 import { inviteCheckedInGuest } from "@/lib/guest-invitations";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -115,6 +116,7 @@ export async function POST(request: Request) {
         actor: auth.user,
         request,
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true, result });
     }
 
@@ -144,6 +146,7 @@ export async function POST(request: Request) {
         actorLabel: auth.label,
         request,
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true, ...result });
     }
 
@@ -161,6 +164,7 @@ export async function POST(request: Request) {
         .update(guestAccountsTable)
         .set({ status: next, updatedAt: new Date() })
         .where(eq(guestAccountsTable.id, account.id));
+      revalidateLiveContent();
       return NextResponse.json({ success: true, status: next });
     }
 
@@ -174,6 +178,7 @@ export async function POST(request: Request) {
         .update(guestsTable)
         .set({ marketingConsent: consent, updatedAt: new Date() })
         .where(eq(guestsTable.id, account.guestId));
+      revalidateLiveContent();
       return NextResponse.json({ success: true, consent });
     }
 

@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 
+// Live data: never prerendered — see src/lib/revalidate.ts
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Get the Android App | Sunrise Motel Lilongwe",
   description:

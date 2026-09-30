@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { revalidatePath } from "next/cache";
+import { revalidateLiveContent } from "@/lib/revalidate";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { postsTable } from "@/db/schema";
@@ -65,12 +65,7 @@ export async function POST(request: Request) {
       actor: "manager", ip: clientIp(request), metadata: { title: newPost.title, category: newPost.category },
     });
 
-    revalidatePath("/");
-    revalidatePath("/stay");
-    revalidatePath("/gallery");
-    revalidatePath("/dine");
-    revalidatePath("/admin");
-    revalidatePath("/desk");
+    revalidateLiveContent();
 
     return NextResponse.json({ post: newPost }, { status: 201 });
   } catch (error) {
@@ -96,12 +91,7 @@ export async function DELETE(request: Request) {
       action: "ACTIVITY_DELETED", entity: "post", entityId: id,
       summary: `Post removed (id ${id}).`, actor: "manager", ip: clientIp(request),
     });
-    revalidatePath("/");
-    revalidatePath("/stay");
-    revalidatePath("/gallery");
-    revalidatePath("/dine");
-    revalidatePath("/admin");
-    revalidatePath("/desk");
+    revalidateLiveContent();
     return NextResponse.json({ success: true, message: "Post removed successfully." });
   } catch (error) {
     console.error("Failed to delete post:", error);
@@ -132,12 +122,7 @@ export async function PATCH(request: Request) {
       actor: "manager", ip: clientIp(request),
     });
 
-    revalidatePath("/");
-    revalidatePath("/stay");
-    revalidatePath("/gallery");
-    revalidatePath("/dine");
-    revalidatePath("/admin");
-    revalidatePath("/desk");
+    revalidateLiveContent();
 
     return NextResponse.json({ post: updated });
   } catch (error) {

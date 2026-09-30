@@ -16,6 +16,7 @@ import { waitlistTable } from "@/db/schema";
 import { clientIp } from "@/lib/audit";
 import { notifyInPortal } from "@/lib/notify";
 import { addToWaitlist } from "@/lib/reviews";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
       )
       .limit(1);
     if (duplicate) {
+      revalidateLiveContent();
       return NextResponse.json({
         success: true,
         alreadyWaiting: true,
@@ -106,6 +108,7 @@ export async function POST(request: Request) {
         `${body.note ? ` — ${body.note}` : ""}. Ring them first if a room opens: ${phone || email}. (Logged from ${clientIp(request) ?? "the website"}.)`,
     });
 
+    revalidateLiveContent();
     return NextResponse.json({
       success: true,
       checkIn,

@@ -6,6 +6,7 @@ import { clientIp, logAudit } from "@/lib/audit";
 import { deskActor, requireMotelManager } from "@/lib/desk-auth";
 import { buildFolioInvoice } from "@/lib/folio-invoice";
 import { folioTotals, postFolioItem } from "@/lib/hotel";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -155,6 +156,7 @@ export async function POST(request: Request) {
         actorLabel: auth.label,
         ip: clientIp(request),
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true, item });
     }
 
@@ -183,6 +185,7 @@ export async function POST(request: Request) {
         ip: clientIp(request),
         metadata: { voidedAmount: item.amount, reason: body.reason.trim() },
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true });
     }
 
@@ -198,6 +201,7 @@ export async function POST(request: Request) {
         actorLabel: auth.label,
         ip: clientIp(request),
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true, invoice });
     }
 

@@ -5,6 +5,7 @@ import { messageThreadsTable, messagesTable } from "@/db/schema";
 import { clientIp, logAudit } from "@/lib/audit";
 import { GUEST_AUTH_HINT, resolveGuestContext } from "@/lib/guest-context";
 import { logNotification } from "@/lib/notify";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -118,6 +119,7 @@ export async function POST(request: Request) {
       metadata: { kind, channel: ctx.channel, priority: kind === "emergency" ? "emergency" : "normal" },
     });
 
+    revalidateLiveContent();
     return NextResponse.json({ success: true, message, threadId: thread.id, emergency: kind === "emergency" });
   } catch (error) {
     console.error("Guest message failed", error);

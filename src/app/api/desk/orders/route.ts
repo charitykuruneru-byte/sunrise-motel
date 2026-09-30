@@ -6,6 +6,7 @@ import { clientIp, logAudit } from "@/lib/audit";
 import { deskActor } from "@/lib/desk-auth";
 import { logNotification } from "@/lib/notify";
 import { malawiDatePart, nowDate } from "@/lib/time";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -154,6 +155,7 @@ export async function PATCH(request: Request) {
         ip: clientIp(request),
         metadata: { orderNumber: order.orderNumber, item: item.name, reason: body.reason.trim() },
       });
+      revalidateLiveContent();
       return NextResponse.json({ success: true, total });
     } else {
       return NextResponse.json({ error: `Unknown action "${action}".` }, { status: 400 });
@@ -180,6 +182,7 @@ export async function PATCH(request: Request) {
       ip: clientIp(request),
       metadata: { orderNumber: order.orderNumber, status: patch.status, reason: body.reason ?? null },
     });
+    revalidateLiveContent();
     return NextResponse.json({ success: true, status: patch.status, guestMessage });
   } catch (error) {
     console.error("Order update failed", error);

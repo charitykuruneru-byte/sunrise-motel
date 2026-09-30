@@ -7,6 +7,7 @@ import { GUEST_AUTH_HINT, canChargeRoom, resolveGuestContext } from "@/lib/guest
 import { nextOrderNumber, postFolioItem, roomForBooking, serviceWindow } from "@/lib/hotel";
 import { logNotification } from "@/lib/notify";
 import { malawiShortDate } from "@/lib/time";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -165,6 +166,7 @@ export async function POST(request: Request) {
       metadata: { orderNumber: order!.orderNumber, total, unavailable, channel: ctx.channel },
     });
 
+    revalidateLiveContent();
     return NextResponse.json({
       success: true,
       order: { ...order!, items: lines.map((l) => ({ name: l.item.name, qty: l.qty, amount: l.amount })) },

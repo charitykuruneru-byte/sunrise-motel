@@ -7,6 +7,7 @@ import { clientIp, logAudit } from "@/lib/audit";
 import { bookingMath } from "@/lib/pricing";
 import { isMotelManagerRole, readSession } from "@/lib/staff-auth";
 import { nowDate } from "@/lib/time";
+import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
       actor: "manager", actorLabel: `${user.staffCode} — ${user.name}`, ip: clientIp(request),
       metadata: { extraNights, additionalFee, newCheckOut: body.newCheckOut },
     });
+    revalidateLiveContent();
     return NextResponse.json({ booking: updated, additionalFee, extraNights });
   } catch (err) {
     console.error("Extend booking failed", err);
