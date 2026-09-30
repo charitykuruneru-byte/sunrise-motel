@@ -105,6 +105,9 @@ export async function GET(request: Request) {
       expiresAt: invite.expiresAt,
       createdAt: invite.createdAt,
       deliveryError: invite.deliveryError,
+      // When the last attempt happened — so a stored failure from three days ago
+      // cannot look like a failure that is happening now.
+      updatedAt: invite.updatedAt,
     })) : [],
     canManage,
   });

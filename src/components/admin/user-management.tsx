@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, Clock3, Loader2, Mail, Plus, RefreshCw, Shield, Trash2, UserRoundX, Users, X } from "lucide-react";
 
 type UserRow = { id: string; name: string; email?: string; role: string; invitedBy?: string | null; status: string; lastLogin?: string | null; createdAt?: string };
-type InviteRow = { id: string; email: string; name: string; role: string; accountType: string; invitedByName: string; status: string; expiresAt: string; deliveryError: string | null };
+type InviteRow = { id: string; email: string; name: string; role: string; accountType: string; invitedByName: string; status: string; expiresAt: string; deliveryError: string | null; updatedAt: string | null };
 const ROLES = ["super_admin", "motel_manager", "restaurant_manager", "staff"];
 const roleName = (role: string) => ({ super_admin: "Super Admin", admin: "Super Admin", motel_manager: "Motel Manager", restaurant_manager: "Restaurant Manager", staff: "Front Desk Staff" }[role] ?? role);
 
@@ -129,7 +129,7 @@ export default function UserManagement() {
           {invitations.map((invite) => (
             <div className="invoice-row" key={invite.id}>
               <div><strong>{invite.name}</strong><small>{invite.email} · invited by {invite.invitedByName}</small></div>
-              <div><strong>{roleName(invite.role)}</strong><small><Clock3 size={12} /> {invite.status} · expires {new Date(invite.expiresAt).toLocaleString()}</small>{invite.deliveryError ? <small>{invite.deliveryError}</small> : null}</div>
+              <div><strong>{roleName(invite.role)}</strong><small><Clock3 size={12} /> {invite.status} · expires {new Date(invite.expiresAt).toLocaleString()}</small>{invite.deliveryError ? <small>{invite.deliveryError}</small> : null}{invite.deliveryError && invite.updatedAt ? <small>Last attempt {new Date(invite.updatedAt).toLocaleString()} — press Retry send to deliver it now.</small> : null}</div>
               <div className="invoice-actions">
                 {invite.status !== "accepted" && invite.status !== "revoked" ? <button className="btn-action" type="button" disabled={busy} onClick={() => void post("PATCH", { action: "resend", id: invite.id })}><RefreshCw size={14} /> {invite.status === "failed" ? "Retry send" : "Resend"}</button> : null}
                 {invite.status !== "accepted" && invite.status !== "revoked" ? <button className="btn-action btn-danger-text" type="button" disabled={busy} onClick={() => void revoke(invite)}><X size={14} /> Revoke</button> : null}
