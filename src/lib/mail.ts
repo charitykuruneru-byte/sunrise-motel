@@ -107,8 +107,11 @@ export async function sendMail(opts: {
       html: opts.html,
       text: opts.text,
       attachments: opts.attachments,
-    })) as { messageId?: string } | undefined;
-    return { sent: true as const, messageId: info?.messageId ?? null };
+    })) as { messageId?: string; response?: string } | undefined;
+    // `response` is the mail server's own words — Gmail's "250 2.0.0 OK … - gsmtp"
+    // means it accepted and queued the message. Kept, because "we sent it" and "the
+    // server took it" are different claims, and only the second one is evidence.
+    return { sent: true as const, messageId: info?.messageId ?? null, smtpResponse: info?.response ?? null };
   } catch (error) {
     // A delivery hiccup must never break a booking, an invoice email or a
     // manager action — the failure comes back in the same { sent:false, reason }

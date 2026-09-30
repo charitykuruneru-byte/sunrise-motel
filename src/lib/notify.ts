@@ -83,8 +83,11 @@ export async function notifyByEmail(input: {
       body: input.logBody ?? input.text ?? null,
       status: result.sent ? "sent" : "skipped",
       // The provider's own id when it gave us one — the receipt to quote if the
-      // message never arrives.
-      providerRef: result.sent ? result.messageId : null,
+      // message never arrives. For SMTP the server's acceptance line is appended,
+      // e.g. "… · 250 2.0.0 OK … - gsmtp": proof the receiving server took it.
+      providerRef: result.sent
+        ? [result.messageId, "smtpResponse" in result ? result.smtpResponse : null].filter(Boolean).join(" · ").slice(0, 160) || null
+        : null,
       error: result.sent ? null : result.reason,
       guestId: input.guestId,
       bookingId: input.bookingId,
