@@ -134,7 +134,7 @@ export default function AdminPage() {
   const [reminders, setReminders] = useState<{ pendingCount: number; reminderDue: { id: string; reference: string; bookingNumber: string | null; guestName: string; hours: number }[] } | null>(null);
   const [staffList, setStaffList] = useState<{ id: string; staffCode: string; name: string; email: string; phone: string | null; role: string; isActive: boolean; lastLoginAt: string | null }[]>([]);
   const [roomsList, setRoomsList] = useState<{ id: string; name: string; rate: number; totalInventory: number; isActive: boolean }[]>([]);
-  const [roomForm, setRoomForm] = useState({ id: "", name: "", rate: "", totalInventory: "3" });
+  const [roomForm, setRoomForm] = useState({ id: "", name: "", rate: "", totalInventory: "3", weekendPrice: "", extraBedPrice: "", cleaningFee: "", taxPercent: "16.5", minNights: "1", weeklyDiscountPercent: "", monthlyDiscountPercent: "" });
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -525,10 +525,27 @@ export default function AdminPage() {
 
   const addRoom = async (e: FormEvent) => {
     e.preventDefault();
-    const res = await fetch("/api/admin/rooms", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...roomForm, rate: Number(roomForm.rate), totalInventory: Number(roomForm.totalInventory) }) });
+    const res = await fetch("/api/admin/rooms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...roomForm,
+        rate: Number(roomForm.rate),
+        totalInventory: Number(roomForm.totalInventory),
+        // The form speaks percent because that is how a rate is written on paper;
+        // the API stores basis points so 16.5% cannot drift into 16% by rounding.
+        weekendPrice: Number(roomForm.weekendPrice) || 0,
+        extraBedPrice: Number(roomForm.extraBedPrice) || 0,
+        cleaningFee: Number(roomForm.cleaningFee) || 0,
+        taxPercent: Number(roomForm.taxPercent) || 0,
+        minNights: Number(roomForm.minNights) || 1,
+        weeklyDiscountBp: Math.round((Number(roomForm.weeklyDiscountPercent) || 0) * 100),
+        monthlyDiscountBp: Math.round((Number(roomForm.monthlyDiscountPercent) || 0) * 100),
+      }),
+    });
     const data = await res.json();
     if (!res.ok) { notify(data.error || "Could not add room"); return; }
-    setRoomForm({ id: "", name: "", rate: "", totalInventory: "3" });
+    setRoomForm({ id: "", name: "", rate: "", totalInventory: "3", weekendPrice: "", extraBedPrice: "", cleaningFee: "", taxPercent: "16.5", minNights: "1", weeklyDiscountPercent: "", monthlyDiscountPercent: "" });
     notify(`Room added: ${data.room.name}.`);
     loadAll();
   };
@@ -680,6 +697,7 @@ export default function AdminPage() {
         {isMotelManager && <button className={tab === "rooms" ? "active" : ""} onClick={() => setTab("rooms")}><BedDouble size={15} /> Rooms ({roomsList.length})</button>}
         <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}><Download size={15} /> Reports</button>
         <a className="admin-btn" href="/admin/notifications" style={{ textDecoration: "none" }}><Send size={15} /> App push</a>
+        {canViewUsers && <a className="admin-btn" href="/admin/finance" style={{ textDecoration: "none" }}><CreditCard size={15} /> Finance &amp; night audit</a>}
       </nav>
 
       {/* ---------------- BOOKINGS ---------------- */}
@@ -1099,6 +1117,22 @@ export default function AdminPage() {
             <div className="form-grid-2">
               <label><span>Rate MWK/night *</span><input required type="number" value={roomForm.rate} onChange={(e) => setRoomForm({ ...roomForm, rate: e.target.value })} /></label>
               <label><span>Rooms of this type</span><input type="number" value={roomForm.totalInventory} onChange={(e) => setRoomForm({ ...roomForm, totalInventory: e.target.value })} /></label>
+            </div>
+            <div className="form-grid-2">
+              <label><span>Weekend rate — Fri/Sat (MWK)</span><input type="number" value={roomForm.weekendPrice} onChange={(e) => setRoomForm({ ...roomForm, weekendPrice: e.target.value })} placeholder="blank = same as rate" /></label>
+              <label><span>Extra bed (MWK)</span><input type="number" value={roomForm.extraBedPrice} onChange={(e) => setRoomForm({ ...roomForm, extraBedPrice: e.target.value })} /></label>
+            </div>
+            <div className="form-grid-2">
+              <label><span>Cleaning fee (MWK)</span><input type="number" value={roomForm.cleaningFee} onChange={(e) => setRoomForm({ ...roomForm, cleaningFee: e.target.value })} /></label>
+              <label><span>VAT %</span><input type="number" step="0.01" value={roomForm.taxPercent} onChange={(e) => setRoomForm({ ...roomForm, taxPercent: e.target.value })} /></label>
+            </div>
+            <div className="form-grid-2">
+              <label><span>Minimum nights</span><input type="number" value={roomForm.minNights} onChange={(e) => setRoomForm({ ...roomForm, minNights: e.target.value })} /></label>
+              <label><span>Weekly discount % (7+ nights)</span><input type="number" value={roomForm.weeklyDiscountPercent} onChange={(e) => setRoomForm({ ...roomForm, weeklyDiscountPercent: e.target.value })} /></label>
+            </div>
+            <div className="form-grid-2">
+              <label><span>Monthly discount % (28+ nights)</span><input type="number" value={roomForm.monthlyDiscountPercent} onChange={(e) => setRoomForm({ ...roomForm, monthlyDiscountPercent: e.target.value })} /></label>
+              <p style={{ fontSize: 12, opacity: 0.75, alignSelf: "end" }}>New quotes use these. Bookings already made keep the price they were made at.</p>
             </div>
             <button type="submit" className="admin-btn admin-btn-primary"><Plus size={15} /> Add room / service</button>
           </form>

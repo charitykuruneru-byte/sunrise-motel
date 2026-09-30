@@ -49,6 +49,10 @@ export async function GET(request: Request) {
         slug: room.slug,
         description: room.description,
         rate: room.rate,
+        // Added: the weekend rate and VAT show on /stay when a manager sets them, so
+        // "Fri & Sat costs more" is visible before the guest picks dates.
+        weekendPrice: room.weekendPrice,
+        taxRateBp: room.taxRateBp,
         totalInventory: room.totalInventory,
         bookedCount: booked,
         availableCount: available,

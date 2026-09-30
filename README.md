@@ -2828,3 +2828,47 @@ and the sentence in the email; before this they were two hard-coded literals tha
 why); "Copy link" re-issues the token, so the previously emailed link stops working — the portal says
 so at the moment you press it; and nothing here proves an email reached an inbox, only that the mail
 server accepted it with a provider reference recorded in `notification_log`.
+---
+
+## 61. The audit that came before this change ✅
+
+`AUDIT_REPORT.md` is the audit: what already existed, how each existing flow works, and a
+KEEP / EXTEND / MISSING / SKIP verdict for every item of the brief that prompted it. The
+finding, in one line: this system is not a blank page — 30 tables, ~70 API routes and 23
+pages already existed, so most of the brief was **already built** and the instruction to
+extend rather than replace was the right one.
+
+### Kept exactly as it was
+
+Invite-only accounts (`/register` and `/signup` already redirect to
+`/login?message=invite-only` — there is no self-registration anywhere, and guests never
+create accounts); one email + one phone = one guest, enforced by two expression unique
+indexes in the database; the desks' check-in/check-out, folio, invoice PDF and verify/reject
+payment queue; POS orders and bill-to-room; `service_tasks` housekeeping and
+`/api/desk/issues` maintenance; `audit_log` and `/admin/audit-logs`; `notification_log` with
+email, web push and FCM; `revalidateLiveContent()` plus `force-dynamic` public pages.
+
+### Added (all additive — the migration has no DROP, RENAME or ALTER COLUMN)
+
+| Added | Where |
+| --- | --- |
+| Eight pricing columns with defaults (weekend, extra bed, cleaning, VAT basis points, min nights, weekly/monthly discounts, amenity charges) | `room_types`, `drizzle/0013_melted_wraith.sql` |
+| `calculateStayQuote()` — the one price engine, pure and checkable by hand | `src/lib/pricing.ts` (appended below the untouched `bookingMath`) |
+| `POST /api/rooms/calculate-price` — night-by-night breakdown, read-only | `src/app/api/rooms/calculate-price/route.ts` |
+| The eight price inputs in the existing room form | `src/app/admin/page.tsx` |
+| Weekend rate shown on `/stay` | `src/components/experience-pages.tsx` |
+| `night_audit` and `expenses` tables, `computeNightAudit()`, `/api/admin/night-audit`, `/api/admin/expenses` | `src/lib/night-audit.ts` + routes |
+| **Finance & night audit** page: occupancy, ADR, RevPAR, net today, run-the-audit, expense book | `/admin/finance` |
+| Automatic cleaning task on check-out | `src/app/api/desk/stay/route.ts` |
+| `merge-duplicate-guests.mjs` — dry run by default, `--apply` merges in one transaction | `scripts/` |
+
+### Honest limits of this pass
+
+The 30-day room calendar, the guest 360 page, the housekeeping Kanban board, `m_pesa`/`card`
+in the desk payment picker, and a premium restyle of the older screens are **Phase 2/3** and
+are named as such in `AUDIT_REPORT.md` — not quietly implied to be finished. The pricing
+engine is wired into the new quote endpoint, but the public booking widget still uses the
+original `bookingMath` path: switching live bookings over to VAT-inclusive quotes changes
+what guests are charged, so that is a deliberate decision for the owner, not a side effect of
+an audit.
+

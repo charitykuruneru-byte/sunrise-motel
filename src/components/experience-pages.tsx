@@ -535,7 +535,7 @@ export function StayPage() {
                 </button>
                 <div className="sell-gradient">
                   <strong>{room.name}</strong>
-                  <span>{formatMoney(room.rate)} / night</span>
+                  <span>{formatMoney(room.rate)} / night{room.weekendPrice ? ` · Fri–Sat ${formatMoney(room.weekendPrice)}` : ""}</span>
                 </div>
               </div>
 

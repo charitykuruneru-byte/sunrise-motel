@@ -6,7 +6,17 @@ export const roomTypesTable = pgTable("room_types", {
   name: varchar("name", { length: 120 }).notNull(),
   slug: varchar("slug", { length: 120 }).notNull().unique(),
   description: text("description").notNull(),
-  rate: integer("rate").notNull(), // MWK per night
+  rate: integer("rate").notNull(), // MWK per night — the base price, and still the field the site quotes
+  // ── PRICING (added, all additive: every column has a default, so existing rows and
+  //    every existing booking/quote path keep working untouched) ──────────────────
+  weekendPrice: integer("weekend_price").notNull().default(0), // Fri & Sat nights; 0 = use `rate`
+  extraBedPrice: integer("extra_bed_price").notNull().default(0),
+  cleaningFee: integer("cleaning_fee").notNull().default(0),
+  taxRateBp: integer("tax_rate_bp").notNull().default(1650), // basis points: 1650 = 16.50% VAT
+  minNights: integer("min_nights").notNull().default(1),
+  weeklyDiscountBp: integer("weekly_discount_bp").notNull().default(0), // 500 = 7+ nights → 5% off
+  monthlyDiscountBp: integer("monthly_discount_bp").notNull().default(0), // 1000 = 28+ nights → 10% off
+  amenitiesCharges: text("amenities_charges").notNull().default("[]"), // [{ name, price, perPerson, perNight }]
   totalInventory: integer("total_inventory").notNull().default(3),
   bed: varchar("bed", { length: 80 }).notNull(),
   sleeps: varchar("sleeps", { length: 80 }).notNull(),
@@ -547,6 +557,45 @@ export const roomTypeRatesTable = pgTable("room_type_rates", {
   minNights: integer("min_nights").notNull().default(1),
   nightlyRate: integer("nightly_rate").notNull(),
   isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// NIGHT AUDIT — one row per business date: the numbers the owner reads in the morning.
+// Stored rather than recomputed, because a report that changes when last month's
+// payments are edited is not a record of anything.
+export const nightAuditTable = pgTable("night_audit", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  auditDate: varchar("audit_date", { length: 10 }).notNull().unique(), // YYYY-MM-DD
+  roomsSold: integer("rooms_sold").notNull().default(0),
+  roomsAvailable: integer("rooms_available").notNull().default(0),
+  occupancyBp: integer("occupancy_bp").notNull().default(0), // basis points: 7250 = 72.50%
+  adr: integer("adr").notNull().default(0), // average daily rate, MWK
+  revpar: integer("revpar").notNull().default(0), // revenue per available room, MWK
+  roomRevenue: integer("room_revenue").notNull().default(0),
+  posRevenue: integer("pos_revenue").notNull().default(0),
+  totalRevenue: integer("total_revenue").notNull().default(0),
+  totalExpenses: integer("total_expenses").notNull().default(0),
+  netProfit: integer("net_profit").notNull().default(0),
+  runBy: varchar("run_by", { length: 160 }),
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// EXPENSES — what the motel spent. Without this, "net profit" is only revenue
+// wearing a suit: the night audit subtracts these rows or it reports nothing.
+export const expensesTable = pgTable("expenses", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  category: varchar("category", { length: 32 }).notNull().default("other"), // cleaning|food|bar_stock|maintenance|salary|utility|other
+  description: text("description").notNull(),
+  amount: integer("amount").notNull(),
+  paidTo: varchar("paid_to", { length: 160 }),
+  method: varchar("method", { length: 24 }).notNull().default("cash"), // cash|bank|m_pesa|airtel_money|card|other
+  receiptUrl: text("receipt_url"),
+  spentOn: varchar("spent_on", { length: 10 }).notNull(), // YYYY-MM-DD
+  approvedBy: varchar("approved_by", { length: 160 }),
+  createdBy: varchar("created_by", { length: 160 }),
+  note: text("note"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

@@ -42,6 +42,16 @@ export async function POST(request: Request) {
       badge: str(body.badge) || null,
       features: Array.isArray(body.features) ? JSON.stringify(body.features) : "[]",
       images: Array.isArray(body.images) ? JSON.stringify(body.images) : "[]",
+      // PRICING (added): defaults preserve today's behaviour — weekend 0 means "same as
+      // rate", tax 1650bp means 16.50% VAT, no discounts unless asked for.
+      weekendPrice: Math.max(0, Math.round(Number(body.weekendPrice) || 0)),
+      extraBedPrice: Math.max(0, Math.round(Number(body.extraBedPrice) || 0)),
+      cleaningFee: Math.max(0, Math.round(Number(body.cleaningFee) || 0)),
+      taxRateBp: body.taxPercent !== undefined ? Math.max(0, Math.round((Number(body.taxPercent) || 0) * 100)) : Math.max(0, Math.round(Number(body.taxRateBp ?? 1650) || 0)),
+      minNights: Math.max(1, Math.round(Number(body.minNights) || 1)),
+      weeklyDiscountBp: Math.max(0, Math.round(Number(body.weeklyDiscountBp) || 0)),
+      monthlyDiscountBp: Math.max(0, Math.round(Number(body.monthlyDiscountBp) || 0)),
+      amenitiesCharges: Array.isArray(body.amenitiesCharges) ? JSON.stringify(body.amenitiesCharges) : "[]",
       isActive: true,
     }).returning();
     await logAudit({
@@ -75,6 +85,17 @@ export async function PATCH(request: Request) {
     if (typeof body.isActive === "boolean") update.isActive = body.isActive;
     if (Array.isArray(body.features)) update.features = JSON.stringify(body.features);
     if (Array.isArray(body.images)) update.images = JSON.stringify(body.images);
+    // ── PRICING (added). Each field is optional and only written when sent, so an
+    //    existing caller that knows nothing about weekend prices changes nothing.
+    if (body.weekendPrice !== undefined) update.weekendPrice = Math.max(0, Math.round(Number(body.weekendPrice) || 0));
+    if (body.extraBedPrice !== undefined) update.extraBedPrice = Math.max(0, Math.round(Number(body.extraBedPrice) || 0));
+    if (body.cleaningFee !== undefined) update.cleaningFee = Math.max(0, Math.round(Number(body.cleaningFee) || 0));
+    if (body.taxRateBp !== undefined) update.taxRateBp = Math.max(0, Math.min(10_000, Math.round(Number(body.taxRateBp) || 0)));
+    if (body.taxPercent !== undefined) update.taxRateBp = Math.max(0, Math.min(10_000, Math.round((Number(body.taxPercent) || 0) * 100)));
+    if (body.minNights !== undefined) update.minNights = Math.max(1, Math.round(Number(body.minNights) || 1));
+    if (body.weeklyDiscountBp !== undefined) update.weeklyDiscountBp = Math.max(0, Math.min(9_999, Math.round(Number(body.weeklyDiscountBp) || 0)));
+    if (body.monthlyDiscountBp !== undefined) update.monthlyDiscountBp = Math.max(0, Math.min(9_999, Math.round(Number(body.monthlyDiscountBp) || 0)));
+    if (Array.isArray(body.amenitiesCharges)) update.amenitiesCharges = JSON.stringify(body.amenitiesCharges);
     const [room] = await db.update(roomTypesTable).set(update).where(eq(roomTypesTable.id, id)).returning();
     if (!room) return NextResponse.json({ error: "Room not found." }, { status: 404 });
     await logAudit({

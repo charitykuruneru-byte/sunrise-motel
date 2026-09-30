@@ -1,7 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { bookings, guestsTable, roomsTable } from "@/db/schema";
+import { bookings, guestsTable, roomsTable, serviceTasksTable } from "@/db/schema";
 import { clientIp, logAudit } from "@/lib/audit";
 import { logBookingEvent } from "@/lib/booking-events";
 import { deskActor } from "@/lib/desk-auth";
@@ -157,6 +158,23 @@ export async function POST(request: Request) {
       }
       const invoice = await buildFolioInvoice(booking.id);
       await settleFolio(booking.id);
+
+      // Housekeeping, without being asked: a room that has just been vacated needs
+      // cleaning, and a task on the board is visible while a room *state* alone is
+      // something somebody has to remember to look at.
+      if (room) {
+        await db.insert(serviceTasksTable).values({
+          id: randomUUID(),
+          roomNumber: room.roomNumber,
+          bookingId: booking.id,
+          kind: "cleaning",
+          note: `Departure clean after ${booking.guestName}'s stay (checked out ${new Date().toISOString().slice(0, 10)}).`,
+          requestedBy: "system",
+          requestedByLabel: "Automatic on check-out",
+          priority: "normal",
+          status: "open",
+        });
+      }
 
       // Guest stats: stay_count / total_spent / is_regular (§12 guest stats).
       if (booking.guestId) {
