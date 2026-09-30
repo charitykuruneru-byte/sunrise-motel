@@ -35,6 +35,10 @@ const KNOWN_KEYS = [
   // anyone about a booking (see the notifyTargets block in /api/bookings).
   "ADMIN_EMAIL",
   "STAFF_NOTIFY_EMAILS",
+  // The switch itself: SETTINGS_SOURCE=db makes the stored values win over any
+  // environment variable, which is how a stale credential nobody can edit is
+  // overridden without access to the hosting dashboard.
+  "SETTINGS_SOURCE",
 ];
 
 const arg = (name, fallback = "") => {
