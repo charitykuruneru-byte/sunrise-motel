@@ -7,7 +7,7 @@ import { clientIp, logAudit } from "@/lib/audit";
 import { appOrigin } from "@/lib/invitation-email";
 import { notifyByEmail } from "@/lib/notify";
 import { hashPassword } from "@/lib/password";
-import { nextStaffCode } from "@/lib/staff-auth";
+import { cookieValue, nextStaffCode, type SessionRole } from "@/lib/staff-auth";
 import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
@@ -199,7 +199,38 @@ export async function POST(request: Request) {
       });
     }
     revalidateLiveContent();
-    return NextResponse.json({ success: true, accountType: invitation.accountType, emailSent: delivery.sent, loginUrl });
+    // Somebody who proved they hold the invitation token AND chose a password has
+    // authenticated themselves. Making them type that password again on the next
+    // screen is ceremony, so a staff setup signs them in here — the same signed
+    // cookie /api/admin/login sets. Guest invitations keep their own sign-in.
+    const response = NextResponse.json({
+      success: true,
+      accountType: invitation.accountType,
+      emailSent: delivery.sent,
+      loginUrl,
+      redirectTo: guest ? null : "/admin",
+    });
+    if (!guest) {
+      const [createdStaff] = await db
+        .select({ staffCode: staffTable.staffCode, name: staffTable.name, email: staffTable.email, role: staffTable.role })
+        .from(staffTable)
+        .where(eq(staffTable.id, accountId))
+        .limit(1);
+      if (createdStaff) {
+        response.cookies.set(
+          "sunrise_session",
+          cookieValue({
+            id: accountId,
+            staffCode: createdStaff.staffCode,
+            name: createdStaff.name,
+            email: createdStaff.email,
+            role: createdStaff.role as SessionRole,
+          }),
+          { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 12, secure: process.env.NODE_ENV === "production" },
+        );
+      }
+    }
+    return response;
   } catch (error) {
     console.error("Invitation setup failed", error);
     return NextResponse.json({ error: "Could not create the account. Contact the Administrator." }, { status: 500 });

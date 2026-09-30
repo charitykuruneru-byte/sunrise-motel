@@ -57,10 +57,13 @@ export default function SetupAccountPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, name, password, confirmPassword, acceptedTerms }),
       });
-      const data = (await response.json()) as { error?: string; success?: boolean; emailSent?: boolean; loginUrl?: string };
+      const data = (await response.json()) as { error?: string; success?: boolean; emailSent?: boolean; loginUrl?: string; redirectTo?: string | null };
       if (!response.ok) throw new Error(data.error ?? "Could not create the account.");
-      setMessage(data.emailSent ? "Account created. A confirmation email has been sent." : "Account created. The confirmation email could not be delivered; you can sign in now.");
-      if (data.loginUrl) window.setTimeout(() => window.location.assign(data.loginUrl!), 1800);
+      setMessage(data.redirectTo ? "Account created — signing you in…" : data.emailSent ? "Account created. A confirmation email has been sent." : "Account created. The confirmation email could not be delivered; you can sign in now.");
+      // Staff are already signed in (the server set the session cookie on this very
+      // response), so they go straight to the portal; guests go to their sign-in page.
+      const destination = data.redirectTo || data.loginUrl;
+      if (destination) window.setTimeout(() => window.location.assign(destination), 1800);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not create the account.");
     } finally {
