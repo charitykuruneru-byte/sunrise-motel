@@ -36,8 +36,6 @@ import {
   Star,
   Users,
   Utensils,
-  Volume2,
-  VolumeX,
   Waves,
   Wifi,
   X,
@@ -468,53 +466,9 @@ export default function HomePage() {
   // state they depend on is declared.
 
   // ---- The hero film (§2.3) -------------------------------------------------
-  // The property's own tour of the grounds, playing silently behind the words.
-  // Muted is not a preference here, it is the price of autoplay in every browser;
-  // the loop is what makes it footage rather than a video someone has to babysit.
-  // Two things are deliberate. First, the photograph underneath stays the real
-  // hero: if the file is missing, the codec is one this phone will not play, or
-  // the guest taps Pause, what is left is still a finished hero and not a black
-  // rectangle — `src` is held in state only so a failed load can put the
-  // photograph back on top for good. Second, 8 MB is a week of somebody's airtime,
-  // so the film is HELD BACK until the browser has told us the connection is a
-  // cheap one — the first paint is the photograph for everybody, which is the only
-  // way a metered or Save-Data phone is certain never to start the download. Those
-  // guests, and anyone whose device asks for reduced motion, keep the photograph
-  // and a Play button; the file moves only if they ask for it.
-  const heroVideoRef = useRef<HTMLVideoElement | null>(null);
+  // Muted autoplay is required by browsers; loop keeps the property tour playing
+  // behind the hero copy. Keep the photograph if the video cannot be decoded.
   const [heroVideoSrc, setHeroVideoSrc] = useState<string | null>(HERO_VIDEO?.src ?? null);
-  const [heroFilmHeld, setHeroFilmHeld] = useState(true); // poster first, Play on request
-  const [heroPlaying, setHeroPlaying] = useState(false);
-  const [heroMuted, setHeroMuted] = useState(true);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const connection = (
-      navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }
-    ).connection;
-    // No Network Information API (Safari, iOS) means we cannot know, and a guest
-    // who came to look at the hotel should not be punished for that: autoplay.
-    const metered =
-      !!connection && (connection.saveData === true || /^(slow-2g|2g|3g)$/.test(connection.effectiveType ?? ""));
-    if (reducedMotion || metered) return;
-    setHeroFilmHeld(false);
-    setHeroPlaying(true);
-  }, []);
-
-  useEffect(() => {
-    const film = heroVideoRef.current;
-    if (!film || heroFilmHeld) return;
-    film.muted = heroMuted;
-    if (!heroPlaying) {
-      film.pause();
-      return;
-    }
-    film.play().catch(() => {
-      /* the browser said no (autoplay policy, or a background tab) — the
-         photograph stays exactly where it is and nothing else changes */
-    });
-  }, [heroPlaying, heroMuted, heroFilmHeld, heroVideoSrc]);
 
   // ---- The showcase slideshow (§2.5b) ---------------------------------------
   // One photograph at a time, of this property, playing by itself. Three things
@@ -752,14 +706,13 @@ export default function HomePage() {
             imgClassName="hp-hero-img"
             fallbackLabel="Sunrise Motel · Area 5, Lilongwe"
           />
-          {heroVideoSrc && !heroFilmHeld ? (
+          {heroVideoSrc ? (
             <video
-              ref={heroVideoRef}
               className="hp-hero-video"
               src={heroVideoSrc}
               poster={HERO_IMAGE?.src}
               autoPlay
-              muted={heroMuted}
+              muted
               loop
               playsInline
               preload="auto"
@@ -773,45 +726,6 @@ export default function HomePage() {
             />
           ) : null}
           <div className="hp-hero-scrim" aria-hidden="true" />
-          {heroVideoSrc ? (
-            <div className="hp-hero-media-controls">
-              {heroFilmHeld ? (
-                <button
-                  type="button"
-                  className="hp-hero-media-btn"
-                  onClick={() => {
-                    setHeroFilmHeld(false);
-                    setHeroPlaying(true);
-                  }}
-                  aria-label="Play the short film of the property"
-                >
-                  <Play size={13} />
-                  <span>Play film</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="hp-hero-media-btn"
-                  onClick={() => setHeroPlaying((playing) => !playing)}
-                  aria-label={heroPlaying ? "Pause the film in the background" : "Play the film"}
-                >
-                  {heroPlaying ? <Pause size={13} /> : <Play size={13} />}
-                  <span>{heroPlaying ? "Pause" : "Play"}</span>
-                </button>
-              )}
-              {!heroFilmHeld ? (
-                <button
-                  type="button"
-                  className="hp-hero-media-btn"
-                  onClick={() => setHeroMuted((muted) => !muted)}
-                  aria-label={heroMuted ? "Turn the sound on" : "Mute the film"}
-                >
-                  {heroMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
-                  <span>{heroMuted ? "Sound on" : "Mute"}</span>
-                </button>
-              ) : null}
-            </div>
-          ) : null}
           <div className="hp-hero-inner hp-wrap">
             <p className="hp-hero-eyebrow hp-anim hp-anim-1">Area 5 · Lilongwe · Mzimba Road</p>
             <h1 className="hp-h1 hp-anim hp-anim-2">A warm room, a full plate, and a quiet evening.</h1>
