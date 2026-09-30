@@ -54,15 +54,27 @@ export function hashInviteToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
-/** Five invitations an hour per actor — a person, not a mail-bomb. */
+/**
+ * How much invitation mail one administrator may send in an hour.
+ *
+ * Counted from the audit trail, and it deliberately counts only *sent* emails
+ * (INVITE_SENT / INVITE_RESENT). The first version counted EMAIL_FAILED too, and a
+ * live run exposed what that means: five retries of an invitation that could not be
+ * delivered locked the manager out of inviting anybody for an hour — the brake was
+ * blocking the very retry the feature exists for, while sending no mail at all.
+ * Ten an hour is still a hard ceiling on a runaway loop, and comfortably fits the
+ * brief's own flow (three administrators, plus resends).
+ */
+export const INVITE_BUDGET_PER_HOUR = 10;
+
 async function inviteLimitReached(actorId: string) {
   const since = new Date(Date.now() - 60 * 60 * 1000);
   const recent = await db
     .select({ id: auditLogTable.id })
     .from(auditLogTable)
-    .where(and(eq(auditLogTable.actorId, actorId), inArray(auditLogTable.action, ["INVITE_SENT", "INVITE_RESENT", "EMAIL_FAILED"]), gt(auditLogTable.createdAt, since)))
-    .limit(5);
-  return recent.length >= 5;
+    .where(and(eq(auditLogTable.actorId, actorId), inArray(auditLogTable.action, ["INVITE_SENT", "INVITE_RESENT"]), gt(auditLogTable.createdAt, since)))
+    .limit(INVITE_BUDGET_PER_HOUR);
+  return recent.length >= INVITE_BUDGET_PER_HOUR;
 }
 
 async function audit(request: Request, actor: SessionUser, input: { action: string; invitationId?: string; targetId?: string; targetEmail?: string; details?: Record<string, unknown> }) {

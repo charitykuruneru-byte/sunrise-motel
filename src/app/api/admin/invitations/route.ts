@@ -169,7 +169,7 @@ export async function PATCH(request: Request) {
       const delivery = body.notify === false ? ({ sent: false as const, reason: "Not emailed — copy the link and send it yourself." }) : await emailInvitation(request, refreshed!, token);
       const linkIsLive = delivery.sent || body.notify === false;
       await db.update(invitationsTable).set({ status: linkIsLive ? "pending" : "failed", deliveryError: linkIsLive ? null : delivery.reason ?? "Email failed", updatedAt: new Date() }).where(eq(invitationsTable.id, invitation.id));
-      await audit(request, user, { action: linkIsLive ? "INVITE_RESENT" : "EMAIL_FAILED", invitationId: invitation.id, targetEmail: invitation.email, details: { role: invitation.role, emailSent: delivery.sent, notified: body.notify !== false, reason: delivery.sent ? undefined : delivery.reason } });
+      await audit(request, user, { action: body.notify === false ? "INVITE_LINK_REISSUED" : linkIsLive ? "INVITE_RESENT" : "EMAIL_FAILED", invitationId: invitation.id, targetEmail: invitation.email, details: { role: invitation.role, emailSent: delivery.sent, notified: body.notify !== false, reason: delivery.sent ? undefined : delivery.reason } });
       revalidateLiveContent();
       return NextResponse.json({ success: true, emailSent: delivery.sent, reason: delivery.sent ? null : delivery.reason, inviteLink: setupLinkFor(request, token) });
     }
