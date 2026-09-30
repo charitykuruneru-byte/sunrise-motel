@@ -19,7 +19,7 @@ import { Calendar, Loader2, RefreshCw, Shield, Trash2 } from "lucide-react";
 type GridRoom = { id: string; roomNumber: string; floor: string | null; state: string; roomTypeId: string; roomType: string; isActive: boolean };
 type Stay = { id: string; reference: string; guestName: string; assignedRoomId: string | null; checkIn: string; checkOut: string; status: string };
 type Block = { id: string; roomNumber: string; startDate: string; endDate: string; reason: string; note: string | null };
-type Unassigned = { roomType: string; checkIn: string; checkOut: string };
+type Unassigned = { id: string; reference: string; guestName: string; roomType: string; checkIn: string; checkOut: string; roomOptions: string[] };
 
 const REASONS = ["maintenance", "hold", "ooo", "other"];
 
@@ -92,6 +92,28 @@ export default function CalendarPage() {
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not release those dates.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const assign = async (booking: Unassigned, roomId: string) => {
+    if (!roomId) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/calendar", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId: booking.id, roomId }),
+      });
+      const data = (await response.json()) as { roomNumber?: string; error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Could not assign that room.");
+      setNotice(`${booking.guestName} (${booking.reference}) is now in room ${data.roomNumber}. Those nights show blue in the grid.`);
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not assign that room.");
     } finally {
       setBusy(false);
     }
@@ -191,10 +213,32 @@ export default function CalendarPage() {
 
 
         {unassigned.length > 0 ? (
-          <p className="toolbar-info" style={{ marginTop: 12, fontSize: 13 }}>
-            <strong>{unassigned.length} booking(s) with no room chosen yet</strong> — the desk assigns a room at check-in, so these sit in no row:{" "}
-            {unassigned.map((row) => `${row.roomType} ${row.checkIn}→${row.checkOut}`).join(" · ")}
-          </p>
+          <div style={{ marginTop: 16 }}>
+            <div className="toolbar-info" style={{ fontSize: 13 }}>
+              <strong>{unassigned.length} booking(s) with no room chosen yet</strong> — they hold a room <em>type</em>, not a room, so they sit in no row
+              of the grid and housekeeping cannot see them. Assign one here and its nights turn blue.
+            </div>
+            <div className="invoice-list" style={{ marginTop: 8 }}>
+              {unassigned.map((row) => (
+                <div className="invoice-row" key={row.id}>
+                  <div><strong>{row.guestName}</strong><small>{row.reference} · {row.roomType} · {row.checkIn} → {row.checkOut}</small></div>
+                  <div className="invoice-actions">
+                    {row.roomOptions.length > 0 ? (
+                      <select defaultValue="" disabled={busy} onChange={(event) => void assign(row, event.target.value)} aria-label={`Assign a room to ${row.guestName}`}>
+                        <option value="">Choose a room…</option>
+                        {row.roomOptions.map((roomId) => {
+                          const room = rooms.find((candidate) => candidate.id === roomId);
+                          return <option key={roomId} value={roomId}>{room?.roomNumber ?? roomId}{room?.state === "occupied" ? " (occupied until they leave)" : ""}</option>;
+                        })}
+                      </select>
+                    ) : (
+                      <small>No room of that type is free for those nights.</small>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         ) : null}
 
         <div className="section-toolbar" style={{ marginTop: 28 }}>
