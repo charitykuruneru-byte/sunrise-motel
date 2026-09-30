@@ -16,6 +16,55 @@ export default function NotificationsAdminPage() {
   const [testing, setTesting] = useState(false);
   const [state, setState] = useState<SendState>({ tone: "idle", text: "" });
 
+  // --- WEB PUSH (VAPID) ------------------------------------------------------
+  // A different channel from the Firebase one above: it reaches browsers and the
+  // installed web app, needs no Google account, and each device is one row in
+  // `push_subscriptions`. The button proves delivery instead of assuming it.
+  const [webPushBusy, setWebPushBusy] = useState(false);
+  async function testWebPush() {
+    setWebPushBusy(true);
+    setState({ tone: "idle", text: "" });
+    try {
+      const res = await fetch("/api/admin/push-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim() || "Sunrise Motel",
+          body: body.trim() || "Web alerts are working — this is a test from the manager portal.",
+          url: url || "/",
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        reason?: string;
+        sent?: number;
+        pruned?: number;
+        failed?: number;
+        devices?: number;
+      };
+      if (!res.ok) throw new Error(data.error || "Web push test failed.");
+      if (data.reason) {
+        setState({ tone: "warn", text: data.reason });
+        return;
+      }
+      if (data.sent) {
+        const extra = [data.pruned ? `${data.pruned} stale subscription${data.pruned === 1 ? "" : "s"} removed` : "", data.failed ? `${data.failed} failed` : ""]
+          .filter(Boolean)
+          .join(", ");
+        setState({ tone: "ok", text: `Web push delivered to ${data.sent} device${data.sent === 1 ? "" : "s"}${extra ? ` (${extra})` : ""}.` });
+      } else {
+        setState({
+          tone: "warn",
+          text: `No device is subscribed yet (${data.devices ?? 0} stored). Open the site on a phone, tap "Get alerts", then press this button again.`,
+        });
+      }
+    } catch (err) {
+      setState({ tone: "err", text: err instanceof Error ? err.message : "Web push test failed." });
+    } finally {
+      setWebPushBusy(false);
+    }
+  }
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
@@ -120,6 +169,15 @@ export default function NotificationsAdminPage() {
           )}
           <button type="button" className="admin-btn admin-btn-secondary" style={{ width: "100%", justifyContent: "center" }} onClick={testConfig} disabled={busy || testing}>
             {testing ? "Testing..." : "Test configuration (no notification sent)"}
+          </button>
+          <button
+            type="button"
+            className="admin-btn admin-btn-secondary"
+            style={{ width: "100%", justifyContent: "center" }}
+            onClick={testWebPush}
+            disabled={busy || testing || webPushBusy}
+          >
+            {webPushBusy ? "Sending…" : "Send test web push (browsers & installed web app)"}
           </button>
           <button type="submit" className="btn-submit-booking-request" disabled={busy || testing || !title.trim() || !body.trim()}>
             {busy ? "Sending…" : "Send to All App Users"}

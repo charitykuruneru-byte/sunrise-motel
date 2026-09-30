@@ -45,6 +45,7 @@ import Link from "next/link";
 import InstallAppButton from "@/components/install-app";
 import InstallAppPopup from "@/components/InstallAppPopup";
 import { NewBadge } from "@/components/new-badge";
+import PushOptIn from "@/components/push-opt-in";
 import Reveal from "@/components/reveal";
 import SafeImage from "@/components/safe-image";
 import SiteNav from "@/components/site-nav";
@@ -1575,6 +1576,10 @@ export default function HomePage() {
                 Comfortable rooms, generous meals, lively evenings and dependable connectivity — all in Area 5,
                 Lilongwe.
               </p>
+              {/* Alerts for this device: one tap on, one tap off. The component
+                  hides itself entirely when the server has no VAPID keys, so it can
+                  never offer a notification that could not be sent. */}
+              <PushOptIn />
               <div className="hp-footer-col" style={{ marginTop: 24 }}>
                 <strong>Contact</strong>
                 <p><Phone size={13} /> <a href="tel:+265998688332">+265 998 688 332</a></p>

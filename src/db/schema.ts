@@ -655,9 +655,27 @@ export type BookingEvent = typeof bookingEventsTable.$inferSelect;
 export type AuditLog = typeof auditLogTable.$inferSelect;
 export type Staff = typeof staffTable.$inferSelect;
 export type Booking = typeof bookings.$inferSelect;
+// Web push subscriptions (W3C Push API). One row per browser or phone that
+// tapped "Get alerts" — no personal data: the endpoint is the browser's own push
+// URL, and p256dh/auth are the public keys that let the push service encrypt a
+// message to that one device. A 404/410 from the push service means the device
+// is gone for good, and the row is deleted at that moment.
+export const pushSubscriptionsTable = pgTable("push_subscriptions", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  label: varchar("label", { length: 120 }), // "Chrome on Android" — helps a human prune
+  failureCount: integer("failure_count").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  // Last time this device was heard from: on subscribe, and on every delivery.
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export type RoomType = typeof roomTypesTable.$inferSelect;
 export type Post = typeof postsTable.$inferSelect;
 export type MenuItem = typeof menuItemsTable.$inferSelect;
 export type GalleryImage = typeof galleryImagesTable.$inferSelect;
 export type Invoice = typeof invoicesTable.$inferSelect;
 export type UploadedImage = typeof uploadedImagesTable.$inferSelect;
+export type PushSubscriptionRow = typeof pushSubscriptionsTable.$inferSelect;

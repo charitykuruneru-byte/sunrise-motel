@@ -36,6 +36,45 @@ self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
+// PUSH — a real notification in the phone's status bar, even with the site
+// closed. The payload is JSON from our own API: { title, body, url, tag }.
+// A push with nothing readable still shows something honest rather than nothing.
+self.addEventListener("push", (event) => {
+  let data = { title: "Sunrise Motel", body: "Something new is on at the motel.", url: "/", tag: "sunrise" };
+  try {
+    if (event.data) data = { ...data, ...event.data.json() };
+  } catch {
+    /* keep the defaults — a malformed payload must not lose the alert */
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      tag: data.tag,
+      data: { url: data.url || "/" },
+    }),
+  );
+});
+
+// Tapping the notification lands on the page it is about: an already-open tab is
+// reused and focused (so a guest does not end up with five Sunrise tabs), and if
+// none is open the browser opens one.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+      for (const client of windows) {
+        if (client.url.startsWith(self.location.origin) && "focus" in client) {
+          return client.navigate(target).then(() => client.focus());
+        }
+      }
+      return self.clients.openWindow(target);
+    }),
+  );
+});
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
