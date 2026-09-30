@@ -77,21 +77,22 @@ Measured before creating anything:
 | gallery_images | 24 | 26 |
 | audit_log | 91 | 43 |
 
-* The site on this laptop is `next start` on port 3000. It reads `.env`, so it talks to
+* The site on this laptop runs on port **3112** — `npm run dev` (or `npm start`), the only dev
+  port this project uses. It reads `.env`, so it talks to
   `DATABASE_URL` — the **local** Postgres `127.0.0.1/sunrise_db`. Dev and this build see the
   same data.
 * There is **no `.vercel` directory**, so nothing in this folder is deployed from here.
 * `PUBLIC_APP_URL` in `.env` is `https://header-finger-simpson-shipped.trycloudflare.com` — a
   Cloudflare **quick tunnel**. That hostname no longer resolves ("no such host"): quick tunnels
   are handed a new name on every restart, so treat the value as stale. The working address is
-  `http://127.0.0.1:3000`.
+  `http://127.0.0.1:3112`.
 * Neon is one project, `summer-firefly-28238061` ("sunrise-db"), with exactly one branch,
   `production`.
 
 ## Testing on a phone
 
 * The guest cookie is set `Secure` (`src/lib/guest-auth.ts`), which is right for production and
-  fine in a browser on `localhost` or `https`. Over a plain `http://192.168.x.x:3000` LAN address
+  fine in a browser on `localhost` or `https`. Over a plain `http://192.168.x.x:3112` LAN address
   a browser will not keep it, so **guest sign-in looks broken when it is not**. Use the tunnel
   address (https), or test the guest view on the laptop.
 * The staff/admin cookies carry **no** `Secure` flag, so those do work over a plain LAN http
