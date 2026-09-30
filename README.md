@@ -752,9 +752,10 @@ the sender.
 Check it any time with `node scripts/verify-email-smtp.mjs`: it reads `.env`, prints the settings
 with the password masked, then sends four real emails through the app's own `src/lib/mail.ts` —
 plain `sendMail`, the guest template, an invoice **with a PDF attachment**, and the
-staff-credentials template. `--dry` checks the configuration without sending anything. In the
-portal the equivalent is **Admin → Send test email** (`POST /api/admin/email-test`), which mails
-the signed-in account's own address.
+staff-credentials template — plus a raw SMTP transcript, so Gmail's own `250 … accepted` line is
+visible. `--to you@example.com` sends the batch to another address, `--dry` checks the
+configuration without sending anything. In the portal the equivalent is **Admin → Send test
+email** (`POST /api/admin/email-test`), which mails the signed-in account's own address.
 
 Production needs the same values in Vercel → Project → Settings → Environment Variables; without
 them `sendMail()` honestly reports "Email is not configured" and no mail leaves the site.

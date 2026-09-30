@@ -41,9 +41,12 @@ Gmail gotchas: the App Password needs 2-Step Verification on the account and mus
 **without** the `abcd efgh ijkl mnop` display spaces — SMTP AUTH rejects the spaced form.
 `SMTP_FROM` must be the same address as `SMTP_USER`, or Gmail rewrites the sender.
 
-Check it any time (sends four real emails through the app's own `src/lib/mail.ts`):
+Check it any time (sends four real emails plus a raw SMTP transcript through the app's own
+`src/lib/mail.ts`):
 ```powershell
-node scripts/verify-email-smtp.mjs          # --dry = check the config, send nothing
+node scripts/verify-email-smtp.mjs                      # 4 emails + Gmail's acceptance line
+node scripts/verify-email-smtp.mjs --to you@gmail.com   # send the batch to another address
+node scripts/verify-email-smtp.mjs --dry                # check the config, send nothing
 ```
 
 ## Install + migrate (done once)

@@ -2,8 +2,9 @@
 /**
  * Proves the mail settings in .env can actually deliver Sunrise Motel email.
  *
- *   node scripts/verify-email-smtp.mjs          # config + 3 real sends
- *   node scripts/verify-email-smtp.mjs --dry    # config only, sends nothing
+ *   node scripts/verify-email-smtp.mjs                          # config + real sends
+ *   node scripts/verify-email-smtp.mjs --dry                    # config only, sends nothing
+ *   node scripts/verify-email-smtp.mjs --to someone@gmail.com   # send the batch elsewhere
  *
  * It calls the app's OWN module (`src/lib/mail.ts`), so a pass here means the
  * booking confirmation, the invoice email and staff invitations send too.
@@ -24,6 +25,8 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 config({ path: join(root, ".env") });
 
 const dry = process.argv.includes("--dry");
+const toIndex = process.argv.indexOf("--to");
+const cliTo = toIndex > -1 ? (process.argv[toIndex + 1] ?? "").trim() : "";
 const {
   RESEND_API_KEY, SMTP_HOST, SMTP_PORT, SMTP_SECURE,
   SMTP_USER, SMTP_PASS, SMTP_FROM, ADMIN_EMAIL,
@@ -32,12 +35,20 @@ const {
 const pass = (SMTP_PASS ?? "").replace(/\s+/g, "");
 
 console.log("Sunrise Motel — email verification\n");
-console.table({
-  "RESEND_API_KEY": RESEND_API_KEY ? "SET — it wins over SMTP, unset it to test Gmail" : "unset",
-  SMTP_HOST, SMTP_PORT, "SMTP_SECURE": SMTP_SECURE, "SMTP_USER": SMTP_USER ?? "(unset)",
-  "SMTP_PASS": `(${pass.length} chars${pass.length === 16 ? ", correct app-password length" : " — a Google app password is 16"})`,
-  SMTP_FROM, ADMIN_EMAIL,
-});
+// Plain aligned lines rather than console.table: box-drawing characters mangle
+// in cmd.exe and in copied logs, and this output is meant to be pasted around.
+const settings = {
+  RESEND_API_KEY: RESEND_API_KEY ? "SET — it wins over SMTP, unset it to test Gmail" : "unset",
+  SMTP_HOST,
+  SMTP_PORT,
+  SMTP_SECURE,
+  SMTP_USER: SMTP_USER ?? "(unset)",
+  SMTP_PASS: `(${pass.length} chars${pass.length === 16 ? ", correct app-password length" : " — a Google app password is 16"})`,
+  SMTP_FROM,
+  ADMIN_EMAIL,
+};
+for (const [key, value] of Object.entries(settings)) console.log(`  ${key.padEnd(14)} ${value ?? ""}`);
+console.log("");
 
 let failures = 0;
 for (const [name, value] of [["SMTP_HOST", SMTP_HOST], ["SMTP_USER", SMTP_USER], ["SMTP_PASS", pass]]) {
@@ -59,7 +70,7 @@ if (dry) {
   console.log(`\n--dry: configuration checks done, no email sent (${failures} problem(s)).`);
   process.exitCode = failures ? 1 : 0;
 } else {
-  const to = ADMIN_EMAIL || SMTP_USER;
+  const to = cliTo || ADMIN_EMAIL || SMTP_USER;
   console.log(`\nSending to ${to} as ${SMTP_FROM || SMTP_USER}\n`);
 
   await runChecks(to);
@@ -134,4 +145,30 @@ await attempt("staff credentials template (staffCredentialsHtml)", () =>
     text: "Staff credentials template test.",
   }));
 
+  // Gmail's own acceptance line, straight from the socket — independent of the
+  // app code, and handy when someone wants proof in the mailbox, not the log.
+  console.log("\nSMTP transcript (direct transport — Gmail's own response):");
+  try {
+    const nodemailer = (await import("nodemailer")).default;
+    const transport = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: Number(SMTP_PORT || 587),
+      secure: SMTP_SECURE === "true",
+      auth: { user: SMTP_USER, pass },
+    });
+    const info = await transport.sendMail({
+      from: SMTP_FROM || SMTP_USER,
+      to,
+      subject: "Sunrise Motel — email test 5/5 (SMTP transcript)",
+      text: `Direct SMTP check. Accepted at ${new Date().toISOString()}.`,
+    });
+    console.log(`  accepted : ${JSON.stringify(info.accepted)}`);
+    console.log(`  rejected : ${JSON.stringify(info.rejected)}`);
+    console.log(`  response : ${info.response}`);
+    console.log(`  messageId: ${info.messageId}`);
+    transport.close();
+  } catch (error) {
+    failures++;
+    console.error(`FAIL  SMTP transcript — ${error?.responseCode ?? ""} ${error?.response ?? error?.message}`);
+  }
 }
