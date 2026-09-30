@@ -1,4 +1,4 @@
-import { and, desc, ilike, or, gte, lte, eq, type SQL } from "drizzle-orm";
+import { and, desc, ilike, or, gte, lte, eq, sql, type SQL } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { db } from "@/db";
@@ -20,13 +20,62 @@ async function rowsFor(request: Request) {
   const actor = params.get("actor")?.trim();
   const action = params.get("action")?.trim();
   const target = params.get("target")?.trim();
+  const family = params.get("family")?.trim();
   if (from && !Number.isNaN(Date.parse(from))) filters.push(gte(auditLogTable.createdAt, new Date(from)));
   if (to && !Number.isNaN(Date.parse(to))) filters.push(lte(auditLogTable.createdAt, new Date(`${to}T23:59:59.999Z`)));
   if (actor) filters.push(or(ilike(auditLogTable.actorEmail, `%${actor}%`), ilike(auditLogTable.actorLabel, `%${actor}%`))!);
   if (action) filters.push(eq(auditLogTable.action, action));
   if (target) filters.push(or(ilike(auditLogTable.targetEmail, `%${target}%`), ilike(auditLogTable.targetId, `%${target}%`), ilike(auditLogTable.reference, `%${target}%`), ilike(auditLogTable.summary, `%${target}%`))!);
+  if (family && family !== "all") {
+    // The same classification the stat chips use — one expression, two places it is used,
+    // kept together here so a chip and its filter can never disagree.
+    const familyMatch: Record<string, SQL> = {
+      Bookings: sql`(${auditLogTable.action} ilike '%booking%')`,
+      Money: sql`(${auditLogTable.action} ilike '%pay%' or ${auditLogTable.action} ilike '%expense%' or ${auditLogTable.action} ilike '%night_audit%' or ${auditLogTable.action} ilike '%invoice%')`,
+      Rooms: sql`(${auditLogTable.action} ilike '%room%')`,
+      Guests: sql`(${auditLogTable.action} ilike '%guest%')`,
+      "People & access": sql`(${auditLogTable.action} ilike '%invite%' or ${auditLogTable.action} ilike '%user%' or ${auditLogTable.action} ilike '%role%' or ${auditLogTable.action} ilike '%staff%')`,
+      "Sign-ins": sql`(${auditLogTable.action} ilike '%login%' or ${auditLogTable.action} ilike '%auth%' or ${auditLogTable.action} ilike '%session%')`,
+      Messages: sql`(${auditLogTable.action} ilike '%push%' or ${auditLogTable.action} ilike '%email%' or ${auditLogTable.action} ilike '%notification%')`,
+    };
+    const match = familyMatch[family];
+    if (match) filters.push(match);
+  }
   const rows = await db.select().from(auditLogTable).where(filters.length ? and(...filters) : undefined).orderBy(desc(auditLogTable.createdAt)).limit(1000);
-  return { rows } as const;
+
+  // ADDED: the numbers behind the page's stat cards, computed over the SAME filter window
+  // as the rows — so "12 failures" always refers to the list somebody is looking at.
+  const where = filters.length ? and(...filters) : undefined;
+  const [totals] = await db
+    .select({
+      total: sql<number>`count(*)::int`,
+      people: sql<number>`count(distinct coalesce(${auditLogTable.actorEmail}, ${auditLogTable.actorLabel}))::int`,
+      failures: sql<number>`count(*) filter (where ${auditLogTable.action} ilike '%fail%' or ${auditLogTable.action} ilike '%reject%' or ${auditLogTable.action} ilike '%revoke%' or ${auditLogTable.action} ilike '%denied%' or ${auditLogTable.action} ilike '%refus%')::int`,
+      money: sql<number>`count(*) filter (where ${auditLogTable.action} ilike '%pay%' or ${auditLogTable.action} ilike '%invoice%' or ${auditLogTable.action} ilike '%expense%' or ${auditLogTable.action} ilike '%night_audit%' or ${auditLogTable.action} ilike '%refund%')::int`,
+    })
+    .from(auditLogTable)
+    .where(where);
+
+  const families = await db
+    .select({
+      family: sql<string>`case
+        when ${auditLogTable.action} ilike 'booking%' or ${auditLogTable.action} ilike '%booking%' then 'Bookings'
+        when ${auditLogTable.action} ilike '%pay%' or ${auditLogTable.action} ilike '%expense%' or ${auditLogTable.action} ilike '%night_audit%' then 'Money'
+        when ${auditLogTable.action} ilike '%room%' then 'Rooms'
+        when ${auditLogTable.action} ilike '%guest%' then 'Guests'
+        when ${auditLogTable.action} ilike '%invite%' or ${auditLogTable.action} ilike '%user%' or ${auditLogTable.action} ilike '%role%' or ${auditLogTable.action} ilike '%staff%' then 'People & access'
+        when ${auditLogTable.action} ilike '%login%' or ${auditLogTable.action} ilike '%auth%' or ${auditLogTable.action} ilike '%session%' then 'Sign-ins'
+        when ${auditLogTable.action} ilike '%push%' or ${auditLogTable.action} ilike '%email%' or ${auditLogTable.action} ilike '%notification%' then 'Messages'
+        else 'Other' end`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(auditLogTable)
+    .where(where)
+    .groupBy(sql`1`)
+    .orderBy(sql`2 desc`)
+    .limit(9);
+
+  return { rows, stats: { ...(totals ?? { total: 0, people: 0, failures: 0, money: 0 }), families } } as const;
 }
 
 export async function GET(request: Request) {
@@ -66,5 +115,5 @@ export async function GET(request: Request) {
     const bytes = await pdf.save();
     return new Response(new Uint8Array(bytes), { headers: { "Content-Type": "application/pdf", "Content-Disposition": "attachment; filename=Sunrise-audit-log.pdf" } });
   }
-  return NextResponse.json({ entries: result.rows });
+  return NextResponse.json({ entries: result.rows, stats: result.stats });
 }
