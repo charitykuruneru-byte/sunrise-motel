@@ -171,7 +171,7 @@ export async function PATCH(request: Request) {
       await db.update(invitationsTable).set({ status: linkIsLive ? "pending" : "failed", deliveryError: linkIsLive ? null : delivery.reason ?? "Email failed", updatedAt: new Date() }).where(eq(invitationsTable.id, invitation.id));
       await audit(request, user, { action: body.notify === false ? "INVITE_LINK_REISSUED" : linkIsLive ? "INVITE_RESENT" : "EMAIL_FAILED", invitationId: invitation.id, targetEmail: invitation.email, details: { role: invitation.role, emailSent: delivery.sent, notified: body.notify !== false, reason: delivery.sent ? undefined : delivery.reason } });
       revalidateLiveContent();
-      return NextResponse.json({ success: true, emailSent: delivery.sent, reason: delivery.sent ? null : delivery.reason, inviteLink: setupLinkFor(request, token) });
+      return NextResponse.json({ success: true, emailSent: delivery.sent, reason: delivery.sent ? null : delivery.reason, inviteLink: await setupLinkFor(request, token) });
     }
 
     const [target] = await db.select().from(staffTable).where(eq(staffTable.id, body.id)).limit(1);

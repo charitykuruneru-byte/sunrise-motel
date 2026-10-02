@@ -82,10 +82,12 @@ Measured before creating anything:
   `DATABASE_URL` — the **local** Postgres `127.0.0.1/sunrise_db`. Dev and this build see the
   same data.
 * There is **no `.vercel` directory**, so nothing in this folder is deployed from here.
-* `PUBLIC_APP_URL` in `.env` is `https://header-finger-simpson-shipped.trycloudflare.com` — a
-  Cloudflare **quick tunnel**. That hostname no longer resolves ("no such host"): quick tunnels
-  are handed a new name on every restart, so treat the value as stale. The working address is
-  `http://127.0.0.1:3112`.
+* `PUBLIC_APP_URL` in `.env` is `https://sunrise-motel.vercel.app` — the live site. It used to hold
+  a Cloudflare **quick tunnel** hostname, and that value was the reason invitations sent from this
+  laptop arrived with a dead link: quick tunnels are handed a new name on every restart, so the old
+  host resolved to nothing ("no such host"). Set a *fresh* tunnel URL here only while you are
+  actively sharing the laptop, then set it back (README §16.5).
+* The laptop's own address is `http://127.0.0.1:3112`.
 * Neon is one project, `summer-firefly-28238061` ("sunrise-db"), with exactly one branch,
   `production`.
 

@@ -1,4 +1,6 @@
+import { publicBaseUrl, publicOriginCandidate } from "@/lib/mail";
 import { notifyByEmail } from "@/lib/notify";
+import { settings } from "@/lib/settings";
 
 const GUEST_APK = "https://github.com/charitykuruneru-byte/sunrise-motel/releases/latest/download/SunriseMotel.apk";
 
@@ -24,13 +26,30 @@ export function roleLabel(role: string) {
 const escapeHtml = (value: string) =>
   value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
 
-export function appOrigin(request: Request) {
-  const configured = process.env.PUBLIC_APP_URL || process.env.NEXT_PUBLIC_APP_URL;
-  const origin = new URL(configured || request.url);
-  if (process.env.NODE_ENV === "production" && origin.protocol !== "https:") {
-    throw new Error("PUBLIC_APP_URL must use HTTPS in production.");
-  }
-  return origin.origin;
+/**
+ * The origin an invitation is built on.
+ *
+ * Deliberately reads the setting through src/lib/settings.ts instead of
+ * `process.env` directly, so the host can be corrected with one row in
+ * `app_settings` — the escape hatch this deployment already leans on for SMTP and
+ * the push keys, because its hosting environment variables cannot be edited. With
+ * `SETTINGS_SOURCE=db` present the stored value wins over a stale env one, which
+ * is what a wrong invitation host needs.
+ *
+ * Whatever the setting cannot supply falls back to the same resolution every other
+ * email link uses (src/lib/mail.ts): Vercel's own production host, then the
+ * request's host. An unusable value is skipped rather than thrown, so a bad
+ * setting can make a link's host wrong but can never stop the email being sent —
+ * the version this replaces threw on a non-HTTPS setting and lost the invitation
+ * entirely.
+ */
+export async function appOrigin(request: Request) {
+  const configured = await settings("PUBLIC_APP_URL", "NEXT_PUBLIC_APP_URL");
+  return (
+    publicOriginCandidate(configured.PUBLIC_APP_URL) ??
+    publicOriginCandidate(configured.NEXT_PUBLIC_APP_URL) ??
+    publicBaseUrl(request)
+  );
 }
 
 export async function sendInvitationEmail(opts: {
@@ -44,7 +63,7 @@ export async function sendInvitationEmail(opts: {
   token: string;
   booking?: { reference: string; roomType: string; checkIn: string } | null;
 }) {
-  const base = appOrigin(opts.request);
+  const base = await appOrigin(opts.request);
   const setupUrl = `${base}/setup-account?token=${encodeURIComponent(opts.token)}`;
   const name = escapeHtml(opts.name);
   const role = escapeHtml(roleLabel(opts.role));

@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     if (password !== body.confirmPassword) return NextResponse.json({ error: "The two passwords do not match." }, { status: 400 });
     if (body.acceptedTerms !== true) return NextResponse.json({ error: "Accept the terms to create your account." }, { status: 400 });
 
-    const base = appOrigin(request);
+    const base = await appOrigin(request);
     const tokenHash = hashInviteToken(token);
     const first = await findInvitation(token);
     if (!first || first.status !== "pending" || first.expiresAt.getTime() <= Date.now()) {

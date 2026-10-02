@@ -46,8 +46,8 @@ export function nameFromEmail(email: string) {
 }
 
 /** The link that goes in the email. /admin/setup forwards here (both URLs work). */
-export function setupLinkFor(request: Request, token: string) {
-  return `${appOrigin(request)}/setup-account?token=${encodeURIComponent(token)}`;
+export async function setupLinkFor(request: Request, token: string) {
+  return `${await appOrigin(request)}/setup-account?token=${encodeURIComponent(token)}`;
 }
 
 export function hashInviteToken(token: string) {
@@ -101,7 +101,7 @@ async function audit(request: Request, actor: SessionUser, input: { action: stri
  * clicks a link, sets a second password and then wonders which one works.
  */
 async function emailRoleGranted(opts: { request: Request; email: string; name: string; role: string; actor: SessionUser }) {
-  const base = appOrigin(opts.request);
+  const base = await appOrigin(opts.request);
   const role = roleLabel(opts.role);
   const loginUrl = `${base}/admin/login`;
   const text = [
@@ -251,7 +251,7 @@ export async function createStaffInvitation(opts: {
 
   return {
     outcome: "invited", email, role, invitationId: invitation.id,
-    inviteLink: setupLinkFor(opts.request, token),
+    inviteLink: await setupLinkFor(opts.request, token),
     emailSent: delivery.sent,
     reason: delivery.sent ? null : (delivery.reason ?? "Email could not be sent."),
   };

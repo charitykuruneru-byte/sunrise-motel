@@ -1,27 +1,67 @@
 // Single place that decides which public domain goes into emails
-// (guest track links, manager portal links). Reads the live tunnel URL from
+// (guest track links, manager portal links). Reads the public address from
 // PUBLIC_APP_URL (preferred, not NEXT_PUBLIC_ so secrets stay server-side),
-// falls back to NEXT_PUBLIC_APP_URL, and never returns localhost on Vercel.
+// falls back to NEXT_PUBLIC_APP_URL, then to the host Vercel itself reports,
+// and never returns localhost on a hosted deployment.
 import { settings } from "@/lib/settings";
 
-export function publicBaseUrl(request?: Request) {
-  const fromEnv =
-    process.env.PUBLIC_APP_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    "";
-  if (fromEnv && !/localhost|127\.0\.0\.1/i.test(fromEnv)) return fromEnv.replace(/\/$/, "");
-  if (fromEnv) return fromEnv.replace(/\/$/, ""); // local dev: localhost is correct there
-  if (request) {
-    try {
-      const u = new URL(request.url);
-      if (u.hostname !== "localhost" && u.hostname !== "127.0.0.1") {
-        return `${u.protocol}//${u.host}`;
-      }
-    } catch {
-      // ignore — fall through
-    }
+/** Hosts that are correct while developing and wrong in a link a guest receives. */
+const LOCAL_HOSTNAME = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/i;
+
+/**
+ * Turn a candidate into an origin, or `null` if it must not go in an email.
+ *
+ * Exported because invitations resolve their host through it too (see
+ * `appOrigin` in src/lib/invitation-email.ts) — one rule, not two.
+ *
+ * A relative or malformed value is not usable, and localhost is only usable while
+ * developing. Returning `null` (rather than throwing or passing the value on) lets
+ * the caller try the next candidate, so a mistyped setting costs a wrong host at
+ * worst and never an email that fails to send.
+ */
+export function publicOriginCandidate(value: string | undefined | null): string | null {
+  const raw = (value ?? "").trim().replace(/\/+$/, "");
+  if (!raw) return null;
+  try {
+    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    if (LOCAL_HOSTNAME.test(url.hostname) && process.env.NODE_ENV === "production") return null;
+    return url.origin;
+  } catch {
+    return null;
   }
-  return "";
+}
+
+/**
+ * The public origin for links that leave the building.
+ *
+ * Order: PUBLIC_APP_URL → NEXT_PUBLIC_APP_URL → the host Vercel reports for this
+ * project → the current request's own host → the one dev port.
+ *
+ * The Vercel entries matter. With no PUBLIC_APP_URL at all this used to fall
+ * straight through to the request host, which on a preview build is the throwaway
+ * deployment URL — right for that build, wrong for a link that outlives it.
+ * `VERCEL_PROJECT_PRODUCTION_URL` is the project's stable production domain.
+ *
+ * What this cannot do: tell a *well-formed* host that no longer resolves from a
+ * good one. A dead Cloudflare quick tunnel is exactly that case — the shape this
+ * bug took — so PUBLIC_APP_URL has to be corrected or cleared when a tunnel dies.
+ * That is precisely what happened: a stale quick-tunnel name sat in the setting
+ * and every invitation built from it pointed nowhere.
+ */
+export function publicBaseUrl(request?: Request) {
+  const candidates = [
+    process.env.PUBLIC_APP_URL,
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "",
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "",
+    request?.url,
+  ];
+  for (const candidate of candidates) {
+    const origin = publicOriginCandidate(candidate);
+    if (origin) return origin;
+  }
+  return "http://localhost:3112";
 }
 
 export function guestAppDownloadUrl(request?: Request) {
