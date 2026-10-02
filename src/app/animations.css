@@ -27,6 +27,18 @@
   from { opacity: 0; transform: translateY(22px); }
   to { opacity: 1; transform: none; }
 }
+@keyframes meal-alert-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes meal-alert-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(18px); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .meal-alert-popup { animation: meal-alert-in 0.24s ease-out both; }
+  .meal-alert-popup.is-closing { animation: meal-alert-out 0.18s ease-in both; }
+}
 @keyframes sunrise-ken-burns {
   from { transform: scale(1.06) translate3d(0, 0, 0); }
   to { transform: scale(1) translate3d(0, -1%, 0); }

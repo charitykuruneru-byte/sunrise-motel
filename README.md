@@ -18,6 +18,7 @@ The document has **four parts, and they are not the same thing**:
 | **Part C — sections 40–46** | The **three addenda, now built**: how guest accounts are created, the two guest paths (an account… or nothing but the room you are standing in), and the landing page as a booking engine that never says a bare "no" — reviews, the sold-out waitlist, and the desk screens that run both. | ✅ **Live / built** |
 | **Part D — sections 47–52** | **The six later addenda, and the fix that made them real.** The session cookie is now signed, so *every* admin-only block is enforced on the server rather than by hiding a button; the desk gained the one menu control it needed; and the guest menu finally comes from the database. Includes the **honest build status** of all six documents. | ✅ **Enforcement built** · ⚠️ **with the gaps listed** |
 | **Part E — sections 53–58** | **The navigation & image addenda.** Three navigation tiers in one component, images with a standard the code enforces (`SafeImage`, alt text, lazy loading, placeholders), motion that never hides content, the app's five tabs with a What's-on feed, and the manager's picture/post tools with an end-to-end check (`npm run verify:media`). Includes what is still **not** built. | ✅ **Built** · ⚠️ **§58 lists the gaps** |
+| **Part F — section 59** | **Meal alerts and the live restaurant menu.** Admin-managed Malawi meal schedules, foreground polling, guest dismiss/attend state, live menu browsing and desk-visible takeaway/pre-order orders. The additive schema and default schedules are applied to both production and the `pricing-development` Neon branch; localhost feature APIs still return HTTP 500, so the running app's database target or runtime error needs diagnosis. | ⚙️ **Code added · production and dev schemas migrated · localhost APIs failing** |
 
 **Status legend**
 
@@ -837,6 +838,32 @@ a `whatsapp_queued` timeline event so the staff know a message was prompted.
     reason: "Firebase not configured…" }` so the UI never lies about a send.
   * Every attempt (send, test, failure) is written to `audit_log` as
     `notification.broadcast` / `notification.test` / `notification.failed`.
+
+## 59. Meal alerts and live menu
+
+Meal alerts are a separate foreground-only system: the browser (including the guest Android
+WebView) polls `GET /api/notifications/active` every minute and on focus/visibility changes.
+It uses local storage for same-day dismiss/attend choices and logs a dismissal through
+`POST /api/notifications/dismiss`. It does not use Firebase, FCM, or the Push API; the existing
+FCM broadcast feature in §10.3 remains unchanged.
+
+An administrator can edit the schedule, title, message, popup duration, CTA and optional image
+under **Admin → Menu → Meal alerts**. The schedules use `Africa/Blantyre` wall time. Default
+windows are breakfast 06:30–09:30, lunch 11:45–13:30, dinner 18:00–20:30 and late-night
+pre-order 22:40–23:35. The initial values are inserted by
+`drizzle/0017_meal_alerts_and_live_menu.sql`.
+
+The public `/menu` page reads `GET /api/menu/live`, which is the same `menu_items` table managed
+under **Admin → Menu → Menu items**. Administrators can assign a meal period and preparation
+time; unassigned legacy items remain visible in each meal filter. The page refreshes the menu
+every 30 seconds and submits counter/takeaway requests to `POST /api/menu/orders`. These orders
+are not charged to a room folio: the guest pays at pickup/service, while room-charge ordering
+continues through the authenticated `/api/guest/orders` flow. Late-night alert orders are marked
+`preorder_pending` and appear in the front-desk order board ahead of ordinary orders.
+
+Before deploying this feature, apply the additive migration through the repository's normal
+Drizzle migration workflow. Until then, the public endpoints return an explicit temporary
+unavailable response rather than substituting static menu or alert data.
 
 ---
 

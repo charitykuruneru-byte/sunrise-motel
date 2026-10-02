@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import type { CSSProperties } from "react";
 import type { ReactNode } from "react";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import { MealNotificationsProvider } from "@/components/meal-notifications";
 import themeConfig from "../../theme.config.json";
 import "./globals.css";
 import "./inner-pages.css";
@@ -90,7 +91,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body style={themeVariables}>
         <ServiceWorkerRegister />
-        {children}
+        <MealNotificationsProvider>{children}</MealNotificationsProvider>
       </body>
     </html>
   );

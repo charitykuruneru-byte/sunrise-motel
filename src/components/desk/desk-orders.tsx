@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2, Timer, UtensilsCrossed } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, BTN, BTN_DANGER, BTN_PRIMARY, CARD, INPUT, money, ORDER_STATUS_LABEL } from "./shared";
 
 type OrderLine = { id: string; name: string; qty: number; unitPrice: number; amount: number; status: string };
@@ -10,6 +10,7 @@ type Order = {
   orderNumber: string;
   roomNumber: string | null;
   guestName: string | null;
+  guestPhone: string | null;
   status: string;
   service: string;
   note: string | null;
@@ -45,6 +46,10 @@ export default function DeskOrders({
   const [rejectFor, setRejectFor] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [menuImages, setMenuImages] = useState<Record<string, string>>({});
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const audioContext = useRef<AudioContext | null>(null);
+  const soundEnabledRef = useRef(false);
+  const seenPreorders = useRef<string[] | null>(null);
 
   const load = useCallback(async () => {
     const data = await api<{
@@ -52,6 +57,21 @@ export default function DeskOrders({
       history: Order[];
       totals: { live: number; revenueToday: number; voids: number };
     }>("/api/desk/orders");
+    const preorderIds = (data.board.preorders ?? []).map((order) => order.id);
+    if (seenPreorders.current && soundEnabledRef.current && preorderIds.some((id) => !seenPreorders.current?.includes(id))) {
+      const context = audioContext.current;
+      if (context?.state === "running") {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.frequency.value = 880;
+        gain.gain.value = 0.08;
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start();
+        oscillator.stop(context.currentTime + 0.2);
+      }
+    }
+    seenPreorders.current = preorderIds;
     setBoard(data.board);
     setHistory(data.history);
     setTotals(data.totals);
@@ -59,7 +79,13 @@ export default function DeskOrders({
 
   useEffect(() => {
     void load();
-  }, [load]);
+    const refresh = window.setInterval(() => {
+      void load().catch((error) => setToast(error instanceof Error ? error.message : "Could not refresh orders."));
+    }, 20_000);
+    return () => window.clearInterval(refresh);
+  }, [load, setToast]);
+
+  useEffect(() => { soundEnabledRef.current = soundEnabled; }, [soundEnabled]);
 
   useEffect(() => {
     let active = true;
@@ -92,6 +118,22 @@ export default function DeskOrders({
   const act = (order: Order, action: string, label: string) =>
     run(label, () => api("/api/desk/orders", { method: "PATCH", body: JSON.stringify({ orderId: order.id, action }) }));
 
+  const toggleSound = async () => {
+    if (soundEnabled) {
+      setSoundEnabled(false);
+      return;
+    }
+    try {
+      const context = new AudioContext();
+      await context.resume();
+      audioContext.current = context;
+      setSoundEnabled(true);
+    } catch (error) {
+      console.error("Could not enable pre-order sound", error);
+      setToast("This browser could not enable order sounds.");
+    }
+  };
+
   return (
     <div className="space-y-4">
       <section className="desk-orders-heading">
@@ -104,9 +146,32 @@ export default function DeskOrders({
           <span><strong>{totals.live}</strong> live orders</span>
           <span><strong>{money(totals.revenueToday)}</strong> ordered today</span>
           <span><strong>{totals.voids}</strong> voided lines</span>
+          <button type="button" className={BTN} onClick={() => void toggleSound()}>{soundEnabled ? "Sound on" : "Enable sound"}</button>
         </div>
         <div className="desk-orders-wait-note"><Timer size={13} /> Orders waiting over 20 minutes are highlighted.</div>
       </section>
+      {(board.preorders ?? []).length > 0 && (
+        <section className={`${CARD} border border-amber-400/40 bg-amber-950/20`}>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div><h3 className="font-bold text-amber-100">Late-arrival pre-orders</h3><p className="text-xs text-white/60">Confirm these takeaway orders before the guest arrives.</p></div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {(board.preorders ?? []).map((order) => (
+              <article key={order.id} className="rounded-xl border border-amber-400/30 bg-black/20 p-3 text-sm text-white">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div><strong>{order.orderNumber} · {order.guestName ?? "Guest"}</strong><p className="text-xs text-white/70">{order.guestPhone ?? "No phone provided"} · {order.waitingMinutes} min ago</p></div>
+                  <span className="rounded-full bg-amber-400/20 px-2 py-1 text-xs font-bold text-amber-200">PRE-ORDER · LATE ARRIVAL</span>
+                </div>
+                <ul className="my-2 text-xs text-white/80">{order.items.map((line) => <li key={line.id}>{line.qty}× {line.name} · {money(line.amount)}</li>)}</ul>
+                {order.note && <p className="text-xs text-white/65">Note: {order.note}</p>}
+                <p className="mt-2 font-bold">{money(order.total)}</p>
+                {!readOnly && <div className="mt-3 flex gap-2"><button className={BTN_PRIMARY} disabled={busy} onClick={() => act(order, "accept", `${order.orderNumber}: pre-order confirmed.`)}>Confirm pre-order</button><button className={BTN_DANGER} disabled={busy} onClick={() => setRejectFor(order.id)}>Reject</button></div>}
+                {rejectFor === order.id && <div className="mt-2 space-y-2"><input className={INPUT} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Reason shown to guest" /><div className="flex gap-2"><button className={BTN_DANGER} disabled={busy || !reason.trim()} onClick={() => run("Pre-order rejected.", async () => { await api("/api/desk/orders", { method: "PATCH", body: JSON.stringify({ orderId: order.id, action: "reject", reason }) }); setRejectFor(null); setReason(""); })}>Confirm rejection</button><button className={BTN} onClick={() => setRejectFor(null)}>Cancel</button></div></div>}
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
       <section className="desk-order-board grid gap-3 lg:grid-cols-4">
         {COLUMNS.map((column) => (
           <div key={column.key} className={CARD}>

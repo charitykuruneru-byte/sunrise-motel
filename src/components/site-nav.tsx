@@ -22,6 +22,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SunriseLogo } from "@/components/sunrise-logo";
+import { MealAlertBell } from "@/components/meal-notifications";
 
 /**
  * THE SITE NAVIGATION — three tiers, not one flat row.
@@ -50,7 +51,7 @@ type NavItem = { label: string; href: string; sub?: string; icon: typeof Home };
 const PRIMARY: NavItem[] = [
   { label: "Home", href: "/", icon: Home },
   { label: "Stay", href: "/stay", sub: "Rooms & availability", icon: BedDouble },
-  { label: "Dine", href: "/dine", sub: "Restaurant & room service", icon: Utensils },
+  { label: "Dine", href: "/menu", sub: "Restaurant & live menu", icon: Utensils },
   { label: "Unwind", href: "/unwind", sub: "Events, braai & lounge", icon: Waves },
   { label: "Connect", href: "/connect", sub: "Wi-Fi & workspace", icon: Wifi },
   { label: "Gallery", href: "/gallery", icon: Layers },
@@ -157,6 +158,7 @@ export default function SiteNav({
           </nav>
 
           <div className="header-right-actions">
+            <MealAlertBell />
             <Link href={bookingHref} className="btn-check-availability" onClick={closeMenu}>
               <CalendarCheck size={15} /> Check availability
             </Link>

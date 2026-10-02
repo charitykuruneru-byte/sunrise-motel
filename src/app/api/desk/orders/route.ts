@@ -33,13 +33,14 @@ export async function GET(request: Request) {
       ...order,
       waitingMinutes: waitingMinutes(order.placedAt, now),
       overdue:
-        ["placed", "accepted", "preparing"].includes(order.status) &&
+        ["placed", "preorder_pending", "accepted", "preparing"].includes(order.status) &&
         waitingMinutes(order.placedAt, now) > 20,
       items: items.filter((item) => item.orderId === order.id),
     }));
     return NextResponse.json({
       today,
       board: {
+        preorders: withItems.filter((o) => o.status === "preorder_pending"),
         placed: withItems.filter((o) => o.status === "placed"),
         accepted: withItems.filter((o) => o.status === "accepted"),
         preparing: withItems.filter((o) => o.status === "preparing"),
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
       },
       history: withItems.filter((o) => ["delivered", "rejected"].includes(o.status)),
       totals: {
-        live: withItems.filter((o) => ["placed", "accepted", "preparing", "ready"].includes(o.status)).length,
+        live: withItems.filter((o) => ["placed", "preorder_pending", "accepted", "preparing", "ready"].includes(o.status)).length,
         revenueToday: withItems
           .filter((o) => new Date(o.placedAt).toISOString().slice(0, 10) === today)
           .filter((o) => o.status !== "rejected")

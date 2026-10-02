@@ -98,7 +98,24 @@ export const menuItemsTable = pgTable("menu_items", {
   imageUrl: text("image_url").notNull(),
   isAvailable: boolean("is_available").notNull().default(true),
   isSpecial: boolean("is_special").notNull().default(false),
+  mealPeriod: varchar("meal_period", { length: 24 }), // breakfast | lunch | dinner; NULL = all day
+  prepTimeMins: integer("prep_time_mins").notNull().default(20),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const mealNotificationSettingsTable = pgTable("meal_notification_settings", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  mealType: varchar("meal_type", { length: 32 }).notNull(), // breakfast | lunch | dinner | late_night_preorder | custom
+  enabled: boolean("enabled").notNull().default(true),
+  title: varchar("title", { length: 160 }).notNull(),
+  message: text("message").notNull(),
+  startTime: varchar("start_time", { length: 5 }).notNull(), // Africa/Blantyre wall time, HH:mm
+  endTime: varchar("end_time", { length: 5 }).notNull(),
+  popupDurationMinutes: integer("popup_duration_minutes").notNull().default(30),
+  ctaText: varchar("cta_text", { length: 80 }).notNull().default("View Live Menu"),
+  imageUrl: text("image_url"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const galleryImagesTable = pgTable("gallery_images", {
@@ -429,6 +446,7 @@ export const ordersTable = pgTable("orders", {
   guestId: varchar("guest_id", { length: 36 }),
   guestAccountId: varchar("guest_account_id", { length: 36 }),
   guestName: varchar("guest_name", { length: 160 }),
+  guestPhone: varchar("guest_phone", { length: 40 }),
   // placed | accepted | preparing | ready | delivered | rejected
   status: varchar("status", { length: 24 }).notNull().default("placed"),
   service: varchar("service", { length: 24 }).notNull().default("room_service"), // room_service | takeaway
@@ -436,6 +454,9 @@ export const ordersTable = pgTable("orders", {
   // desk | whatsapp | counter. The desk sees this on the board so they know whether
   // the guest can be reached by push or only by SMS/WhatsApp.
   channel: varchar("channel", { length: 16 }).notNull().default("app"),
+  isAutoNudge: boolean("is_auto_nudge").notNull().default(false),
+  nudgeType: varchar("nudge_type", { length: 32 }),
+  scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
   roomSessionId: varchar("room_session_id", { length: 36 }),
   note: text("note"),
   total: integer("total").notNull().default(0),

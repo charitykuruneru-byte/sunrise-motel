@@ -18,6 +18,8 @@ type MenuInput = {
   imageUrl: string;
   isAvailable: boolean;
   isSpecial: boolean;
+  mealPeriod: string | null;
+  prepTimeMins: number;
 };
 
 function parseMenuInput(body: Record<string, unknown>): MenuInput | string {
@@ -28,6 +30,12 @@ function parseMenuInput(body: Record<string, unknown>): MenuInput | string {
   const price = body.price;
   const isAvailable = body.isAvailable;
   const isSpecial = body.isSpecial;
+  const mealPeriodValue = body.mealPeriod;
+  if (mealPeriodValue !== undefined && mealPeriodValue !== null && mealPeriodValue !== "" && typeof mealPeriodValue !== "string") {
+    return "Meal period must be breakfast, lunch, dinner, or all day.";
+  }
+  const mealPeriod = typeof mealPeriodValue === "string" && mealPeriodValue !== "" ? mealPeriodValue : null;
+  const prepTimeMins = body.prepTimeMins === undefined ? 20 : body.prepTimeMins;
 
   if (!name || name.length > 160) return "Name is required and must be 160 characters or fewer.";
   if (!category || category.length > 80) return "Category is required and must be 80 characters or fewer.";
@@ -50,6 +58,12 @@ function parseMenuInput(body: Record<string, unknown>): MenuInput | string {
   }
   if (isAvailable !== undefined && typeof isAvailable !== "boolean") return "Availability must be true or false.";
   if (isSpecial !== undefined && typeof isSpecial !== "boolean") return "Special status must be true or false.";
+  if (mealPeriod !== null && !["breakfast", "lunch", "dinner"].includes(mealPeriod)) {
+    return "Meal period must be breakfast, lunch, dinner, or all day.";
+  }
+  if (!Number.isInteger(prepTimeMins) || Number(prepTimeMins) < 1 || Number(prepTimeMins) > 240) {
+    return "Preparation time must be between 1 and 240 minutes.";
+  }
 
   return {
     name,
@@ -59,6 +73,8 @@ function parseMenuInput(body: Record<string, unknown>): MenuInput | string {
     imageUrl,
     isAvailable: isAvailable === undefined ? true : isAvailable,
     isSpecial: isSpecial === undefined ? false : isSpecial,
+    mealPeriod,
+    prepTimeMins: Number(prepTimeMins),
   };
 }
 

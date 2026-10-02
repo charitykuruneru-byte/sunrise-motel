@@ -120,6 +120,13 @@
       "when": 1790892000000,
       "tag": "0016_malawi_vat_rate_1750",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790950000000,
+      "tag": "0017_meal_alerts_and_live_menu",
+      "breakpoints": true
     }
   ]
 }

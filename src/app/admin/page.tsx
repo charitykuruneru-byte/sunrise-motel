@@ -37,6 +37,7 @@ import { AdminNavigation, AdminSection } from "@/components/admin/admin-navigati
 import ImageUploader from "@/components/ImageUploader";
 import SafeImage from "@/components/safe-image";
 import { SunriseLogo } from "@/components/sunrise-logo";
+import MealAlertSettings from "@/components/admin/meal-alert-settings";
 import { formatMalawi } from "@/lib/time";
 
 type BookingItem = {
@@ -95,7 +96,7 @@ type InvoiceItem = {
 };
 
 type PostItem = { id: string; title: string; category: string; day: string | null; date: string | null; time: string | null; detail: string; priceTag: string | null; bookingAddonPrice: number | null; imageUrl: string | null; isActive: boolean };
-type MenuAdminItem = { id: string; name: string; category: string; description: string; price: number; imageUrl: string; isAvailable: boolean; isSpecial: boolean };
+type MenuAdminItem = { id: string; name: string; category: string; description: string; price: number; imageUrl: string; isAvailable: boolean; isSpecial: boolean; mealPeriod: string | null; prepTimeMins: number };
 type GalleryItem = { id: string; title: string; category: string; imageUrl: string; altText: string; caption: string | null; displayOrder: number };
 type RoomAdminItem = { id: string; name: string; rate: number; weekendPrice?: number; totalInventory: number; isActive: boolean; images: string | string[] };
 type AuditEntry = { id: string; action: string; entity: string; entityId: string | null; reference: string | null; summary: string | null; actor: string; actorLabel: string | null; ip: string | null; createdAt: string };
@@ -139,6 +140,7 @@ export default function AdminPage() {
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [postsError, setPostsError] = useState("");
   const [menuItems, setMenuItems] = useState<MenuAdminItem[]>([]);
+  const [menuView, setMenuView] = useState<"items" | "alerts">("items");
   const [menuLoading, setMenuLoading] = useState(false);
   const [menuError, setMenuError] = useState("");
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
@@ -195,7 +197,7 @@ export default function AdminPage() {
   const [editingPost, setEditingPost] = useState<PostItem | null>(null);
   const [post, setPost] = useState({ title: "", category: "Event", day: "SAT", date: "26", time: "12:00 — 20:00", detail: "", priceTag: "", bookingAddonPrice: "", imageUrl: "" });
   const [notifyAppUsers, setNotifyAppUsers] = useState(false);
-  const [menuForm, setMenuForm] = useState({ name: "", category: "Mains", description: "", price: "", imageUrl: "/images/food-grill.jpg", isAvailable: true, isSpecial: false });
+  const [menuForm, setMenuForm] = useState({ name: "", category: "Mains", description: "", price: "", imageUrl: "/images/food-grill.jpg", isAvailable: true, isSpecial: false, mealPeriod: "", prepTimeMins: "20" });
   const [editingMenuId, setEditingMenuId] = useState("");
   const [showMenuEditor, setShowMenuEditor] = useState(false);
   const [menuBusy, setMenuBusy] = useState(false);
@@ -722,7 +724,13 @@ export default function AdminPage() {
       const res = await fetch("/api/admin/menu", {
         method: editingMenuId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...menuForm, price: Number(menuForm.price), ...(editingMenuId ? { id: editingMenuId } : {}) }),
+        body: JSON.stringify({
+          ...menuForm,
+          price: Number(menuForm.price),
+          mealPeriod: menuForm.mealPeriod || null,
+          prepTimeMins: Number(menuForm.prepTimeMins),
+          ...(editingMenuId ? { id: editingMenuId } : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data.item) throw new Error(data.error || "Could not save menu item.");
@@ -731,7 +739,7 @@ export default function AdminPage() {
         : [...items, data.item].sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)));
       setShowMenuEditor(false);
       setEditingMenuId("");
-      setMenuForm({ name: "", category: "Mains", description: "", price: "", imageUrl: "/images/food-grill.jpg", isAvailable: true, isSpecial: false });
+      setMenuForm({ name: "", category: "Mains", description: "", price: "", imageUrl: "/images/food-grill.jpg", isAvailable: true, isSpecial: false, mealPeriod: "", prepTimeMins: "20" });
       notify(editingMenuId ? "Menu item updated." : "Menu item added.");
       router.refresh();
     } catch (error) {
@@ -752,12 +760,14 @@ export default function AdminPage() {
       imageUrl: item.imageUrl,
       isAvailable: item.isAvailable,
       isSpecial: item.isSpecial,
+      mealPeriod: item.mealPeriod ?? "",
+      prepTimeMins: String(item.prepTimeMins ?? 20),
     });
   };
 
   const addMenuItem = () => {
     setEditingMenuId("");
-    setMenuForm({ name: "", category: "Mains", description: "", price: "", imageUrl: "/images/food-grill.jpg", isAvailable: true, isSpecial: false });
+    setMenuForm({ name: "", category: "Mains", description: "", price: "", imageUrl: "/images/food-grill.jpg", isAvailable: true, isSpecial: false, mealPeriod: "", prepTimeMins: "20" });
     setShowMenuEditor(true);
   };
 
@@ -765,7 +775,7 @@ export default function AdminPage() {
     if (menuBusy) return;
     setShowMenuEditor(false);
     setEditingMenuId("");
-    setMenuForm({ name: "", category: "Mains", description: "", price: "", imageUrl: "/images/food-grill.jpg", isAvailable: true, isSpecial: false });
+    setMenuForm({ name: "", category: "Mains", description: "", price: "", imageUrl: "/images/food-grill.jpg", isAvailable: true, isSpecial: false, mealPeriod: "", prepTimeMins: "20" });
   };
 
   const toggleMenuAvailability = async (item: MenuAdminItem) => {
@@ -793,7 +803,7 @@ export default function AdminPage() {
       if (editingMenuId === item.id) {
         setShowMenuEditor(false);
         setEditingMenuId("");
-        setMenuForm({ name: "", category: "Mains", description: "", price: "", imageUrl: "/images/food-grill.jpg", isAvailable: true, isSpecial: false });
+        setMenuForm({ name: "", category: "Mains", description: "", price: "", imageUrl: "/images/food-grill.jpg", isAvailable: true, isSpecial: false, mealPeriod: "", prepTimeMins: "20" });
       }
       notify("Menu item removed.");
       router.refresh();
@@ -1464,14 +1474,20 @@ export default function AdminPage() {
         <section className="admin-content-section">
           <div className="section-toolbar">
             <div className="toolbar-info">
-              <h2>Restaurant menu &amp; prices</h2>
-              <p>Prices are MWK per dish. Changes update the guest menu; front-desk staff can still only mark dishes sold out.</p>
+              <h2>{menuView === "items" ? "Restaurant menu & prices" : "Meal alerts"}</h2>
+              <p>{menuView === "items" ? "Prices are MWK per dish. Changes update the guest menu; front-desk staff can still only mark dishes sold out." : "Choose the guest popup schedule and message for every meal period."}</p>
             </div>
             <div className="inline-actions">
-              <span className="admin-action-total">{menuItems.length} item{menuItems.length === 1 ? "" : "s"}</span>
-              <button type="button" className="admin-btn admin-btn-primary" onClick={addMenuItem}><Plus size={14} /> Add menu item</button>
+              <button type="button" className={`admin-btn ${menuView === "items" ? "admin-btn-primary" : "admin-btn-secondary"}`} onClick={() => setMenuView("items")}>Menu items</button>
+              {isAdmin && <button type="button" className={`admin-btn ${menuView === "alerts" ? "admin-btn-primary" : "admin-btn-secondary"}`} onClick={() => setMenuView("alerts")}>Meal alerts</button>}
+              {menuView === "items" && <>
+                <span className="admin-action-total">{menuItems.length} item{menuItems.length === 1 ? "" : "s"}</span>
+                <button type="button" className="admin-btn admin-btn-primary" onClick={addMenuItem}><Plus size={14} /> Add menu item</button>
+              </>}
             </div>
           </div>
+          {menuView === "alerts" && isAdmin ? <MealAlertSettings /> : null}
+          {menuView === "items" && <>
           {menuError && <div className="booking-error-banner" role="alert"><X size={14} /><span>{menuError}</span></div>}
 
           {menuLoading ? (
@@ -1494,10 +1510,12 @@ export default function AdminPage() {
                     <div className="inv-main">
                       <strong>{item.name}{item.isSpecial ? " · Special" : ""}</strong>
                       <span>{item.category} · {item.description}</span>
+                      <small>{item.mealPeriod ? `${item.mealPeriod} menu` : "Available all day"} · {item.prepTimeMins} min prep</small>
                       <small>{item.isAvailable ? "Available to order" : "Sold out / unavailable"}</small>
                     </div>
                   </div>
                   <div className="inv-money"><strong>{money(item.price)}</strong><small>per item</small></div>
+                  {!item.imageUrl && <strong className="text-sm text-rose-600">No image</strong>}
                   <div className="inv-actions">
                     <button className="admin-btn admin-btn-secondary" type="button" onClick={() => editMenuItem(item)}>Edit</button>
                     <button className="admin-btn" type="button" onClick={() => toggleMenuAvailability(item)}>{item.isAvailable ? "Mark sold out" : "Put back on sale"}</button>
@@ -1507,6 +1525,7 @@ export default function AdminPage() {
               ))}
             </div>
           )}
+          </>}
         </section>
       )}
 
@@ -1532,6 +1551,17 @@ export default function AdminPage() {
               <div className="form-grid-2">
                 <label><span>Dish name *</span><input autoFocus required maxLength={160} value={menuForm.name} onChange={(event) => setMenuForm({ ...menuForm, name: event.target.value })} placeholder="e.g. Chambo with nsima" /></label>
                 <label><span>Menu category *</span><input required maxLength={80} value={menuForm.category} onChange={(event) => setMenuForm({ ...menuForm, category: event.target.value })} placeholder="e.g. Mains, Drinks, Breakfast" /></label>
+              </div>
+              <div className="form-grid-2">
+                <label><span>Meal period</span>
+                  <select value={menuForm.mealPeriod} onChange={(event) => setMenuForm({ ...menuForm, mealPeriod: event.target.value })}>
+                    <option value="">All day / not assigned</option>
+                    <option value="breakfast">Breakfast</option>
+                    <option value="lunch">Lunch</option>
+                    <option value="dinner">Dinner</option>
+                  </select>
+                </label>
+                <label><span>Preparation time (minutes)</span><input type="number" min="1" max="240" required value={menuForm.prepTimeMins} onChange={(event) => setMenuForm({ ...menuForm, prepTimeMins: event.target.value })} /></label>
               </div>
               <div className="form-grid-2">
                 <label><span>Price (MWK per item) *</span><input required type="number" min="0" max="50000000" step="1" inputMode="numeric" value={menuForm.price} onChange={(event) => setMenuForm({ ...menuForm, price: event.target.value })} placeholder="e.g. 18500" /></label>
