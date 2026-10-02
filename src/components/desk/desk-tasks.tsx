@@ -1,7 +1,8 @@
 "use client";
 
-import { Loader2, Wrench } from "lucide-react";
+import { AlertTriangle, Check, Loader2, Play, Plus, X, Wrench } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import DeskDialog from "./desk-dialog";
 import { api, BTN, BTN_DANGER, BTN_PRIMARY, CARD, INPUT, ROOM_STATE_LABEL } from "./shared";
 
 type Task = {
@@ -36,6 +37,7 @@ export default function DeskTasks({
   const [done, setDone] = useState<Task[]>([]);
   const [stats, setStats] = useState({ open: 0, overdue: 0, urgent: 0, doneToday: 0 });
   const [busy, setBusy] = useState(false);
+  const [showAddTask, setShowAddTask] = useState(false);
   const [form, setForm] = useState({ roomNumber: "", kind: "cleaning", note: "", priority: "normal", assignedTo: "" });
   const [oooFor, setOooFor] = useState<string | null>(null);
   const [oooReason, setOooReason] = useState("");
@@ -56,15 +58,17 @@ export default function DeskTasks({
   }, [load]);
 
   const run = async (label: string, work: () => Promise<unknown>) => {
-    if (readOnly) return;
+    if (readOnly) return false;
     setBusy(true);
     try {
       await work();
       await load();
       await onChanged();
       setToast(label);
+      return true;
     } catch (error) {
       setToast(error instanceof Error ? error.message : "That action failed.");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -75,6 +79,31 @@ export default function DeskTasks({
       api("/api/desk/tasks", { method: "PATCH", body: JSON.stringify({ taskId: task.id, action, ...extra }) }),
     );
 
+  const submitTask = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const saved = await run("Task logged.", async () => {
+      await api("/api/desk/tasks", { method: "POST", body: JSON.stringify(form) });
+      setForm({ roomNumber: "", kind: "cleaning", note: "", priority: "normal", assignedTo: "" });
+    });
+    if (saved) setShowAddTask(false);
+  };
+
+  const submitOutOfOrder = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const task = open.find((item) => item.id === oooFor);
+    if (!task) return;
+    const saved = await act(
+      task,
+      "out_of_order",
+      { reason: oooReason },
+      "Room set out of order — it will not be sold until fixed.",
+    );
+    if (saved) {
+      setOooFor(null);
+      setOooReason("");
+    }
+  };
+
   return (
     <div className="space-y-4">
       <section className="flex flex-wrap items-center gap-3">
@@ -84,63 +113,63 @@ export default function DeskTasks({
         <span className="text-[11px] text-white/50">
           {stats.open} open · {stats.overdue} overdue · {stats.urgent} urgent · {stats.doneToday} done today
         </span>
+        {!readOnly && (
+          <button className={`${BTN_PRIMARY} ml-auto min-h-10`} type="button" onClick={() => setShowAddTask(true)}>
+            <Plus size={14} /> Log a task
+          </button>
+        )}
       </section>
-      {!readOnly && (
-        <section className={CARD}>
-          <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-white/60">Log a task</h3>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              className={`${INPUT} max-w-[130px]`}
-              placeholder="room (e.g. 104)"
-              value={form.roomNumber}
-              onChange={(e) => setForm({ ...form, roomNumber: e.target.value })}
-            />
-            <select
-              className={`${INPUT} max-w-[160px]`}
-              value={form.kind}
-              onChange={(e) => setForm({ ...form, kind: e.target.value })}
-            >
-              {KINDS.map((kind) => (
-                <option key={kind} value={kind}>
-                  {kind.replace("_", " ")}
-                </option>
-              ))}
-            </select>
-            <select
-              className={`${INPUT} max-w-[150px]`}
-              value={form.priority}
-              onChange={(e) => setForm({ ...form, priority: e.target.value })}
-            >
-              <option value="normal">normal (2 h)</option>
-              <option value="urgent">urgent (15 min)</option>
-              <option value="emergency">emergency (5 min)</option>
-            </select>
-            <input
-              className={`${INPUT} max-w-[180px]`}
-              placeholder="assign to (name)"
-              value={form.assignedTo}
-              onChange={(e) => setForm({ ...form, assignedTo: e.target.value })}
-            />
-            <input
-              className={`${INPUT} max-w-[260px]`}
-              placeholder="note (e.g. extra pillows)"
-              value={form.note}
-              onChange={(e) => setForm({ ...form, note: e.target.value })}
-            />
-            <button
-              className={BTN_PRIMARY}
-              disabled={busy || !form.roomNumber.trim()}
-              onClick={() =>
-                run("Task logged.", async () => {
-                  await api("/api/desk/tasks", { method: "POST", body: JSON.stringify(form) });
-                  setForm({ roomNumber: "", kind: "cleaning", note: "", priority: "normal", assignedTo: "" });
-                })
-              }
-            >
-              {busy ? <Loader2 size={13} className="animate-spin" /> : null} Add task
-            </button>
-          </div>
-        </section>
+      {showAddTask && !readOnly && (
+        <DeskDialog
+          title="Log a housekeeping task"
+          description="Choose the room, task and urgency. Add a note or assignee if helpful."
+          onClose={() => { if (!busy) setShowAddTask(false); }}
+        >
+          <form className="grid gap-4" onSubmit={submitTask}>
+            <label className="grid gap-1.5 text-xs font-semibold text-white/80">
+              Room number *
+              <input
+                className={INPUT}
+                autoFocus
+                required
+                maxLength={16}
+                value={form.roomNumber}
+                onChange={(event) => setForm({ ...form, roomNumber: event.target.value })}
+                placeholder="e.g. 104"
+              />
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="grid gap-1.5 text-xs font-semibold text-white/80">
+                Task *
+                <select className={INPUT} value={form.kind} onChange={(event) => setForm({ ...form, kind: event.target.value })}>
+                  {KINDS.map((kind) => <option key={kind} value={kind}>{kind.replace("_", " ")}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-1.5 text-xs font-semibold text-white/80">
+                Priority *
+                <select className={INPUT} value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}>
+                  <option value="normal">Normal · due in 2 hours</option>
+                  <option value="urgent">Urgent · due in 15 minutes</option>
+                  <option value="emergency">Emergency · due in 5 minutes</option>
+                </select>
+              </label>
+            </div>
+            <label className="grid gap-1.5 text-xs font-semibold text-white/80">
+              Assign to (optional)
+              <input className={INPUT} maxLength={120} value={form.assignedTo} onChange={(event) => setForm({ ...form, assignedTo: event.target.value })} placeholder="Staff member name" />
+            </label>
+            <label className="grid gap-1.5 text-xs font-semibold text-white/80">
+              Note (optional)
+              <textarea className={INPUT} rows={3} maxLength={500} value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} placeholder="For example, bring extra pillows" />
+            </label>
+            <div className="flex flex-wrap justify-end gap-2 border-t border-white/10 pt-4">
+              <button className={BTN} type="button" disabled={busy} onClick={() => setShowAddTask(false)}>Cancel</button>
+              <button className={BTN_PRIMARY} type="submit" disabled={busy || !form.roomNumber.trim()}>
+                {busy ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Add task
+              </button>
+            </div>
+          </form>
+        </DeskDialog>
       )}
       <section className={CARD}>
         <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-white/60">Open tasks</h3>
@@ -182,54 +211,59 @@ export default function DeskTasks({
                 {!readOnly && (
                   <div className="flex flex-wrap gap-1.5">
                     <button className={BTN} disabled={busy} onClick={() => act(task, "start")}>
-                      Start
+                      <Play size={14} /> Start work
                     </button>
                     <button
                       className={BTN_PRIMARY}
                       disabled={busy}
                       onClick={() => act(task, "done", {}, "Task completed — the room is clean and sellable again.")}
                     >
-                      Done
+                      <Check size={15} /> Mark done
                     </button>
                     <button className={BTN} disabled={busy} onClick={() => act(task, "cancel", {}, "Task cancelled.")}>
-                      Cancel
+                      <X size={14} /> Cancel task
                     </button>
                     <button className={BTN_DANGER} disabled={busy} onClick={() => setOooFor(task.id)}>
-                      Send room out of order
+                      <AlertTriangle size={14} /> Mark room unavailable
                     </button>
                   </div>
                 )}
               </div>
-              {oooFor === task.id && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <input
-                    className={`${INPUT} max-w-[320px]`}
-                    placeholder="why can't it be fixed now?"
-                    value={oooReason}
-                    onChange={(e) => setOooReason(e.target.value)}
-                  />
-                  <button
-                    className={BTN_DANGER}
-                    disabled={busy}
-                    onClick={async () => {
-                      await act(
-                        task,
-                        "out_of_order",
-                        { reason: oooReason },
-                        "Room set out of order — it will not be sold until fixed.",
-                      );
-                      setOooFor(null);
-                      setOooReason("");
-                    }}
-                  >
-                    Confirm out of order
-                  </button>
-                </div>
-              )}
             </div>
           ))}
         </div>
       </section>
+
+      {oooFor && !readOnly && (
+        <DeskDialog
+          title="Mark room out of order"
+          description="The room will be removed from sale until it is restored. Record the reason for the desk and housekeeping team."
+          onClose={() => { if (!busy) { setOooFor(null); setOooReason(""); } }}
+        >
+          <form className="grid gap-4" onSubmit={submitOutOfOrder}>
+            <label className="grid gap-1.5 text-xs font-semibold text-white/80">
+              Reason *
+              <textarea
+                className={INPUT}
+                autoFocus
+                required
+                minLength={3}
+                maxLength={500}
+                rows={3}
+                value={oooReason}
+                onChange={(event) => setOooReason(event.target.value)}
+                placeholder="Describe what needs to be repaired or checked"
+              />
+            </label>
+            <div className="flex flex-wrap justify-end gap-2 border-t border-white/10 pt-4">
+              <button className={BTN} type="button" disabled={busy} onClick={() => { setOooFor(null); setOooReason(""); }}>Cancel</button>
+              <button className={BTN_DANGER} type="submit" disabled={busy || oooReason.trim().length < 3}>
+                {busy ? <Loader2 size={14} className="animate-spin" /> : null} Confirm out of order
+              </button>
+            </div>
+          </form>
+        </DeskDialog>
+      )}
 
       <section className={CARD}>
         <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-white/60">Recently completed</h3>

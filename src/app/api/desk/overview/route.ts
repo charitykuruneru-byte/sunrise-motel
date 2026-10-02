@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  auditLogTable,
   bookings,
   folioItemsTable,
   messageThreadsTable,
@@ -30,7 +29,7 @@ export async function GET(request: Request) {
     const today = malawiDatePart();
     const now = nowDate();
 
-    const [allBookings, rooms, threads, orders, tasks, payments, folioItems, activity] = await Promise.all([
+    const [allBookings, rooms, threads, orders, tasks, payments, folioItems] = await Promise.all([
       db.select().from(bookings).orderBy(desc(bookings.createdAt)),
       db.select().from(roomsTable),
       db.select().from(messageThreadsTable).orderBy(desc(messageThreadsTable.lastMessageAt)),
@@ -38,7 +37,6 @@ export async function GET(request: Request) {
       db.select().from(serviceTasksTable).orderBy(desc(serviceTasksTable.createdAt)).limit(100),
       db.select().from(paymentsTable).orderBy(desc(paymentsTable.createdAt)).limit(200),
       db.select().from(folioItemsTable).where(eq(folioItemsTable.status, "open")),
-      db.select().from(auditLogTable).orderBy(desc(auditLogTable.createdAt)).limit(12),
     ]);
 
     const live = allBookings.filter((b) => !["cancelled", "released_unpaid"].includes(b.status));
@@ -67,8 +65,13 @@ export async function GET(request: Request) {
     const collected = verifiedPayments.reduce((sum, p) => sum + p.amount, 0);
 
     const activeOrders = orders.filter((o) => ["placed", "accepted", "preparing", "ready"].includes(o.status));
-    const waitingOrders = activeOrders.filter((o) => now.getTime() - new Date(o.placedAt).getTime() > 20 * 60_000);
+    const waitingOrders = orders.filter(
+      (o) => ["placed", "accepted", "preparing"].includes(o.status) && now.getTime() - new Date(o.placedAt).getTime() > 20 * 60_000,
+    );
     const openTasks = tasks.filter((t) => ["open", "assigned", "in_progress"].includes(t.status));
+    const overdueTasks = openTasks
+      .filter((task) => task.dueBy && new Date(task.dueBy) < now)
+      .sort((a, b) => new Date(a.dueBy!).getTime() - new Date(b.dueBy!).getTime());
     const folioOutstanding = folioItems.reduce((sum, item) => sum + item.amount, 0);
 
     const monthStart = new Date(now);
@@ -79,8 +82,14 @@ export async function GET(request: Request) {
     const sumSince = (from: Date) =>
       allBookings.filter((b) => new Date(b.createdAt) >= from).reduce((sum, b) => sum + b.totalAmount, 0);
 
-    const oldestThread = [...openThreads].sort(
+    const oldestComplaint = [...complaints].sort(
       (a, b) => new Date(a.lastMessageAt).getTime() - new Date(b.lastMessageAt).getTime(),
+    )[0];
+    const oldestWaitingOrder = [...waitingOrders].sort(
+      (a, b) => new Date(a.placedAt).getTime() - new Date(b.placedAt).getTime(),
+    )[0];
+    const oldestPendingPayment = [...pendingPayments].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     )[0];
 
     const byRoomId = new Map(rooms.map((r) => [r.id, r]));
@@ -91,7 +100,18 @@ export async function GET(request: Request) {
     return NextResponse.json({
       today,
       actionCentre: {
-        paymentsToVerify: { count: pendingPayments.length, amount: unverifiedTotal },
+        paymentsToVerify: {
+          count: pendingPayments.length,
+          amount: unverifiedTotal,
+          oldest: oldestPendingPayment
+            ? {
+                reference: oldestPendingPayment.reference,
+                amount: oldestPendingPayment.amount,
+                channel: oldestPendingPayment.channel,
+                payerName: oldestPendingPayment.payerName,
+              }
+            : null,
+        },
         unassignedArrivals: {
           count: unassigned.length,
           list: unassigned.slice(0, 6).map((b) => ({
@@ -102,23 +122,43 @@ export async function GET(request: Request) {
           count: emergencies.length,
           room: emergencies[0]?.roomNumber ?? null,
           subject: emergencies[0]?.subject ?? null,
+          guestName: emergencies[0]?.guestName ?? null,
         },
         complaints: {
           count: complaints.length,
-          oldestMinutes: oldestThread
-            ? Math.round((now.getTime() - new Date(oldestThread.lastMessageAt).getTime()) / 60000)
+          oldestMinutes: oldestComplaint
+            ? Math.max(0, Math.round((now.getTime() - new Date(oldestComplaint.lastMessageAt).getTime()) / 60000))
             : 0,
+          oldest: oldestComplaint
+            ? { guestName: oldestComplaint.guestName, room: oldestComplaint.roomNumber, subject: oldestComplaint.subject }
+            : null,
         },
         escalatedBookings: { count: allBookings.filter((b) => b.escalatedAt && b.status === "pending").length },
         ordersWaiting: {
           count: waitingOrders.length,
-          oldestMinutes: waitingOrders[0]
-            ? Math.round((now.getTime() - new Date(waitingOrders[0].placedAt).getTime()) / 60000)
+          oldestMinutes: oldestWaitingOrder
+            ? Math.max(0, Math.round((now.getTime() - new Date(oldestWaitingOrder.placedAt).getTime()) / 60000))
             : 0,
+          oldest: oldestWaitingOrder
+            ? {
+                orderNumber: oldestWaitingOrder.orderNumber,
+                guestName: oldestWaitingOrder.guestName,
+                roomNumber: oldestWaitingOrder.roomNumber,
+                status: oldestWaitingOrder.status,
+              }
+            : null,
         },
         openTasks: {
           count: openTasks.length,
-          overdue: openTasks.filter((t) => t.dueBy && new Date(t.dueBy) < now).length,
+          overdue: overdueTasks.length,
+          oldestOverdue: overdueTasks[0]
+            ? {
+                roomNumber: overdueTasks[0].roomNumber,
+                kind: overdueTasks[0].kind,
+                note: overdueTasks[0].note,
+                assignedTo: overdueTasks[0].assignedTo,
+              }
+            : null,
         },
       },
       kpis: {
@@ -165,10 +205,6 @@ export async function GET(request: Request) {
       outOfOrderRooms: rooms
         .filter((r) => r.state === "out_of_order")
         .map((r) => ({ roomNumber: r.roomNumber, reason: r.oooReason, until: r.oooUntil })),
-      recentActivity: activity.map((row) => ({
-        id: row.id, action: row.action, summary: row.summary, actor: row.actor,
-        actorLabel: row.actorLabel, createdAt: row.createdAt,
-      })),
     });
   } catch (error) {
     console.error("Desk overview failed", error);

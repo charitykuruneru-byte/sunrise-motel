@@ -1,0 +1,92 @@
+.desk-console-shell .desk-sidebar {
+  min-width: 0;
+}
+.desk-console-shell .desk-green-navigation {
+  display: flex;
+  height: 100%;
+  max-height: none;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: #71917c #254b3d;
+  scrollbar-width: thin;
+}
+.desk-console-shell .desk-sidebar-account {
+  margin-top: auto;
+}
+.desk-console-shell .desk-green-navigation > div {
+  flex-shrink: 0;
+}
+.desk-console-shell .desk-mobile-nav-overlay {
+  display: block;
+}
+.desk-console-shell .desk-green-navigation .desk-nav-button {
+  color: #e0ebe3 !important;
+}
+.desk-console-shell .desk-green-navigation .desk-nav-button:hover {
+  background-color: #315746 !important;
+  color: #fff !important;
+}
+.desk-console-shell .desk-green-navigation .desk-nav-button[aria-current="page"] {
+  background-color: #e3eee6 !important;
+  color: #244938 !important;
+  box-shadow: inset 3px 0 #9ab7a2, 0 0 0 1px rgba(210, 230, 216, .35);
+}
+.desk-console-shell .desk-green-navigation .desk-nav-button svg {
+  color: #b9d0c0 !important;
+}
+.desk-console-shell .desk-green-navigation .desk-nav-button[aria-current="page"] svg {
+  color: #315746 !important;
+}
+.desk-console-shell .desk-green-navigation .desk-nav-button[aria-current="page"] span:last-child {
+  color: #244938;
+}
+.desk-mobile-green-navigation .desk-nav-button {
+  color: #435c4b !important;
+}
+.desk-mobile-green-navigation .desk-nav-button:hover {
+  background-color: #e8f0ea !important;
+}
+.desk-mobile-green-navigation .desk-nav-button[aria-current="page"] {
+  background-color: #dce9df !important;
+  color: #244938 !important;
+}
+
+@media (max-width: 760px) {
+  .desk-console-shell .desk-green-navigation { display: none; }
+}
+
+@media (min-width: 1024px) {
+  .desk-console-shell .desk-topbar {
+    position: fixed;
+    inset: 0 0 auto;
+    height: 64px;
+  }
+  .desk-console-shell .desk-topbar-inner {
+    max-width: none;
+    height: 100%;
+    flex-wrap: nowrap;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  .desk-console-shell .desk-workspace-layout {
+    display: block;
+    width: auto;
+    max-width: 1830px;
+    margin: 0 0 0 230px;
+    padding: 88px 24px 24px;
+  }
+  .desk-console-shell .desk-sidebar {
+    position: fixed;
+    z-index: 25;
+    inset: 64px auto 0 0;
+    width: 230px;
+  }
+  .desk-console-shell .desk-green-navigation {
+    border-left: 0;
+    border-top: 0;
+    border-bottom: 0;
+    border-radius: 0;
+    box-shadow: 0 7px 24px rgba(43, 36, 31, 0.08);
+  }
+}

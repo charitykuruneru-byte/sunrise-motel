@@ -137,7 +137,7 @@ export function TrackBooking() {
             </div>
 
             <div className="track-actions">
-              <a className="btn-submit-booking-request" href={result.booking.invoiceUrl} download><Download size={16} /> Download {result.booking.amountPaid >= result.booking.totalAmount ? "receipt" : "pro-forma invoice"} (PDF)</a>
+              <a className="btn-submit-booking-request" href={result.booking.invoiceUrl} download><Download size={16} /> Download {result.booking.amountPaid >= result.booking.totalAmount ? "payment confirmation" : "pro-forma invoice"} (PDF)</a>
               <a className="btn-whatsapp-success" href={`https://wa.me/265998688332?text=${encodeURIComponent(`Hello Sunrise Motel, I am following up on booking ${result.booking.reference}.`)}`} target="_blank" rel="noreferrer"><MessageCircle size={16} /> WhatsApp the front desk</a>
             </div>
 

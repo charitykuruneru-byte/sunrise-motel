@@ -33,8 +33,9 @@ always replace the previous install. The file is referenced, not copied —
 (Gradle's `file()` is module-relative) — and CI restores it once from the
 `KEYSTORE_BASE64` secret (see `SunriseMotelApp/README.md`).
 
-- `versionCode` starts at 1 = `"1.0"`. Bump it by +1 for EVERY release and update
-  `public/version-admin.json` to match, or phones will never be told to update.
+- Current version: `versionCode` 2 / `"1.1"`. Bump the code by +1 for EVERY
+  release and keep `public/version-admin.json` in sync, or phones will not be
+  offered the update.
 - Two different `applicationId`s can share one signing key safely: Android treats
   them as unrelated apps, which is exactly what we want.
 
@@ -48,5 +49,8 @@ always replace the previous install. The file is referenced, not copied —
 ## CI
 
 `.github/workflows/build-apk.yml` builds both projects on every push that touches
-either folder, renames the artefacts to `SunriseMotel.apk` / `SunriseManager.apk`
-(so the download page URLs resolve) and attaches both to the GitHub release.
+either folder or either app's `public/version*.json` metadata, checks that the
+Gradle and published versions match, renames the artefacts to `SunriseMotel.apk` /
+`SunriseManager.apk` (so download and in-app update URLs resolve), and attaches
+both to a GitHub Release on `main`. Website changes appear in this WebView app
+after reload; wrapper changes require a signed APK release.

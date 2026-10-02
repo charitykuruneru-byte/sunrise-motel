@@ -1,0 +1,59 @@
+{
+  "brand": "Sunrise Motel",
+  "logo": {
+    "asset": "/images/sunrise-logo.svg",
+    "keepExisting": true
+  },
+  "colors": {
+    "primary": "#F28C18",
+    "secondary": "#C95612",
+    "accent": "#D4A017",
+    "background": "#F8F5F0",
+    "homeBackground": "#FBF7F0",
+    "text": "#171513",
+    "homeText": "#14110F",
+    "muted": "#756C64",
+    "surface": "#FFFFFF",
+    "surfaceMuted": "#EFE8DF",
+    "sand": "#E9D8C4",
+    "success": "#526A57",
+    "successSurface": "#E8EFE9",
+    "header": "#171513",
+    "sidebar": "#26392F"
+  },
+  "font": {
+    "display": "Georgia, \"Times New Roman\", serif",
+    "body": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif"
+  },
+  "buttonRadius": {
+    "default": "4px",
+    "navigationPrimary": "999px",
+    "homePage": "6px"
+  },
+  "cardRadius": {
+    "default": "8px",
+    "roomAndEditorial": "14px"
+  },
+  "shadow": {
+    "default": "0 2px 10px rgba(0, 0, 0, 0.02)",
+    "roomCard": "0 6px 20px rgba(0, 0, 0, 0.04)",
+    "homeSubtle": "0 1px 2px rgba(20, 17, 15, 0.06)",
+    "homeElevated": "0 16px 40px rgba(20, 17, 15, 0.1)"
+  },
+  "adminOverview": {
+    "route": "/admin?section=overview#hp-main",
+    "renderer": "src/app/admin/page.tsx",
+    "layout": "src/app/admin/layout.tsx",
+    "sidebar": "#26392F",
+    "activeNavigation": "#F28C18",
+    "header": "#171513",
+    "activeNavigationRadius": "8px",
+    "controlRadius": "4px",
+    "font": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif",
+    "icons": "lucide-react"
+  },
+  "sourceOfTruth": "Manager overview at /admin?section=overview#hp-main, rendered by src/app/admin/page.tsx and styled by src/app/globals.css",
+  "preserveBusinessLogic": true,
+  "preserveExistingRoutes": true,
+  "guestRegistration": "invite-only"
+}

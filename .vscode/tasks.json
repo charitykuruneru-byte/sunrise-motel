@@ -1,0 +1,41 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Start Sunrise Motel",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"dev",
+				"--",
+				"--port",
+				"3112"
+			],
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "Verify restored admin typecheck",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"typecheck"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Build restored admin pages",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"set NEXT_DIST_DIR=.next-verify&& npm run build"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		}
+	]
+}

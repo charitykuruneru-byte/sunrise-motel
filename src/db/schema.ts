@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, integer, jsonb, pgTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
+import { boolean, check, integer, jsonb, pgTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 
 export const roomTypesTable = pgTable("room_types", {
   id: varchar("id", { length: 64 }).primaryKey(),
@@ -12,7 +12,7 @@ export const roomTypesTable = pgTable("room_types", {
   weekendPrice: integer("weekend_price").notNull().default(0), // Fri & Sat nights; 0 = use `rate`
   extraBedPrice: integer("extra_bed_price").notNull().default(0),
   cleaningFee: integer("cleaning_fee").notNull().default(0),
-  taxRateBp: integer("tax_rate_bp").notNull().default(1650), // basis points: 1650 = 16.50% VAT
+  taxRateBp: integer("tax_rate_bp").notNull().default(1750), // basis points: 1750 = 17.50% VAT
   minNights: integer("min_nights").notNull().default(1),
   weeklyDiscountBp: integer("weekly_discount_bp").notNull().default(0), // 500 = 7+ nights → 5% off
   monthlyDiscountBp: integer("monthly_discount_bp").notNull().default(0), // 1000 = 28+ nights → 10% off
@@ -81,10 +81,13 @@ export const postsTable = pgTable("posts", {
   time: varchar("time", { length: 80 }), // e.g. 12:00 — 20:00
   detail: text("detail").notNull(),
   priceTag: varchar("price_tag", { length: 80 }), // e.g. MWK 22,000
+  bookingAddonPrice: integer("booking_add_on_price"), // MWK per room-night; NULL means display-only
   imageUrl: text("image_url"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  check("posts_booking_add_on_price_nonnegative", sql`${table.bookingAddonPrice} is null or ${table.bookingAddonPrice} >= 0`),
+]);
 
 export const menuItemsTable = pgTable("menu_items", {
   id: varchar("id", { length: 36 }).primaryKey(),
@@ -123,7 +126,9 @@ export const invoicesTable = pgTable("invoices", {
   nights: integer("nights").notNull().default(1),
   subtotal: integer("subtotal").notNull(),
   extrasTotal: integer("extras_total").notNull().default(0),
-  taxAmount: integer("tax_amount").notNull().default(0), // Tourism levy + VAT if applicable
+  taxAmount: integer("tax_amount").notNull().default(0),
+  taxRateBp: integer("tax_rate_bp"),
+  taxInclusive: boolean("tax_inclusive"),
   totalAmount: integer("total_amount").notNull(),
   amountPaid: integer("amount_paid").notNull().default(0),
   balanceDue: integer("balance_due").notNull().default(0),

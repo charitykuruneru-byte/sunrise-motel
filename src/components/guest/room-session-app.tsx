@@ -245,7 +245,7 @@ export default function RoomSessionApp() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[var(--ivory)]">
+      <main className="room-session-page flex min-h-screen items-center justify-center bg-[var(--ivory)]">
         <Loader2 className="animate-spin text-[var(--orange-deep)]" />
       </main>
     );
@@ -254,7 +254,7 @@ export default function RoomSessionApp() {
   // ------------------------------------------------------------------ entry ----
   if (!view?.active) {
     return (
-      <main className="min-h-screen bg-[var(--ivory)] px-4 py-8">
+      <main className="room-session-page min-h-screen bg-[var(--ivory)] px-4 py-8">
         <div className="mx-auto max-w-md">
           <p className="text-[11px] font-black tracking-widest text-[var(--orange-deep)]">SUNRISE MOTEL</p>
           <h1 className="mt-2 text-2xl font-bold">Your room, right now</h1>
@@ -462,7 +462,7 @@ export default function RoomSessionApp() {
     view.channel === "qr" ? "QR card in the room" : view.channel === "pin" ? "key-sleeve PIN" : view.channel === "reference" ? "booking reference" : "opened by the desk";
 
   return (
-    <main className="min-h-screen bg-[var(--ivory)] pb-24">
+    <main className="room-session-page min-h-screen bg-[var(--ivory)] pb-24">
       <header className="sticky top-0 z-10 border-b border-[var(--line)] bg-white/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
           <div>

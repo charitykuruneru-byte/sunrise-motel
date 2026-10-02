@@ -51,6 +51,7 @@ existed. Specifically, these were already built, audited and working:
 | Auditors — read everything, change nothing (enforced in `deskActor`) | `src/lib/desk-auth.ts` |
 | The audit trail — read, search, filter by entity, export CSV; append-only | `src/app/api/admin/audit/route.ts`, `src/app/admin/page.tsx` |
 | Content the addenda call admin-only — gallery, posts and events, notices of push, staff accounts, rooms and rates, revenue CSV | `src/app/admin/page.tsx`, `src/app/api/admin/**` |
+| Gallery library — search and filter pictures, sort by website order/title/category, edit title/category/image/alt text/caption/display position, and remove one or several with an audit entry per picture | `src/app/admin/page.tsx`, `src/app/api/admin/gallery/route.ts` |
 | Media upload that never dead-ends — Vercel Blob, or Postgres when Blob is not configured | `src/app/api/upload/route.ts`, `src/app/api/images/[id]/route.ts` |
 | Push broadcasts — the composer with a live phone preview, `validate_only` test, topic `all_users` | `src/app/admin/notifications/page.tsx`, `src/lib/fcm.ts` |
 | The guest side of all of it — accounts, the no-account room session, ordering against the folio, private threads, one-tap requests | `src/components/guest/**`, `src/app/api/guest/**` |
@@ -825,7 +826,20 @@ NULL`); a guest cannot ask for a password reset themselves — the desk can, and
 the premium booking-form redesign of Brief 3 is not started, because it is the motel's money path and
 cannot be half-shipped. `docs/BUILD-REQUEST-AUDIT.md` lists these with what each one costs.
 
+## Menu prices and booking offers
 
+The admin portal now has manager-only menu-item create, edit, price, availability and removal
+controls backed by `/api/admin/menu`; the front desk retains its separate sold-out-only action.
+Offer posts can optionally carry a numeric MWK price per room-night. A blank price keeps an offer
+display-only, while a priced active Offer can be selected during booking. The booking endpoint reads
+the active offer prices itself, multiplies each by the stay length, and stores the priced selection
+in the booking extras and invoice line items; browser-supplied extra amounts are not used for these
+new selections.
+
+Migration `drizzle/0015_bookable_offer_price.sql` adds the nullable offer rate. It is part of the
+workspace migration history and must be applied by the normal Drizzle deployment workflow before
+the new offer controls are used against a database. This addendum is a source-code change, not a
+claim that a production database has already been migrated.
 
 *This file is the per-section evidence behind **Part D** of `README.md`, which documents the
 mechanism of the same change. Keep the two in step: when a gap listed here is closed, move the row

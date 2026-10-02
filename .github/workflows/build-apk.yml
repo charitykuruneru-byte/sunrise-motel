@@ -5,6 +5,8 @@ on:
     paths:
       - "SunriseMotelApp/**"
       - "SunriseAdminApp/**"
+      - "public/version.json"
+      - "public/version-admin.json"
       - ".github/workflows/build-apk.yml"
   workflow_dispatch:
 
@@ -150,6 +152,46 @@ jobs:
             exit 1
           fi
 
+      - name: Verify app and update versions match
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const apps = [
+            {
+              gradle: "SunriseMotelApp/app/build.gradle.kts",
+              metadata: "public/version.json",
+              packageId: "com.sunrisemotel.app",
+              apk: "SunriseMotel.apk",
+            },
+            {
+              gradle: "SunriseAdminApp/app/build.gradle.kts",
+              metadata: "public/version-admin.json",
+              packageId: "com.sunrisemotel.admin",
+              apk: "SunriseManager.apk",
+            },
+          ];
+          for (const app of apps) {
+            const gradle = fs.readFileSync(app.gradle, "utf8");
+            const metadata = JSON.parse(fs.readFileSync(app.metadata, "utf8"));
+            const code = Number(gradle.match(/versionCode\s*=\s*(\d+)/)?.[1]);
+            const name = gradle.match(/versionName\s*=\s*"([^"]+)"/)?.[1];
+            const packageId = gradle.match(/applicationId\s*=\s*"([^"]+)"/)?.[1];
+            if (!code || !name || !packageId) {
+              throw new Error(`Could not read release identity/version from ${app.gradle}`);
+            }
+            if (code !== metadata.latestVersionCode || name !== metadata.latestVersionName) {
+              throw new Error(
+                `${app.gradle} is ${code}/${name}, but ${app.metadata} is ` +
+                `${metadata.latestVersionCode}/${metadata.latestVersionName}`,
+              );
+            }
+            if (packageId !== app.packageId || !metadata.apkUrl?.endsWith(`/download/${app.apk}`)) {
+              throw new Error(`Unexpected package ID or APK URL for ${app.gradle}`);
+            }
+            console.log(`${app.packageId}: ${code}/${name} -> ${app.apk}`);
+          }
+          NODE
+
       - name: Build guest release APK (SunriseMotelApp)
         run: |
           cd SunriseMotelApp
@@ -193,4 +235,3 @@ jobs:
           # A release that matched no APK would leave /download and the in-app
           # update URL pointing at nothing — fail instead of publishing one.
           fail_on_unmatched_files: true
-

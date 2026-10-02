@@ -40,10 +40,12 @@ import {
   Wifi,
   X,
 } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import InstallAppButton from "@/components/install-app";
 import InstallAppPopup from "@/components/InstallAppPopup";
+import { BookingOfferOptions, useBookingOffers } from "@/components/booking-offers";
+import HomeReviewDialog from "@/components/guest/home-review-dialog";
 import { NewBadge } from "@/components/new-badge";
 import PushOptIn from "@/components/push-opt-in";
 import Reveal from "@/components/reveal";
@@ -51,7 +53,8 @@ import SafeImage from "@/components/safe-image";
 import SiteNav from "@/components/site-nav";
 import StickyStayBar from "@/components/sticky-stay-bar";
 import { PageLoadingSplash, SunriseFullLogo } from "@/components/sunrise-logo";
-import { HERO_IMAGE, HERO_VIDEO } from "@/lib/media-catalog";
+import { HERO_IMAGE } from "@/lib/media-catalog";
+import { calculateVat } from "@/lib/pricing";
 
 // The landing page's own design system, imported HERE and not in the root layout
 // so it rides only on the route that needs it: every rule inside is `hp-`-
@@ -71,6 +74,18 @@ type RoomData = {
   slug: string;
   description: string;
   rate: number;
+  taxRateBp: number;
+  taxInclusive: boolean;
+  stayQuote: {
+    nights: number;
+    nightlySubtotal: number;
+    subtotal: number;
+    discount: { label: string | null; amount: number };
+    taxRateBp: number;
+    taxAmount: number;
+    taxInclusive: boolean;
+    total: number;
+  };
   totalInventory: number;
   bookedCount: number;
   availableCount: number;
@@ -84,7 +99,7 @@ type RoomData = {
   images: string[];
 };
 
-type PostData = { id: string; title: string; category: string; day: string | null; date: string | null; time: string | null; detail: string; priceTag: string | null; imageUrl: string | null; createdAt?: string; isActive: boolean };
+type PostData = { id: string; title: string; category: string; day: string | null; date: string | null; time: string | null; detail: string; priceTag: string | null; imageUrl: string | null; createdAt?: string };
 /** One photograph as /api/admin/gallery returns it (its GET is public read). */
 type GalleryImageData = { id: string; title: string; category: string; imageUrl: string; altText: string; caption: string | null };
 /** A published review exactly as /api/reviews returns it. */
@@ -367,6 +382,8 @@ export default function HomePage() {
   // stayed there for ever because `finally` had already cleared the spinner.
   const [roomsError, setRoomsError] = useState("");
   const [posts, setPosts] = useState<PostData[]>([]);
+  const [postsLoading, setPostsLoading] = useState(true);
+  const [postsError, setPostsError] = useState("");
   // "Is anything free tonight?" is the first question a traveller asks, so the
   // hero answers it before they touch the date fields: tonight's own count,
   // fetched once. Shown only when there IS a room — never a discouraging zero,
@@ -377,13 +394,24 @@ export default function HomePage() {
 
   const [bookingRoom, setBookingRoom] = useState<RoomData | null>(null);
   const [step, setStep] = useState<"form" | "done">("form");
-  const [result, setResult] = useState<{ reference: string; invoiceUrl: string; trackUrl: string; total: number; emailNote: string | null } | null>(null);
+  const [result, setResult] = useState<{
+    reference: string;
+    invoiceUrl: string;
+    trackUrl: string;
+    total: number;
+    taxAmount: number;
+    taxRateBp: number;
+    taxInclusive: boolean;
+    emailNote: string | null;
+  } | null>(null);
   const [bookingError, setBookingError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const [breakfastQty, setBreakfastQty] = useState(0);
   const [transfer, setTransfer] = useState(false);
   const [lateCheckout, setLateCheckout] = useState(false);
+  const [selectedOfferIds, setSelectedOfferIds] = useState<string[]>([]);
+  const { offers: bookingOffers, loading: bookingOffersLoading, error: bookingOffersError } = useBookingOffers();
 
   const nights = useMemo(() => getNights(checkIn, checkOut), [checkIn, checkOut]);
 
@@ -405,7 +433,8 @@ export default function HomePage() {
       // come out of a cache. The response is then CHECKED rather than assumed —
       // a 500 carries a JSON body that is not a room list, and treating it as
       // one is what left this page saying "Rooms are loading…" for ever.
-      const res = await fetch(`/api/availability?checkIn=${inDate}&checkOut=${outDate}`, { cache: "no-store" });
+      const guests = Math.max(1, adults + children);
+      const res = await fetch(`/api/availability?checkIn=${inDate}&checkOut=${outDate}&guests=${guests}`, { cache: "no-store" });
       const data: { rooms?: RoomData[]; error?: string } = await res.json().catch(() => ({}));
       if (!res.ok || data.error) throw new Error(data.error || `Availability check failed (${res.status}).`);
       const list = Array.isArray(data.rooms) ? data.rooms : [];
@@ -422,7 +451,7 @@ export default function HomePage() {
 
   useEffect(() => {
     fetchAvailability(checkIn, checkOut);
-  }, [checkIn, checkOut]);
+  }, [checkIn, checkOut, adults, children]);
 
   // Tonight's numbers, independent of the dates the guest has picked. A silent
   // failure is correct here: this strip is a bonus, and a broken extra call must
@@ -481,22 +510,44 @@ export default function HomePage() {
     }
   };
 
-  useEffect(() => {
-    // The public feed (addendum Part 7): the same published posts the guest app's
-    // What's on tab shows. Pausing a post in the manager portal removes it from both.
-    fetch("/api/posts", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((d) => setPosts((d.posts ?? []) as PostData[]))
-      .catch(() => setPosts([]));
+  const refreshPosts = useCallback(async () => {
+    try {
+      const response = await fetch("/api/posts", { cache: "no-store" });
+      const data = (await response.json()) as { posts?: PostData[]; error?: string };
+      if (!response.ok || !Array.isArray(data.posts)) {
+        throw new Error(data.error || `The updates feed could not be loaded (${response.status}).`);
+      }
+      const latestPosts = data.posts.slice();
+      latestPosts.sort((a, b) => {
+        const aTime = a.createdAt ? Date.parse(a.createdAt) : 0;
+        const bTime = b.createdAt ? Date.parse(b.createdAt) : 0;
+        return bTime - aTime;
+      });
+      setPosts(latestPosts);
+      setPostsError("");
+    } catch (error) {
+      console.error("Could not load the latest Sunrise updates", error);
+      setPostsError(error instanceof Error ? error.message : "Could not load the latest updates.");
+    } finally {
+      setPostsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void refreshPosts();
+    };
+    refreshWhenVisible();
+    const interval = window.setInterval(refreshWhenVisible, 60_000);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [refreshPosts]);
 
   // NOTE: the reviews fetch and the `?checkIn=&checkOut=` prefill live below, after the
   // state they depend on is declared.
-
-  // ---- The hero film (§2.3) -------------------------------------------------
-  // Muted autoplay is required by browsers; loop keeps the property tour playing
-  // behind the hero copy. Keep the photograph if the video cannot be decoded.
-  const [heroVideoSrc, setHeroVideoSrc] = useState<string | null>(HERO_VIDEO?.src ?? null);
 
   // ---- The showcase slideshow (§2.5b) ---------------------------------------
   // One photograph at a time, of this property, playing by itself. Three things
@@ -559,10 +610,20 @@ export default function HomePage() {
     if (breakfastQty > 0) list.push({ label: `Daily breakfast × ${breakfastQty} guest${breakfastQty > 1 ? "s" : ""} (${nights} night${nights > 1 ? "s" : ""})`, amount: breakfastQty * 8500 * nights });
     if (transfer) list.push({ label: "Kamuzu Airport transfer (one-way)", amount: 25000 });
     if (lateCheckout) list.push({ label: "Late check-out until 15:00", amount: 15000 });
+    for (const offer of bookingOffers.filter((item) => selectedOfferIds.includes(item.id))) {
+      list.push({
+        label: `${offer.title} (${nights} night${nights === 1 ? "" : "s"} @ ${formatMoney(offer.nightlyPrice)}/room-night)`,
+        amount: offer.nightlyPrice * nights,
+      });
+    }
     return list;
-  }, [breakfastQty, transfer, lateCheckout, nights]);
+  }, [breakfastQty, transfer, lateCheckout, nights, bookingOffers, selectedOfferIds]);
   const extrasTotal = extras.reduce((s, e) => s + e.amount, 0);
-  const grandTotal = bookingRoom ? bookingRoom.rate * nights + extrasTotal : 0;
+  const bookingTaxableAmount = bookingRoom ? bookingRoom.stayQuote.subtotal + extrasTotal : 0;
+  const bookingTax = bookingRoom
+    ? calculateVat(bookingTaxableAmount, bookingRoom.taxRateBp, bookingRoom.taxInclusive)
+    : { taxAmount: 0, totalAmount: 0 };
+  const grandTotal = bookingTax.totalAmount;
   const totalRoomsFree = rooms.reduce((s, r) => s + r.availableCount, 0);
   // While a call is in flight, or has failed, the number of free rooms is
   // UNKNOWN — not zero. Both badges below key their "nothing free" styling off
@@ -577,6 +638,23 @@ export default function HomePage() {
   const [reviews, setReviews] = useState<ReviewData[]>([]);
   const [reviewSummary, setReviewSummary] = useState<{ count: number; average: number; averageDisplay: string | null } | null>(null);
   const [showAllReviews, setShowAllReviews] = useState(false);
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const closeReviewDialog = useCallback(() => setReviewDialogOpen(false), []);
+
+  const refreshReviews = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/reviews?limit=${showAllReviews ? 50 : 6}`, { cache: "no-store" });
+      if (!response.ok) throw new Error(`Review feed refresh failed (${response.status}).`);
+      const data = (await response.json()) as {
+        reviews?: ReviewData[];
+        summary?: { count: number; average: number; averageDisplay: string | null };
+      };
+      setReviews(data.reviews ?? []);
+      setReviewSummary(data.summary ?? null);
+    } catch (error) {
+      console.error("Could not refresh the public review feed", error);
+    }
+  }, [showAllReviews]);
 
   // ---- The sold-out waitlist (Part 3.4) ------------------------------------
   // A sold-out week is a lead, not a dead end: capture it and call the guest first.
@@ -586,23 +664,22 @@ export default function HomePage() {
     message: "",
   });
 
-  // Reviews + the real average. Re-run when the guest asks for the rest of them.
+  // Refresh after submissions and periodically so visitors already on the page
+  // see newly published reviews without reloading.
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/reviews?limit=${showAllReviews ? 50 : 6}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (cancelled) return;
-        setReviews((d.reviews ?? []) as ReviewData[]);
-        setReviewSummary(d.summary ?? null);
-      })
-      .catch(() => {
-        if (!cancelled) setReviews([]);
-      });
+    const refreshWhileVisible = () => {
+      if (!cancelled && document.visibilityState === "visible") void refreshReviews();
+    };
+    refreshWhileVisible();
+    const interval = window.setInterval(refreshWhileVisible, 45_000);
+    document.addEventListener("visibilitychange", refreshWhileVisible);
     return () => {
       cancelled = true;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshWhileVisible);
     };
-  }, [showAllReviews]);
+  }, [refreshReviews]);
 
   useEffect(() => {
     // The waitlist email links back here with the dates the guest asked for
@@ -663,6 +740,7 @@ export default function HomePage() {
     setBreakfastQty(0);
     setTransfer(false);
     setLateCheckout(false);
+    setSelectedOfferIds([]);
     lockScroll(true);
   };
   const closeBooking = () => {
@@ -676,6 +754,8 @@ export default function HomePage() {
     setSubmitting(true);
     setBookingError("");
     const fd = new FormData(e.currentTarget);
+    const travelPurpose = String(fd.get("travelPurpose") ?? "").trim();
+    const guestRequests = String(fd.get("requests") ?? "").trim();
     try {
       const res = await fetch("/api/bookings", {
         method: "POST",
@@ -686,17 +766,26 @@ export default function HomePage() {
           checkOut,
           adults,
           children,
-          extras,
+          extraSelections: { breakfastQty, transfer, lateCheckout, offerIds: selectedOfferIds },
           guestName: fd.get("guestName"),
           phone: fd.get("phone"),
           email: fd.get("email"),
           arrival: fd.get("arrival"),
-          requests: fd.get("requests"),
+          requests: [travelPurpose ? `Trip purpose: ${travelPurpose}` : "", guestRequests].filter(Boolean).join(" · ") || null,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not send your request.");
-      setResult({ reference: data.booking.reference, invoiceUrl: data.booking.invoiceUrl, trackUrl: data.booking.trackUrl, total: data.booking.totalAmount, emailNote: data.booking.emailNote ?? null });
+      setResult({
+        reference: data.booking.reference,
+        invoiceUrl: data.booking.invoiceUrl,
+        trackUrl: data.booking.trackUrl,
+        total: data.booking.totalAmount,
+        taxAmount: data.booking.taxAmount,
+        taxRateBp: data.booking.taxRateBp,
+        taxInclusive: data.booking.taxInclusive,
+        emailNote: data.booking.emailNote ?? null,
+      });
       setStep("done");
       fetchAvailability(checkIn, checkOut);
     } catch (err) {
@@ -720,10 +809,7 @@ export default function HomePage() {
       <SiteNav active="Home" bookingHref="#hp-availability" showStickyBar={false} />
 
       <main id="hp-main">
-        {/* HERO — the property's own footage with its own photograph behind it,
-            left-aligned, never centred (redesign §2.3). The photograph is the
-            only eagerly loaded image on the page and it is also the film's
-            poster, so the first thing painted is a finished hero either way. */}
+        {/* HERO — the property's own photograph, left-aligned and never centred. */}
         <section className="hp-hero">
           <SafeImage
             src={HERO_IMAGE?.src ?? null}
@@ -734,25 +820,6 @@ export default function HomePage() {
             imgClassName="hp-hero-img"
             fallbackLabel="Sunrise Motel · Area 5, Lilongwe"
           />
-          {heroVideoSrc ? (
-            <video
-              className="hp-hero-video"
-              src={heroVideoSrc}
-              poster={HERO_IMAGE?.src}
-              autoPlay
-              muted
-              loop
-              playsInline
-              preload="auto"
-              aria-hidden="true"
-              tabIndex={-1}
-              onError={() => {
-                /* a file this device will not decode is dropped for the rest of
-                   the visit: the photograph stays and no data is spent twice */
-                setHeroVideoSrc(null);
-              }}
-            />
-          ) : null}
           <div className="hp-hero-scrim" aria-hidden="true" />
           <div className="hp-hero-inner hp-wrap">
             <p className="hp-hero-eyebrow hp-anim hp-anim-1">Area 5 · Lilongwe · Mzimba Road</p>
@@ -794,13 +861,6 @@ export default function HomePage() {
               </span>
             </div>
 
-            {tonightFree !== null && tonightFree > 0 && (
-              <a className="hp-tonight" href="#rooms-section">
-                <span className="hp-dot" />
-                {tonightFree === 1 ? "1 room free tonight" : `${tonightFree} rooms free tonight`} — two taps and it is yours
-              </a>
-            )}
-
             <div className="hp-avail-fields">
               <div className="hp-field">
                 <label htmlFor="hp-checkin">Check-in</label>
@@ -815,6 +875,20 @@ export default function HomePage() {
                     // departure date — the guest chose nights, so nights is what travels
                     // with them.
                     if (e.target.value) setCheckOut(addDaysIso(e.target.value, nights));
+                  }}
+                />
+              </div>
+              <div className="hp-field">
+                <label htmlFor="hp-checkout">Check-out</label>
+                <input
+                  id="hp-checkout"
+                  type="date"
+                  value={checkOut}
+                  min={addDaysIso(checkIn, MIN_NIGHTS)}
+                  max={addDaysIso(checkIn, MAX_NIGHTS)}
+                  onChange={(e) => {
+                    const nextNights = getNights(checkIn, e.target.value);
+                    if (nextNights >= MIN_NIGHTS && nextNights <= MAX_NIGHTS) setCheckOut(e.target.value);
                   }}
                 />
               </div>
@@ -1063,9 +1137,6 @@ export default function HomePage() {
                     ))}
                   </div>
                   <div className="hp-showcase-foot">
-                    <span className="hp-showcase-honest">
-                      <Camera size={13} /> Only the frame on screen is downloaded — nothing waits in the background
-                    </span>
                     <button
                       type="button"
                       className="hp-showcase-play"
@@ -1092,20 +1163,62 @@ export default function HomePage() {
         <div className="hp-wrap">
           <div className="hp-head-row">
             <div className="hp-head">
-              <p className="hp-eyebrow">This week at Sunrise</p>
-              <h2 className="hp-h2" id="hp-promos-heading">Events, specials &amp; offers</h2>
+              <p className="hp-eyebrow">The latest from our team</p>
+              <h2 className="hp-h2" id="hp-promos-heading">What&apos;s happening at Sunrise</h2>
               <span className="hp-rule" aria-hidden="true" />
               <p className="hp-sub">
-                Published by the team the moment they are confirmed — what you read here is what is actually happening.
+                New events, dining specials and motel updates, posted here as they are announced. See something you like?
+                Message the team to ask, reserve or start an order.
               </p>
             </div>
-            <a className="hp-more" href="/unwind">What&apos;s on <MoveRight size={15} /></a>
+            <div className="hp-updates-heading-actions">
+              <span className="hp-updates-live">
+                <span aria-hidden="true" />
+                {postsLoading
+                  ? "Checking updates"
+                  : postsError
+                    ? "Feed needs a refresh"
+                    : posts.length > 3
+                      ? `Showing 3 of ${posts.length} updates`
+                      : `${posts.length} current update${posts.length === 1 ? "" : "s"}`}
+              </span>
+              <a className="hp-more" href="/unwind">Explore events <MoveRight size={15} /></a>
+            </div>
           </div>
 
           {posts.length > 0 ? (
             <Reveal className="hp-promos-grid">
-              {posts.slice(0, 3).map((post) => (
-                <article key={post.id} className="hp-promo">
+              {posts.slice(0, 3).map((post, index) => {
+                const category = post.category.toLowerCase();
+                const isEvent = /event|braai|function|music|match/.test(`${category} ${post.title.toLowerCase()}`);
+                const isDining = /food|dine|menu|meal|restaurant|breakfast|lunch|dinner|chambo|braai/.test(`${category} ${post.title.toLowerCase()}`);
+                const isOrderable = isDining || /special|offer/.test(category);
+                const isWorkspace = /work|workspace|wi.?fi|day pass|coffee/.test(`${category} ${post.title.toLowerCase()}`);
+                let intent = "ask about";
+                let primaryAction = "Ask the front desk";
+                if (isEvent && isDining) {
+                  intent = "reserve a place or ask about ordering from";
+                  primaryAction = "Reserve or order";
+                } else if (isEvent) {
+                  intent = "ask about or reserve a place for";
+                  primaryAction = "Ask about this event";
+                } else if (isDining) {
+                  intent = "place an order for";
+                  primaryAction = "Start a food order";
+                } else if (isOrderable) {
+                  primaryAction = "Enquire about this offer";
+                }
+                const exploreHref = isWorkspace ? "/connect" : isDining ? "/dine" : "/unwind";
+                const exploreLabel = isWorkspace ? "Explore workspace" : isDining ? "Browse dining" : "Explore what's on";
+                const details = [
+                  [post.day, post.date].filter(Boolean).join(" · "),
+                  post.time,
+                  post.priceTag,
+                ].filter(Boolean).join(" | ");
+                const whatsappMessage = `Hello Sunrise Motel, I would like to ${intent} "${post.title}"${details ? ` (${details})` : ""}. Please let me know the details and availability.`;
+
+                return (
+                <article key={post.id} className={`hp-promo ${index === 0 ? "hp-promo--latest" : ""}`}>
                   <div className="hp-promo-media">
                     {post.imageUrl ? (
                       <SafeImage
@@ -1118,29 +1231,55 @@ export default function HomePage() {
                     ) : (
                       <div className="img-placeholder">{post.category}</div>
                     )}
-                    <span className="hp-promo-cat">{post.category}</span>
+                    <span className="hp-promo-cat"><Sparkles size={12} /> {post.category}</span>
+                    {index === 0 && <span className="hp-promo-latest-label">Latest update</span>}
                     <NewBadge publishedAt={post.createdAt} className="new-chip new-chip--corner" />
                     {post.priceTag && <span className="hp-promo-price">{post.priceTag}</span>}
                   </div>
                   <div className="hp-promo-body">
-                    <span className="hp-promo-date">
-                      <Clock3 size={13} /> {[post.day, post.date].filter(Boolean).join(" · ") || "On now"}
-                    </span>
+                    <div className="hp-promo-meta">
+                      <span className="hp-promo-date">
+                        <Calendar size={13} /> {[post.day, post.date].filter(Boolean).join(" · ") || "From the team"}
+                      </span>
+                      {post.time && <span className="hp-promo-time"><Clock3 size={13} /> {post.time}</span>}
+                    </div>
                     <h3>{post.title}</h3>
                     <p>{post.detail}</p>
                     <div className="hp-promo-foot">
-                      <span className="hp-promo-time"><Clock3 size={13} /> {post.time || "All day"}</span>
-                      <a className="hp-more" href="/unwind">Plan it <MoveRight size={14} /></a>
+                      <a
+                        className="hp-promo-action"
+                        href={`${WA}${encodeURIComponent(whatsappMessage)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <MessageCircle size={15} /> {primaryAction}
+                      </a>
+                      <a className="hp-promo-explore" href={exploreHref}>{exploreLabel} <MoveRight size={14} /></a>
                     </div>
                   </div>
                 </article>
-              ))}
+                );
+              })}
             </Reveal>
+          ) : postsLoading ? (
+            <div className="hp-updates-loading" role="status">
+              <Loader2 size={18} className="animate-spin" />
+              <span>Loading the latest events and offers…</span>
+            </div>
+          ) : postsError ? (
+            <div className="hp-updates-empty hp-updates-error" role="status">
+              <div><strong>We couldn&apos;t refresh the updates.</strong><p>{postsError}</p></div>
+              <button type="button" onClick={() => void refreshPosts()}>Try again <ArrowRight size={14} /></button>
+            </div>
           ) : (
-            <p className="hp-empty">
-              Nothing on the board right now. The kitchen and bar are open 07:00 — 22:00 daily and the front desk answers
-              on +265 998 688 332 at any hour, so call if there is something you want to arrange.
-            </p>
+            <div className="hp-updates-empty">
+              <span className="hp-updates-empty-icon"><CalendarCheck size={19} /></span>
+              <div>
+                <strong>No new announcements today</strong>
+                <p>There are no active events or specials posted right now. Check the dining menu or message the front desk to plan something.</p>
+              </div>
+              <a href="/dine">Explore the menu <MoveRight size={14} /></a>
+            </div>
           )}
         </div>
       </section>
@@ -1183,7 +1322,7 @@ export default function HomePage() {
               <div className="room-card-content">
                 <div className="room-title-rate-row">
                   <div><h3>{room.name}</h3><p className="room-desc">{room.description}</p></div>
-                  <div className="room-pricing-box"><span className="from-label">Per night</span><strong className="rate-amount">{formatMoney(room.rate)}</strong><small className="stay-calc-hint">{formatMoney(room.rate * nights)} for {nights} night{nights > 1 ? "s" : ""}</small></div>
+                  <div className="room-pricing-box"><span className="from-label">Per night</span><strong className="rate-amount">{formatMoney(room.rate)}</strong><small className="stay-calc-hint">{formatMoney(room.stayQuote.total)} for {nights} night{nights > 1 ? "s" : ""}</small><small className="stay-calc-hint">VAT {room.taxInclusive ? "included" : "added"} at {(room.taxRateBp / 100).toFixed(2)}%</small></div>
                 </div>
                 <div className="room-specs-row"><span><BedDouble size={14} className="accent-orange" /> {room.bed}</span><span><Users size={14} className="accent-orange" /> {room.sleeps}</span><span><Compass size={14} className="accent-orange" /> {room.size}</span></div>
                 <div className="availability-meta">
@@ -1390,7 +1529,9 @@ export default function HomePage() {
                 Show all {reviewSummary?.count} reviews
               </button>
             )}
-            <a className="admin-btn admin-btn-primary" href="/review">Rate your stay</a>
+            <button className="admin-btn admin-btn-primary" type="button" onClick={() => setReviewDialogOpen(true)}>
+              Rate your stay
+            </button>
             <span className="hp-reviews-note">
               Stayed with us? One tap, five stars and a sentence if you have one — the same link works from your
               check-out email, and it takes a minute.
@@ -1398,6 +1539,13 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {reviewDialogOpen && (
+        <HomeReviewDialog
+          onClose={closeReviewDialog}
+          onPublished={refreshReviews}
+        />
+      )}
 
       {/* GALLERY — the proof section, and the one that costs the most data, so every
           photograph below the fold lazy-loads (Part 5.4). One horizontal strip
@@ -1536,18 +1684,27 @@ export default function HomePage() {
       {appBannerOpen && (
         <section className="hp-section hp-section--tight" aria-label="Get the Sunrise app">
           <div className="hp-wrap">
-            <div className="hp-app-banner">
-              <Smartphone size={22} />
-              <p>
-                Keep the booking in your pocket: the Android app holds your reference, your dates and your invoice, and
-                reads the same rooms and prices this page does.
-              </p>
+            <div className="hp-app-banner" aria-labelledby="hp-app-banner-title">
+              <span className="hp-app-banner-icon" aria-hidden="true"><Smartphone size={25} /></span>
+              <div className="hp-app-banner-copy">
+                <span className="hp-app-banner-eyebrow">Your stay, within reach</span>
+                <h2 id="hp-app-banner-title">Take Sunrise with you</h2>
+                <p>
+                  Keep your booking reference, stay dates and invoice together. The app reads the same room availability
+                  and prices as this website.
+                </p>
+                <ul className="hp-app-banner-benefits" aria-label="What you can keep in the app">
+                  <li><Check size={14} /> Booking reference</li>
+                  <li><Check size={14} /> Stay dates</li>
+                  <li><Check size={14} /> Invoice</li>
+                </ul>
+              </div>
               <div className="hp-app-banner-actions">
                 {/* This used to be a link to /download. It opens the install popup
                     on the spot instead — Install now or Not now, and no page in
                     between. The button hides itself once the app is on the phone. */}
                 <InstallAppButton label="Get the Android app" className="hp-app-banner-cta" />
-                <a className="hp-more" href="/app">Open my account</a>
+                <a className="hp-app-banner-account" href="/app">Open my account <ArrowRight size={14} /></a>
                 <button
                   className="hp-app-banner-close"
                   type="button"
@@ -1567,70 +1724,87 @@ export default function HomePage() {
       {/* FOOTER */}
       <footer className="hp-footer">
         <div className="hp-wrap">
-          {/* Four columns, then the tagline (§2.12). Every link here resolves, and
-              each one is a page that exists rather than a promise. */}
           <div className="hp-footer-top">
             <div className="hp-footer-brand">
               <SunriseFullLogo className="footer-full-logo" />
               <p>
-                Comfortable rooms, generous meals, lively evenings and dependable connectivity — all in Area 5,
-                Lilongwe.
+                A comfortable place to stay, eat and unwind in Area 5, Lilongwe. Speak with our front desk for help
+                planning your visit.
               </p>
-              {/* Alerts for this device: one tap on, one tap off. The component
-                  hides itself entirely when the server has no VAPID keys, so it can
-                  never offer a notification that could not be sent. */}
               <PushOptIn />
-              <div className="hp-footer-col" style={{ marginTop: 24 }}>
-                <strong>Contact</strong>
-                <p><Phone size={13} /> <a href="tel:+265998688332">+265 998 688 332</a></p>
-                <a
-                  href={`${WA}${encodeURIComponent("Hello Sunrise Motel front desk.")}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <MessageCircle size={13} /> WhatsApp the front desk
-                </a>
-                <a
-                  href="https://maps.google.com/?q=Sunrise+Motel+Mzimba+Road+Area+5+Lilongwe"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <Compass size={13} /> Directions
-                </a>
-                <p><MapPin size={13} /> Mzimba Road, behind Bwasila Secondary School, Area 5, Lilongwe, Malawi</p>
-              </div>
             </div>
 
-            <div className="hp-footer-col">
-              <strong>Stay</strong>
+            <section className="hp-footer-col hp-footer-contact" aria-labelledby="hp-footer-contact-heading">
+              <h2 id="hp-footer-contact-heading">Contact &amp; arrival</h2>
+              <a className="hp-footer-contact-action" href="tel:+265998688332">
+                <span className="hp-footer-action-icon"><Phone size={16} /></span>
+                <span><strong>Call the front desk</strong><small>+265 998 688 332 · any hour</small></span>
+              </a>
+              <a
+                className="hp-footer-contact-action"
+                href={`${WA}${encodeURIComponent("Hello Sunrise Motel, I would like help planning my stay.")}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <span className="hp-footer-action-icon"><MessageCircle size={16} /></span>
+                <span><strong>Message on WhatsApp</strong><small>Ask about a stay, arrival or meal</small></span>
+              </a>
+              <a
+                className="hp-footer-contact-action"
+                href="https://maps.google.com/?q=Sunrise+Motel+Mzimba+Road+Area+5+Lilongwe"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <span className="hp-footer-action-icon"><Compass size={16} /></span>
+                <span><strong>Get directions</strong><small>Open Sunrise Motel in Google Maps</small></span>
+              </a>
+              <p className="hp-footer-address">
+                <MapPin size={14} />
+                <span>Mzimba Road, behind Bwasila Secondary School, Area 5, Lilongwe, Malawi</span>
+              </p>
+              <p className="hp-footer-arrival">Check-in from 14:00 <i /> Check-out by 10:00</p>
+            </section>
+
+            <nav className="hp-footer-col" aria-label="Plan your stay">
+              <strong>Plan your stay</strong>
               <a href="/stay">Rooms &amp; availability</a>
-              <Link href="/#rooms-section">Book a room</Link>
-              <a href="/track">Track a booking</a>
+              <a href="#hp-availability">Check dates on this page</a>
+              <a href="/track">Track a booking &amp; invoice</a>
               <a href="/room">Your room menu</a>
-            </div>
+              <a href="/app">Guest account &amp; bookings</a>
+              <a href="/download">Get the Android app</a>
+            </nav>
 
-            <div className="hp-footer-col">
-              <strong>Food &amp; events</strong>
+            <nav className="hp-footer-col" aria-label="Explore and guest care">
+              <strong>Explore &amp; guest care</strong>
               <a href="/dine">Restaurant &amp; room service</a>
               <a href="/unwind">Braai, events &amp; functions</a>
-              <a href="/gallery">Gallery</a>
-              <a href="/review">Rate your stay</a>
-            </div>
-
-            <div className="hp-footer-col">
-              <strong>Practical</strong>
               <a href="/connect">Wi-Fi &amp; workspace</a>
-              <a href="/download">Android app download</a>
-              <a href="/app">Guest account &amp; bookings</a>
+              <a href="/gallery">Property gallery</a>
+              <button type="button" onClick={() => setReviewDialogOpen(true)}>Rate your stay</button>
               <a href="/admin">Manager portal</a>
-            </div>
+            </nav>
           </div>
+
+          <section className="hp-footer-next" aria-label="Quick next steps">
+            <div>
+              <span className="hp-footer-next-kicker">What would you like to do?</span>
+              <strong>Take the next step with Sunrise Motel</strong>
+            </div>
+            <div className="hp-footer-next-actions">
+              <a className="hp-footer-next-primary" href="#hp-availability">
+                <CalendarCheck size={15} /> Check availability
+              </a>
+              <a href="/track"><Search size={15} /> Track a booking</a>
+              <button type="button" onClick={() => setReviewDialogOpen(true)}><Star size={15} /> Leave a review</button>
+            </div>
+          </section>
 
           <div className="hp-footer-tagline">
             <em>When you are here, you are family.</em>
             <div className="hp-footer-legal">
-              <span>© 2026 Sunrise Motel · Check-in 14:00 · Check-out 10:00 · secure, guarded parking</span>
-              <a href="/app">Get the app</a>
+              <span>© {new Date().getFullYear()} Sunrise Motel · Area 5, Lilongwe · secure, guarded parking</span>
+              <a href="/app">Guest account</a>
             </div>
           </div>
         </div>
@@ -1678,7 +1852,7 @@ export default function HomePage() {
                 <div className="booking-stay-card">
                   <img src={bookingRoom.images[0]} alt="" />
                   <div className="stay-card-info"><strong>{bookingRoom.name}</strong><span>{checkIn} → {checkOut} · {nights} night{nights > 1 ? "s" : ""}</span><small>{adults} adult{adults > 1 ? "s" : ""}{children ? ` · ${children} child` : ""} · {bookingRoom.bed}</small></div>
-                  <div className="stay-card-price"><span>Room total</span><strong>{formatMoney(bookingRoom.rate * nights)}</strong></div>
+                  <div className="stay-card-price"><span>Room total</span><strong>{formatMoney(bookingRoom.stayQuote.total)}</strong></div>
                 </div>
 
                 <div className="extras-calculator-box">
@@ -1695,9 +1869,21 @@ export default function HomePage() {
                     <div className="extra-left"><Clock3 size={16} className="accent-orange" /><div><strong>Late check-out (15:00)</strong><small>Subject to availability · MWK 15,000</small></div></div>
                     <label className="switch-toggle"><input type="checkbox" checked={lateCheckout} onChange={(e) => setLateCheckout(e.target.checked)} /><span className="toggle-slider" /></label>
                   </div>
+                  <BookingOfferOptions
+                    offers={bookingOffers}
+                    loading={bookingOffersLoading}
+                    error={bookingOffersError}
+                    nights={nights}
+                    selectedIds={selectedOfferIds}
+                    onSelectionChange={(offerId, checked) => setSelectedOfferIds((current) =>
+                      checked ? [...current, offerId] : current.filter((id) => id !== offerId),
+                    )}
+                  />
                   <div className="live-calculation-summary">
-                    <div className="calc-row"><span>{bookingRoom.name} × {nights} night{nights > 1 ? "s" : ""} @ {formatMoney(bookingRoom.rate)}</span><span>{formatMoney(bookingRoom.rate * nights)}</span></div>
+                    <div className="calc-row"><span>{bookingRoom.name} · {nights} night{nights > 1 ? "s" : ""}</span><span>{formatMoney(bookingRoom.stayQuote.nightlySubtotal)}</span></div>
+                    {bookingRoom.stayQuote.discount.amount > 0 && <div className="calc-row extras-line"><span>{bookingRoom.stayQuote.discount.label ?? "Stay discount"}</span><span>-{formatMoney(bookingRoom.stayQuote.discount.amount)}</span></div>}
                     {extras.map((x) => <div key={x.label} className="calc-row extras-line"><span>{x.label}</span><span>+{formatMoney(x.amount)}</span></div>)}
+                    <div className="calc-row extras-line"><span>VAT {(bookingRoom.taxRateBp / 100).toFixed(2)}%{bookingRoom.taxInclusive ? " included" : ""}</span><span>{formatMoney(bookingTax.taxAmount)}</span></div>
                     <div className="calc-row total-line"><strong>Total for this stay</strong><strong>{formatMoney(grandTotal)}</strong></div>
                   </div>
                 </div>
@@ -1710,8 +1896,9 @@ export default function HomePage() {
                   </div>
                   <div className="form-grid-2">
                     <label className="form-input-label"><span>Expected arrival</span><select name="arrival" defaultValue=""><option value="">Choose a time</option><option>Morning (before 14:00)</option><option>Afternoon (14:00 — 18:00)</option><option>Evening (18:00 — 22:00)</option><option>Late night (after 22:00)</option></select></label>
-                    <label className="form-input-label"><span>Requests</span><input name="requests" placeholder="Quiet room, ground floor…" /></label>
+                    <label className="form-input-label"><span>Purpose of stay</span><select name="travelPurpose" defaultValue=""><option value="">Choose if you like</option><option value="Work / business">Work / business</option><option value="Personal / leisure">Personal / leisure</option></select></label>
                   </div>
+                  <label className="form-input-label"><span>Requests</span><input name="requests" placeholder="Quiet room, ground floor…" /></label>
                 </div>
 
                 {bookingError && <div className="booking-error-banner"><AlertCircle size={16} /><span>{bookingError}</span></div>}
@@ -1730,7 +1917,7 @@ export default function HomePage() {
                   <div className="booking-confirmed-card">
                     <span className="ref-label">Booking reference</span>
                     <strong className="ref-code">{result.reference}</strong>
-                    <div className="ref-details"><span>Total <strong>{formatMoney(result.total)}</strong></span><span>Status <strong className="status-badge">Pending confirmation</strong></span></div>
+                    <div className="ref-details"><span>VAT {(result.taxRateBp / 100).toFixed(2)}%{result.taxInclusive ? " included" : ""} <strong>{formatMoney(result.taxAmount)}</strong></span><span>Total <strong>{formatMoney(result.total)}</strong></span><span>Status <strong className="status-badge">Pending confirmation</strong></span></div>
                   </div>
                   <div className="success-actions-row">
                     <a className="btn-submit-booking-request" href={result.invoiceUrl} download><Download size={16} /> Download pro-forma invoice (PDF)</a>

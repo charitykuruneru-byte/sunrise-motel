@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Calendar, Loader2, RefreshCw, Shield, Wallet } from "lucide-react";
+import { AdminPageFrame } from "@/components/admin/admin-navigation";
 
 /**
  * GUEST 360 — one person's whole history with the motel, on one page.
@@ -77,8 +78,9 @@ export default function GuestProfilePage() {
   const stats = data.stats;
 
   return (
+    <AdminPageFrame>
     <div className="sunrise-app-root">
-      <main style={{ maxWidth: 900, margin: "0 auto", padding: "32px 16px 96px" }}>
+      <main className="manager-tool-page" style={{ maxWidth: 900, margin: "0 auto", padding: "32px 16px 96px" }}>
         <span className="eyebrow"><span className="eyebrow-line" /> GUEST 360</span>
         <h1 className="hero-headline" style={{ marginTop: 8 }}>{guest?.fullName ?? "Guest"}</h1>
         <p className="hero-description">
@@ -90,13 +92,13 @@ export default function GuestProfilePage() {
         {error ? <div className="booking-error-banner" style={{ marginTop: 16 }}><Shield size={14} /><span>{error}</span></div> : null}
 
         <div className="form-grid-2" style={{ marginTop: 20 }}>
-          <div style={{ border: "1px solid var(--line)", borderRadius: 16, padding: 16, background: "rgba(255,255,255,0.6)" }}>
+          <div className="manager-kpi-card" style={{ border: "1px solid var(--line)", borderRadius: 16, padding: 16, background: "rgba(255,255,255,0.6)" }}>
             <Calendar size={16} />
             <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7, marginTop: 8 }}>STAYS</div>
             <div style={{ fontSize: 24, fontWeight: 700 }}>{stats?.totalBookings ?? 0}</div>
             <div style={{ fontSize: 12, opacity: 0.7 }}>{stats?.totalNights ?? 0} nights · {stats?.stayCountOnRecord ?? 0} completed on record</div>
           </div>
-          <div style={{ border: "1px solid var(--line)", borderRadius: 16, padding: 16, background: "rgba(255,255,255,0.6)" }}>
+          <div className="manager-kpi-card" style={{ border: "1px solid var(--line)", borderRadius: 16, padding: 16, background: "rgba(255,255,255,0.6)" }}>
             <Wallet size={16} />
             <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7, marginTop: 8 }}>BALANCE DUE</div>
             <div style={{ fontSize: 24, fontWeight: 700 }}>{money(stats?.balanceDue ?? 0)}</div>
@@ -185,6 +187,7 @@ export default function GuestProfilePage() {
         <footer className="admin-foot"><Shield size={13} /> Guest records · visible to managers and admins · every view and change is audited</footer>
       </main>
     </div>
+    </AdminPageFrame>
   );
 }
 

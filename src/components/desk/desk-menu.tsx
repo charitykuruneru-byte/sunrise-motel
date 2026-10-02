@@ -1,8 +1,8 @@
 "use client";
 
-import { CheckCircle2, ChefHat, Loader2, RefreshCw } from "lucide-react";
+import { CheckCircle2, ChefHat, Loader2, RefreshCw, Utensils } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { api, BTN, BTN_DANGER, BTN_PRIMARY, CARD, money } from "./shared";
+import { api, BTN, BTN_DANGER, BTN_PRIMARY, money } from "./shared";
 
 type MenuRow = {
   id: string;
@@ -78,13 +78,15 @@ export default function DeskMenu({
   const categories = [...new Set(items.map((item) => item.category))];
 
   return (
-    <div className="space-y-4">
-      <section className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-sm font-bold">
-          <ChefHat size={16} className="text-[#f8c66b]" /> Menu — sold out
-        </h2>
+    <div className="desk-menu-screen">
+      <section className="desk-menu-heading">
+        <div>
+          <span className="desk-menu-eyebrow"><ChefHat size={14} /> RESTAURANT MENU</span>
+          <h2>Meals &amp; availability</h2>
+          <p>View meal photos and prices, and update availability as the kitchen needs.</p>
+        </div>
         <div className="flex items-center gap-2">
-          <span className="rounded border border-white/15 bg-white/5 px-2 py-1 text-[11px] text-white/70">
+          <span className="desk-menu-count">
             {items.length} dishes · <strong>{soldOut}</strong> sold out
           </span>
           <button className={BTN} onClick={() => void load()} disabled={loading}>
@@ -93,64 +95,69 @@ export default function DeskMenu({
         </div>
       </section>
 
-      <p className="rounded border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-white/60">
-        The kitchen runs out mid-service, so the desk can stop a dish being ordered here. This is the
-        only menu control the desk has: no prices, no description, no photographs, no adding or
-        deleting. A sold-out dish disappears from ordering straight away and stays on the menu for
-        tomorrow.
+      <p className="desk-menu-permission-note">
+        <Utensils size={15} />
+        <span>Front desk access: meal details and prices are view-only. You can mark a dish sold out or put it back on sale; menu edits stay with managers.</span>
       </p>
 
       {categories.map((category) => (
-        <section key={category} className={CARD}>
-          <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-white/60">{category}</h3>
-          <div className="space-y-1.5">
+        <section key={category} className="desk-menu-category">
+          <div className="desk-menu-category-heading">
+            <h3>{category}</h3>
+            <span>{items.filter((item) => item.category === category).length} items</span>
+          </div>
+          <div className="desk-menu-grid">
             {items
               .filter((item) => item.category === category)
               .map((item) => (
-                <div
-                  key={item.id}
-                  className={`flex flex-wrap items-center justify-between gap-2 rounded border p-2.5 text-xs ${
-                    item.isAvailable ? "border-white/10 bg-black/20" : "border-rose-500/40 bg-rose-500/10"
-                  }`}
-                >
-                  <div>
-                    <p className="font-bold">
-                      {item.name}
-                      {item.isSpecial && (
-                        <span className="ml-2 rounded bg-[#f28c18]/20 px-1.5 py-0.5 text-[10px] text-[#f8c66b]">
-                          special
-                        </span>
-                      )}
-                      {!item.isAvailable && (
-                        <span className="ml-2 rounded bg-rose-500/25 px-1.5 py-0.5 text-[10px] text-rose-100">
-                          SOLD OUT
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-[11px] text-white/55">{money(item.price)}</p>
+                <article key={item.id} className={`desk-meal-card ${item.isAvailable ? "" : "is-sold-out"}`}>
+                  <div className="desk-meal-image">
+                    <span className="desk-meal-image-fallback" aria-hidden="true"><ChefHat size={25} /></span>
+                    {item.imageUrl && (
+                      <img
+                        src={item.imageUrl}
+                        alt={item.name}
+                        loading="lazy"
+                        onError={(event) => { event.currentTarget.hidden = true; }}
+                      />
+                    )}
+                    {item.isSpecial && <span className="desk-meal-special">House special</span>}
+                    {!item.isAvailable && <span className="desk-meal-sold-badge">Sold out</span>}
                   </div>
-                  {!readOnly && (
-                    <button
-                      className={item.isAvailable ? BTN_DANGER : BTN_PRIMARY}
-                      disabled={busyId === item.id}
-                      onClick={() => void toggle(item)}
-                    >
-                      {busyId === item.id ? (
-                        <Loader2 size={13} className="animate-spin" />
-                      ) : (
-                        <CheckCircle2 size={13} />
+                  <div className="desk-meal-content">
+                    <div className="desk-meal-title-row">
+                      <h4>{item.name}</h4>
+                      <strong className="desk-meal-price">{money(item.price)}</strong>
+                    </div>
+                    <p className="desk-meal-description">{item.description || "A Sunrise Motel menu favourite."}</p>
+                    <div className="desk-meal-footer">
+                      <span className={`desk-meal-availability ${item.isAvailable ? "is-available" : "is-unavailable"}`}>
+                        <span />{item.isAvailable ? "Available to order" : "Currently sold out"}
+                      </span>
+                      {!readOnly && (
+                        <button
+                          className={item.isAvailable ? BTN_DANGER : BTN_PRIMARY}
+                          disabled={busyId === item.id}
+                          onClick={() => void toggle(item)}
+                        >
+                          {busyId === item.id ? (
+                            <Loader2 size={13} className="animate-spin" />
+                          ) : (
+                            <CheckCircle2 size={13} />
+                          )}
+                          {item.isAvailable ? "Mark sold out" : "Put on sale"}
+                        </button>
                       )}
-                      {item.isAvailable ? "Sold out" : "Back on sale"}
-                    </button>
-                  )}
-                </div>
+                    </div>
+                  </div>
+                </article>
               ))}
           </div>
         </section>
       ))}
 
       {!loading && items.length === 0 && (
-        <p className="text-[11px] text-white/40">
+        <p className="desk-menu-empty">
           No dishes are in the menu table yet — seed or add them from the admin portal.
         </p>
       )}

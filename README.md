@@ -45,7 +45,7 @@ PostgreSQL database. It replaces both a paper booking book and the old PHP/MySQL
 | **Staff (front desk)** | Sign in and work **`/desk`**: the Today board, check-in and check-out, validated room assignment, cash at the counter, the order board, the message queue, housekeeping tasks, room access, and closing a dish as *sold out*. Approve / confirm / cancel / follow-up too. |
 | **Admins (manager)** | Everything staff can do **plus** everything staff cannot: verifying claimed payments, folio charges and voids, extending a stay, deleting bookings, managing staff / rooms / rates, posts and gallery pictures, guest account status and consent, moderate reviews, revenue dashboards, reports, and broadcast app push. §8.3 is the exact matrix. |
 | **Auditors** | A third read-only role: everything above is *visible*, every write returns **403** (§8.2). |
-| **Mobile** | Installable PWA (Android/iOS home-screen install, with a **separate "Sunrise Manager" manifest** for the portal) **and two native Android WebView apps** — `SunriseMotelApp` for guests, `SunriseAdminApp` ("Sunrise Manager") for staff — each with its own icon and in-app updates. Push is on the guest app only (§12). |
+| **Mobile** | Installable PWA (Android/iOS home-screen install, with a **separate "Sunrise Manager" manifest** for the portal) that automatically offers installation on page visits, **and two native Android WebView apps** — `SunriseMotelApp` for guests, `SunriseAdminApp` ("Sunrise Manager") for staff — each with its own icon and in-app updates. Push is on the guest app only (§12). |
 | **Auditing** | Every guest and staff action is written to an **append-only audit log** with actor, actor label, IP and Malawi time — so any booking can be reconstructed later. |
 
 Two audiences, one codebase, two very different interfaces:
@@ -74,6 +74,36 @@ Two audiences, one codebase, two very different interfaces:
                                      Firebase Cloud Messaging (app push), Vercel Blob (images)
 ```
 
+### 1.1 Runtime and request paths
+
+This is a **single Next.js application**, not a separately deployed frontend and API. Pages under
+`src/app/` render the guest, desk and manager experiences; browser actions call Route Handlers under
+`src/app/api/`. Those handlers validate inputs, resolve the relevant staff or guest identity, apply
+role and ownership checks, perform database work through Drizzle, and return JSON, files or status
+codes. The browser never connects directly to Postgres.
+
+Typical paths through the system:
+
+1. **Booking:** the guest page requests availability and a price quote; `POST /api/bookings`
+   rechecks inventory on the server, creates the booking and invoice data, writes timeline/audit
+   records, and attempts configured notifications. The guest can then track with booking reference
+   plus phone and download the invoice PDF.
+2. **In-house guest:** the guest enters through a signed-in account or a stay-scoped room session
+   (QR, PIN, or reference + phone). Guest APIs resolve that identity server-side before allowing
+   orders, requests or messages. Check-in opens a room session; check-out closes it.
+3. **Staff operation:** `/desk` and `/admin` call their respective API families. Staff sessions use
+   the signed `sunrise_session` cookie; API handlers enforce roles. The `auditor` role is read-only.
+   `src/middleware.ts` only sets API cache headers; it is **not** the authentication boundary.
+4. **External effects:** email uses SMTP, Android app notifications use Firebase Cloud Messaging,
+   browser notifications use Web Push, and image uploads use Vercel Blob with a Postgres fallback.
+   These integrations are server-side and are optional when their credentials are absent.
+
+`src/db/schema.ts` is the Drizzle model; `drizzle/*.sql` is the versioned migration history.
+`src/db/index.ts` owns the PostgreSQL pool and Drizzle client. `src/lib/` contains shared domain
+rules (pricing, time, authentication, guest context, audit, invoices, notifications) used by the
+Route Handlers. `public/` serves static assets, PWA manifests and service workers. The Android apps
+are WebView clients of the deployed website, not separate business-logic backends.
+
 ## 2. Repository map
 
 ```
@@ -98,7 +128,7 @@ sunraisehotles/
 │  │  ├─ admin/notifications/page.tsx # App push broadcast composer (admin only)
 │  │  ├─ globals.css, inner-pages.css, enhancements.css, animations.css, site-nav.css
 │  │  ├─ home-premium.css, review/review.css     # route sheets — `hp-` on `/`, `rv-` on `/review`
-│  │  └─ api/…                      # every HTTP endpoint (see §9)
+│  │  └─ api/…                      # Route Handlers; full family map in §9
 │  ├─ components/
 │  │  ├─ guest/                     # the guest-side screens
 │  │  │  ├─ guest-app.tsx           → /app       signed-in app: room, folio, orders, messages
@@ -119,6 +149,7 @@ sunraisehotles/
 │  │  │  ├─ guest-credentials-card.tsx # the printed guest app sign-in card (email + system-set password)
 │  │  │  └─ shared.ts               # shared desk types + helpers
 │  │  ├─ experience-pages.tsx       # PageFrame, GalleryGrid, StayPage, DinePage, UnwindPage, ConnectPage
+│  │  ├─ admin/                     # Manager shared panels (audit log, user management)
 │  │  ├─ track-booking.tsx          # Guest tracking UI
 │  │  ├─ sunrise-logo.tsx           # Logo + PageLoadingSplash
 │  │  ├─ ImageUploader.tsx          # Drag & drop file picker → /api/upload
@@ -127,7 +158,7 @@ sunraisehotles/
 │  │  └─ ServiceWorkerRegister.tsx  # SW registration + "A newer version is ready" card
 │  ├─ db/
 │  │  ├─ index.ts                   # pg Pool + Drizzle client (auto SSL for Neon/Supabase/Render)
-│  │  ├─ schema.ts                  # ALL 28 tables (single source of truth — see §4)
+│  │  ├─ schema.ts                  # Drizzle model (34 tables currently declared; see §4)
 │  │  └─ seed.ts                    # First-run seed: rooms, posts, menu, gallery
 │  └─ lib/
 │     ├─ staff-auth.ts              # Session cookie sign/verify/label, staff lookup, roles (§14.2, §47)
@@ -140,7 +171,8 @@ sunraisehotles/
 │     ├─ invoice-pdf.ts             # buildInvoicePdf() + parseExtras() (pdf-lib)
 │     ├─ folio-invoice.ts           # Builds an invoice from folio_items (§25.1)
 │     ├─ mail.ts                    # SMTP transport + all HTML email templates
-│     ├─ fcm.ts                     # FCM access token (RS256 JWT) + sendToTopic()
+│     ├─ fcm.ts / web-push.ts       # Android FCM and browser Web Push
+│     ├─ settings.ts                # Runtime settings (environment values take precedence)
 │     ├─ guest-context.ts           # resolveGuestContext(): account OR room session → one context (§40)
 │     ├─ room-session.ts            # Open / validate / rotate / close a room session (§42)
 │     ├─ guest-otp.ts               # 6-digit codes: hashed, 10 min, 3 attempts, resend throttle (§41)
@@ -149,25 +181,25 @@ sunraisehotles/
 │     ├─ reviews.ts                 # Reviews, the real average, the waitlist and its mail-out (§43)
 │     ├─ hotel.ts                   # The motel's own details, used by cards, emails and PDFs
 │     └─ notify.ts                  # One place that decides channel + audience for a message
-├─ drizzle/                         # Generated SQL migrations + meta journal (7: 0000 → 0006)
+├─ drizzle/                         # SQL migration history + snapshots (15: 0000 → 0014)
 ├─ public/                          # images/, icon-192.png, icon-512.png, manifest.json, sw.js, version.json, version-admin.json, manifest-admin.json
-├─ scripts/staff-invite.mjs         # CLI: create/reset a portal login + email the credentials
-├─ scripts/addenda-verify.mjs       # 58 live HTTP checks — auth, roles, sold-out, menu, posts/gallery, dirty room (Part D §47)
+├─ scripts/staff-login.mjs          # CLI: create/reset a portal login in local, Neon or both DBs
+├─ scripts/                         # Verification, preview-account, media and maintenance scripts
 ├─ docs/ADDENDA-BUILD-STATUS.md     # Per-part build status of the six addenda (honest, incl. gaps)
 ├─ docs/addenda/                    # The six source addenda (31-the-staff-dashboard.md → 36-…)
 ├─ SunriseMotelApp/                 # Native Android WebView wrapper (Kotlin + Gradle) — the guest app
 ├─ SunriseAdminApp/                 # Native Android WebView wrapper for the portal — "Sunrise Manager"
-├─ php-mysql/                       # LEGACY PHP/MySQL prototype — archived, NOT used by the live site
 ├─ .github/workflows/build-apk.yml  # CI: build BOTH signed APKs and attach them to a GitHub Release
 ├─ drizzle.config.ts                # Schema path + DATABASE_URL (never hardcodes 127.0.0.1)
 ├─ next.config.ts                   # turbopack.root pin (silences multi-lockfile warning)
 ├─ vercel.json                      # framework nextjs, region iad1
 ├─ share-tunnel.ps1                 # Local sharing via a cloudflared quick tunnel
-└─ RUN_LOCALLY.md                   # Bare-bones Windows localhost run sheet
+├─ RUN_LOCALLY.md                   # Windows local development run sheet
+└─ README.md                        # System architecture, operations and feature documentation
 ```
 
-> **`php-mysql/` is archived.** It was the first prototype. The live site is the Next.js app in
-> `src/` + `public/`. Its README is kept only for historical reference.
+The live system is the Next.js app in `src/` plus its static assets in `public/`. No separate
+PHP/MySQL application is present in this checkout.
 
 ---
 
@@ -191,29 +223,21 @@ sunraisehotles/
 
 ## 4. Database schema
 
-Defined once in **`src/db/schema.ts`**. The **28 tables** that exist as of this build are:
+Defined once in **`src/db/schema.ts`**, which currently declares **34 tables**. The model spans:
 
-**The ten that Part A was written around** — the backbone, and still the core of the booking engine:
+| Domain | Tables |
+|---|---|
+| Inventory and reservations | `room_types`, `rooms`, `room_type_rates`, `room_blocks`, `bookings` |
+| Guest identity and access | `guests`, `guest_accounts`, `guest_sessions`, `activation_tokens`, `room_sessions`, `staff`, `invitations`, `push_subscriptions` |
+| Content and media | `posts`, `menu_items`, `gallery_images`, `uploaded_images`, `faqs`, `reviews`, `waitlist_entries` |
+| Service and room billing | `orders`, `order_items`, `folio_items`, `message_threads`, `messages`, `service_tasks`, `payments`, `invoices` |
+| Audit, delivery and reporting | `booking_events`, `audit_log`, `notification_log`, `night_audit`, `expenses`, `app_settings` |
 
-`room_types`, `bookings`, `posts`, `menu_items`, `gallery_images`, `invoices`, `staff`,
-`booking_events`, `audit_log`, `uploaded_images`.
-
-**The sixteen added since**, in three batches:
-
-* **The v2 data model** (§31): `rooms`, `guests`, `guest_accounts`, `guest_sessions`,
-  `activation_tokens`, `payments`, `notification_log`, `orders`, `order_items`, `folio_items`,
-  `message_threads`, `messages`, `service_tasks`, `room_type_rates` — **14 tables**.
-* **Part C, the guest paths** (§45): `room_sessions`, `reviews`, `waitlist_entries` — **3 tables**,
-  migration `drizzle/0006_guest_path_channels.sql`.
-* **One more:** `faqs` (the public FAQ rows).
-
-> **Do not quote a table count from memory.** It was 10 when Part A was written, 24 when Part B was
-> written, and 28 now. Confirm against `src/db/schema.ts` (`Select-String -Pattern 'pgTable\('`)
-> before publishing any number — §31 explains which of them are actually live.
-
-Migrations live in `drizzle/` — currently **seven** (`0000_gorgeous_scream` → `0006_guest_path_channels`),
-with the matching snapshots in `drizzle/meta/`. All timestamps are `timestamptz` (stored as UTC
-instants, always *displayed* in Malawi time). All money is an **integer in MWK** (no cents).
+The schema file is authoritative; read it before making schema-level assumptions. The `drizzle/`
+directory currently contains **15 SQL migrations**, `0000_gorgeous_scream.sql` through
+`0014_lame_firelord.sql`, with matching snapshots and a journal under `drizzle/meta/`. Migrations
+are applied with Drizzle Kit. All timestamps are `timestamptz` (stored as UTC instants and displayed
+in Malawi time); money is stored as integer MWK amounts (no fractional currency units).
 
 ### 4.1 `room_types` — the sellable catalogue
 | Column | Purpose |
@@ -632,27 +656,41 @@ and one role gate — but they are different tools for different jobs.
 
 ## 9. API reference
 
-All endpoints live under `src/app/api/`. Booking / tracking / availability routes are
-`force-dynamic` (never cached). `§9.1` needs no login; `§9.2` (`/api/admin/*`) and `§9.3`
-(`/api/desk/*`) require a valid `sunrise_session` cookie, and every write is role-gated through
-`src/lib/desk-auth.ts` (§47).
+All endpoints live under `src/app/api/`. API responses are non-cacheable by default through
+`src/middleware.ts`; image and upload byte routes keep their own cache policy. `§9.1` lists public
+booking/content routes; `§9.2` lists staff/admin routes; and `§9.3` lists desk routes. The
+`/api/admin/*` namespace includes a small number of deliberately public read handlers, so access
+is determined per handler, not from the URL prefix. Protected staff/admin/desk handlers verify the
+`sunrise_session` cookie and enforce roles server-side through the auth helpers (§14, §47).
 
 ### 9.1 Public endpoints (no login)
 
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/availability?checkIn=YYYY-MM-DD&checkOut=YYYY-MM-DD` | Live per-room availability + `statusText`; also triggers the first-run seed |
+| `POST` | `/api/rooms/calculate-price` | Server-side quote for room dates, guests and selected extras |
 | `POST` | `/api/bookings` | Create a booking + pro-forma invoice (transactional, row-locked). `400` validation, `404` unknown room, **`409 SOLD_OUT`** |
 | `POST` | `/api/track` `{ reference, phone }` | Guest tracking (`403` on phone mismatch, `404` unknown reference) |
 | `GET` | `/api/invoices/[reference]` | Streams the pro-forma / receipt **PDF** |
+| `GET` | `/api/posts` | Public published posts feed |
 | `GET` | `/api/admin/posts` | **Public read** — posts for the public site |
 | `GET` | `/api/admin/gallery` | **Public read** — gallery images ordered by `display_order` |
 | `GET` | `/api/reviews` | **Public read** — published reviews, and the real average computed from them or nothing at all (§43.1) |
+| `POST` | `/api/reviews` | Submit an eligible stay review; publication and eligibility are checked server-side |
 | `POST` | `/api/waitlist` | Join the sold-out waitlist: name + one contact + the exact nights that failed (§43.2) |
-| `POST` | `/api/guest/room-session` `{ qr \| roomNumber+pin \| reference+phone }` | Start a **room session** with no account — the `/room` screen (§42) |
-| `POST` | `/api/guest/auth` | Guest sign-in / sign-out / sign-out-everywhere (per-device `guest_sessions`) |
-| `POST` | `/api/guest/activate` | Set a password and consume the 6-digit code from the invitation (§41) |
+| `GET`/`POST`/`DELETE` | `/api/guest/room-session` | Validate/open or close a **room session** with no account — the `/room` screen (§42) |
+| `GET`/`POST`/`DELETE`/`PATCH` | `/api/guest/auth` | Guest sign-in, sign-out, account recovery and security actions (per-device `guest_sessions`) |
+| `GET`/`POST` | `/api/guest/activate` | Validate activation and set a password using the invitation code (§41) |
 | `GET` | `/api/guest/me` | Who the current guest context resolves to — an account *or* a room session (§40) |
+| `GET`/`DELETE` | `/api/guest/sessions` | List or revoke the signed-in guest's device sessions |
+| `GET`/`POST` | `/api/guest/orders` | Read or place an order in the current guest context |
+| `POST` | `/api/guest/messages` | Send a message in the current guest's private desk thread |
+| `POST` | `/api/guest/requests` | Create a service request in the current guest context |
+| `POST` | `/api/invitations/request` | Request guest account access/invitation |
+| `GET`/`POST` | `/api/invitations/setup` | Validate and complete an invitation setup token |
+| `GET`/`POST` | `/api/admin/setup` | Compatibility alias for invitation setup; token-protected, not an admin session endpoint |
+| `GET` | `/api/push/config` | Public Web Push configuration (public key only) |
+| `POST` | `/api/push/subscribe` and `/api/push/unsubscribe` | Register or remove the current browser's Web Push subscription |
 | `GET` | `/api/images/[id]` | Serves a Postgres-stored upload (immutable cache; trailing `.png` etc. tolerated) |
 | `GET` | `/api/uploads/[file]` | Serves a legacy `./uploads` file (basename-sanitised, image extensions only) |
 | `GET` | `/api/health` | `{ ok, serverTime, timezone: "Africa/Blantyre", localTime }` — DB connectivity probe |
@@ -709,6 +747,24 @@ Every one of these goes through `deskActor()`; a write as an `auditor` returns *
 | `GET`/`POST` | `/api/desk/folios` | read — any session · `add_charge`/`void_item`/`regenerate_invoice` — **admin** | The room bill and the invoice built from it |
 | `GET`/`POST` | `/api/desk/guests` | `invite`/`resend`/`activate_at_desk` — staff · `set_status`/`set_consent` — **admin** | The guest CRM and accounts |
 | `GET`/`POST` | `/api/desk/reviews` | `add`/`notify_waitlist` — staff · `moderate` — **admin** | Reviews and the sold-out waitlist (§43) |
+
+### 9.4 Additional route families and operational endpoints
+
+The tables above describe the main guest and desk workflows. These additional route files are also
+part of the deployed system; their `route.ts` files define the exact methods, validation and access
+rules. Do not infer authorization solely from an `/api/admin/` prefix: each handler owns its gate.
+
+| Family | Paths | Purpose / access notes |
+|---|---|---|
+| Admin booking operations | `/api/admin/calendar`, `/api/admin/bookings/extend`, `/api/admin/guests/[id]` | Calendar data/updates, stay extension, and a guest record; protected by staff/admin checks in each handler |
+| Admin finance and close | `/api/admin/expenses`, `/api/admin/night-audit` | Expense records and the daily close/report; manager actions require admin authorization |
+| Admin room operations | `/api/admin/housekeeping`, `/api/admin/room-blocks` | Housekeeping management and dated inventory blocks; protected operational handlers |
+| Admin identity | `/api/admin/invitations`, `/api/admin/invite`, `/api/admin/invite/bulk` | Staff invitations; creation and changes are admin-gated |
+| Admin diagnostics | `/api/admin/audit-logs`, `/api/admin/email-test`, `/api/admin/push-test` | Audit viewing and integration checks; authenticated, with role requirements defined in each handler |
+| Scheduled job | `GET /api/cron/availability-digest` | Scheduled availability notification; schedule is configured in `vercel.json` |
+| Health and deployment checks | `GET /api/health`, `/api/version`, `/api/debug/cache-check`, `/api/debug/live-check` | Runtime health, app update metadata and deployment/cache probes; debug routes are diagnostic, not business APIs |
+| Stored media | `GET /api/images/[id]`, `/api/uploads/[file]` | Serve database-backed or legacy local uploads; local filesystem uploads are not durable on Vercel |
+| Retired download | `GET /api/download-zip` | Returns `410 Gone`; source download is intentionally disabled |
 
 ---
 
@@ -977,15 +1033,19 @@ CI: nothing needs Gradle or the SDK installed locally, and in fact neither is in
 
 * Every monetary value is an **integer number of MWK** (no decimals, no floats) — in the DB, the
   API payloads and the PDF.
-* `bookingMath(nightlyRate, nights, { serviceFee, extensionFee, discount, extrasTotal })` is the
-  single pricing function:
-  `total = max(0, rate × nights + serviceFee + extensionFee + extrasTotal − discount)`
-  (`src/lib/pricing.ts`).
+* `calculateStayQuote()` in `src/lib/pricing.ts` is the shared stay-pricing path for room
+  availability, the booking form and booking submission. It applies the selected nightly rates,
+  date/guest rules, discounts, extras and the room's configured VAT rate. `calculateVat()` handles
+  VAT-inclusive prices (extracting VAT without changing the gross) and VAT-exclusive prices
+  (adding VAT to the net). Booking submission recalculates the quote server-side.
 * The **nightly rate is snapshotted** onto the booking, so raising a room's rate in *Rooms* never
   rewrites history — only *new* bookings get the new price.
+* The default VAT rate for new rooms is **17.5%** (1,750 basis points); room-specific rates remain
+  configurable and are snapshotted onto invoices with the VAT-inclusive/exclusive mode.
 * Recording a full payment automatically flips the booking to `confirmed` and the invoice from
-  `proforma`/`sent` to `paid`, which the PDF then renders as a **receipt** ("PAID IN FULL") instead
-  of a quotation, and the tracking page calls it a *receipt* rather than a *pro-forma*.
+  `proforma`/`sent` to `paid`. The generated PDF is a **payment confirmation**, not an MRA tax
+  invoice or fiscal receipt; the tracking page uses the same distinction. The app must not claim
+  MRA EIS integration unless that integration is configured and verified.
 
 ### 13.2 Time (Africa/Blantyre)
 
@@ -1070,7 +1130,7 @@ Copy `.env.vercel.example` for a deploy checklist. `.env` is gitignored — neve
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | App push | The **whole** service-account JSON pasted as-is |
 | `FIREBASE_PROJECT_ID` | App push | e.g. `sunrise-motel`; recommended so a bad paste reports the real FCM error |
 | `PG_POOL_MAX` | Optional | Postgres pool size (default 10) |
-| `NEON_DATABASE_URL`, `NEON_DATABASE_URL_UNPOOLED`, `NEON_BRANCH`, `NEON_PROJECT_ID` | CLI tooling | Used by `scripts/staff-invite.mjs --db neon` |
+| `NEON_DATABASE_URL`, `NEON_DATABASE_URL_UNPOOLED`, `NEON_BRANCH`, `NEON_PROJECT_ID` | CLI tooling | Staff login utility can target Neon with `--db neon` |
 
 ---
 
@@ -1085,8 +1145,10 @@ Copy `.env.vercel.example` for a deploy checklist. `.env` is gitignored — neve
 | `npm start` | `next start` | Serve the production build |
 | `npm run lint` | `eslint .` | Lint |
 | `npm run typecheck` | `tsc --noEmit` | Type check |
-| `npm run staff:invite` | `node --no-warnings scripts/staff-invite.mjs` | Create/reset a portal login from the CLI |
 | `npm run vercel-build` | `npx drizzle-kit migrate --config=drizzle.config.ts && next build` | What Vercel runs |
+
+The staff login utility is a direct Node command, not an npm script: `node --no-warnings
+scripts/staff-login.mjs`. See §18.2 for flags and safe use.
 
 ### 16.2 First-time setup
 
@@ -1187,25 +1249,24 @@ use **Email login** to reset and re-send, **Deactivate/Activate** to suspend acc
 to delete the account. You cannot deactivate or delete **your own** account, and every one of these
 actions is audited.
 
-### 18.2 From the CLI (`scripts/staff-invite.mjs`)
+### 18.2 Direct login utility (`scripts/staff-login.mjs`)
 
-For the very first admin, a locked-out login, or a specific database:
+Use this only for initial setup or recovery; normal staff onboarding belongs in the admin portal.
+The utility creates or resets a staff login in the configured local database, Neon, or both. It
+reads connection strings from `.env` and uses the application's password hashing and audit log.
 
 ```powershell
-npm run staff:invite -- --name "Willard Kulemeka" --email willard@example.com --role admin
+# Preview first; --db defaults to both configured databases
+node --no-warnings scripts/staff-login.mjs --email you@example.com --password 'replace-with-a-strong-password' --role admin --dry-run
 
-# Useful flags
-#   --role admin|staff          (default staff = least privilege)
-#   --phone "+265…"
-#   --password "…"              (min 6; otherwise a strong one is generated)
-#   --db local|neon|<postgres://url>   (default local = DATABASE_URL in .env)
-#   --no-email                  create/reset without sending mail
-#   --dry-run                   show what would happen, change nothing
+# Apply to the intended target after reviewing the preview
+node --no-warnings scripts/staff-login.mjs --email you@example.com --password 'replace-with-a-strong-password' --role admin --db local
 ```
 
-The CLI reuses the app's own `password.ts` hashing and `mail.ts` templates, prints the credentials
-once, **verifies the stored hash before handing the password over**, and writes a `staff.created` /
-`staff.credentials_reset` row to `audit_log` with `actor_label = "staff-invite CLI"`.
+Supported role values are `super_admin`, `admin`, `motel_manager`, `restaurant_manager`, `staff`
+and `auditor`; `--db` accepts `local`, `neon` or `both`. The password is a command-line argument,
+so avoid running the command in a shared terminal or a shell whose history is exposed. The utility
+does not send an invitation email; use the portal's invitation workflow for routine onboarding.
 
 ---
 
@@ -2965,4 +3026,3 @@ Drag-and-drop on the board (buttons instead); a guest-360 link from the desk's g
 the page works by URL, the entry point is still to come; PDF *generation* for the finance
 reports (the print view covers it); and the Phase 3 premium restyle of the older screens,
 which is visual only and therefore deliberately separate from anything that moves money.
-

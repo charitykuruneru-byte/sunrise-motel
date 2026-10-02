@@ -8,9 +8,13 @@
  * key — it survives every deploy. This is what made the landing page say
  * "Rooms are loading…" forever: one failed call had been stored, and was then
  * served back on every reload for those same dates. The version was bumped so
- * those stored answers are deleted the moment this worker activates. */
+ * those stored answers are deleted the moment this worker activates.
+ *
+ * Next.js assets are also network-only: development chunk URLs are stable across
+ * edits, so cache-first can pair fresh server HTML with stale client JavaScript
+ * and cause React hydration mismatches. */
 
-const CACHE = "sunrise-motel-v3";
+const CACHE = "sunrise-motel-v6";
 const CORE = ["/", "/manifest.json", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -85,6 +89,11 @@ self.addEventListener("fetch", (event) => {
   // respondWith() hands the request back to the browser's own stack, so nothing
   // in this file can answer a question about tonight's rooms.
   if (url.pathname.startsWith("/api/")) return;
+
+  // Next.js chunk URLs may remain stable while their content changes in dev.
+  // Let the browser and Next server handle them directly, never serve old chunks
+  // from the PWA cache.
+  if (url.pathname.startsWith("/_next/")) return;
 
   // Page navigations: try network first, fall back to cached home shell.
   if (request.mode === "navigate") {

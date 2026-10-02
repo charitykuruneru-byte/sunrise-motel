@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { SunriseLogo } from "@/components/sunrise-logo";
 
 /**
@@ -66,7 +67,21 @@ export default function SiteNav({
   bookingHref?: string;
   showStickyBar?: boolean;
 }) {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
+
+  const resolvedActive = (() => {
+    if (active) return active;
+    if (!pathname || pathname === "/") return "Home";
+    const clean = pathname.split("/")[1];
+    const match = PRIMARY.find((item) => {
+      const route = item.href.split("/")[1] ?? "";
+      return route && route === clean;
+    });
+    return match?.label ?? "Home";
+  })();
+
+  const closeMenu = () => setOpen(false);
 
   return (
     <div className="site-nav-root">
@@ -82,9 +97,6 @@ export default function SiteNav({
           <div className="utility-right">
             <a href="/app" className="utility-link">
               <Smartphone size={12} className="accent-orange" /> Get the app
-            </a>
-            <a href="/admin" className="utility-link utility-portal-link">
-              <ShieldCheck size={12} /> Manager portal
             </a>
           </div>
         </div>
@@ -102,36 +114,37 @@ export default function SiteNav({
           <nav className={`header-nav-menu site-primary-nav ${open ? "is-visible" : ""}`} aria-label="Main navigation">
             {PRIMARY.map((item) => {
               const Icon = item.icon;
-              const isActive = active === item.label;
+              const isActive = resolvedActive === item.label;
               return (
-                <a
+                <Link
                   key={item.href}
                   href={item.href}
                   className={`site-nav-item ${isActive ? "is-active" : ""}`}
                   aria-current={isActive ? "page" : undefined}
+                  onClick={closeMenu}
                 >
                   <span className="nav-item-main">
                     <Icon size={16} /> {item.label}
                   </span>
                   {item.sub && <small className="nav-item-sub">{item.sub}</small>}
-                </a>
+                </Link>
               );
             })}
 
             {/* Utilities belong in the drawer, never in the primary row */}
             <span className="nav-divider" aria-hidden="true" />
-            <a href="/track" className={`nav-utility-link ${active === "Track" ? "is-active" : ""}`}>
+            <Link href="/track" className={`nav-utility-link ${resolvedActive === "Track" ? "is-active" : ""}`} onClick={closeMenu}>
               <Search size={15} /> Track booking
-            </a>
-            <a href="/app" className="nav-utility-link">
+            </Link>
+            <Link href="/app" className="nav-utility-link" onClick={closeMenu}>
               <Smartphone size={15} /> Get the app
-            </a>
-            <a href="/room" className="nav-utility-link">
+            </Link>
+            <Link href="/room" className="nav-utility-link" onClick={closeMenu}>
               <BriefcaseBusiness size={15} /> Order to your room
-            </a>
-            <a href="/admin" className="nav-utility-link admin-nav-link">
+            </Link>
+            <Link href="/admin" className="nav-utility-link admin-nav-link" onClick={closeMenu}>
               <ShieldCheck size={15} /> Manager portal
-            </a>
+            </Link>
             <span className="nav-divider" aria-hidden="true" />
             <div className="nav-drawer-contact">
               <a href="tel:+265998688332">
@@ -144,12 +157,12 @@ export default function SiteNav({
           </nav>
 
           <div className="header-right-actions">
-            <a href={bookingHref} className="btn-check-availability">
+            <Link href={bookingHref} className="btn-check-availability" onClick={closeMenu}>
               <CalendarCheck size={15} /> Check availability
-            </a>
-            <a href="/track" className="header-track-link">
+            </Link>
+            <Link href="/track" className="header-track-link" onClick={closeMenu}>
               <Search size={14} /> Track booking
-            </a>
+            </Link>
             <a href={WHATSAPP_DEFAULT} target="_blank" rel="noreferrer" className="btn-whatsapp-header">
               <MessageCircle size={16} /> <span>WhatsApp</span>
             </a>
@@ -168,9 +181,9 @@ export default function SiteNav({
       {/* ---------------- Mobile sticky action bar ---------------- */}
       {showStickyBar && (
         <div className="site-sticky-bar">
-          <a href={bookingHref} className="site-sticky-primary">
+          <Link href={bookingHref} className="site-sticky-primary" onClick={closeMenu}>
             <CalendarCheck size={16} /> Check availability
-          </a>
+          </Link>
           <a
             className="site-sticky-whatsapp"
             href={whatsappLink("Hello Sunrise Motel, I would like to check availability.")}

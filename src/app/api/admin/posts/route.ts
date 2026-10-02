@@ -82,11 +82,22 @@ export async function POST(request: Request) {
       time?: string;
       detail: string;
       priceTag?: string;
+      bookingAddonPrice?: number | null;
       imageUrl?: string;
     };
 
-    if (!body.title || !body.detail) {
+    if (typeof body.title !== "string" || !body.title.trim() || body.title.length > 200 || typeof body.detail !== "string" || !body.detail.trim()) {
       return NextResponse.json({ error: "Title and description are required." }, { status: 400 });
+    }
+    const category = typeof body.category === "string" && body.category.trim() ? body.category.trim() : "Event";
+    const bookingAddonPrice = body.bookingAddonPrice === undefined || body.bookingAddonPrice === null
+      ? null
+      : body.bookingAddonPrice;
+    if (bookingAddonPrice !== null && (!Number.isSafeInteger(bookingAddonPrice) || bookingAddonPrice < 0 || bookingAddonPrice > 50_000_000)) {
+      return NextResponse.json({ error: "Booking add-on price must be a whole MWK amount between 0 and 50,000,000." }, { status: 400 });
+    }
+    if (bookingAddonPrice !== null && category !== "Offer") {
+      return NextResponse.json({ error: "Only Offer posts can be selected as booking add-ons." }, { status: 400 });
     }
 
     const [newPost] = await db
@@ -94,12 +105,13 @@ export async function POST(request: Request) {
       .values({
         id: randomUUID(),
         title: body.title.trim(),
-        category: body.category || "Event",
+        category,
         day: body.day?.trim() || "SPECIAL",
         date: body.date?.trim() || "NOW",
         time: body.time?.trim() || "All day",
         detail: body.detail.trim(),
         priceTag: body.priceTag?.trim() || "",
+        bookingAddonPrice,
         imageUrl: body.imageUrl?.trim() || "https://images.pexels.com/photos/18852576/pexels-photo-18852576.jpeg",
         isActive: true,
       })
@@ -154,20 +166,76 @@ export async function PATCH(request: Request) {
   const denied = requireRestaurantManager(user);
   if (denied) return denied;
   try {
-    const body = (await request.json()) as { id: string; isActive: boolean };
-    if (!body.id) {
+    const body = (await request.json()) as {
+      id: string;
+      isActive?: boolean;
+      title?: string;
+      category?: string;
+      day?: string;
+      date?: string;
+      time?: string;
+      detail?: string;
+      priceTag?: string;
+      bookingAddonPrice?: number | null;
+      imageUrl?: string;
+    };
+    if (!body.id || typeof body.id !== "string") {
       return NextResponse.json({ error: "Post ID is required." }, { status: 400 });
     }
 
+    const updates: Partial<typeof postsTable.$inferInsert> = {};
+    if (typeof body.isActive === "boolean") updates.isActive = body.isActive;
+    if (body.title !== undefined) {
+      if (typeof body.title !== "string" || !body.title.trim() || body.title.length > 200) return NextResponse.json({ error: "A title of 1–200 characters is required." }, { status: 400 });
+      updates.title = body.title.trim();
+    }
+    if (body.category !== undefined) {
+      if (typeof body.category !== "string" || !body.category.trim() || body.category.length > 64) return NextResponse.json({ error: "A valid category is required." }, { status: 400 });
+      updates.category = body.category.trim();
+    }
+    for (const field of ["day", "date", "time", "priceTag", "imageUrl"] as const) {
+      if (body[field] !== undefined) {
+        if (typeof body[field] !== "string") return NextResponse.json({ error: `Invalid ${field}.` }, { status: 400 });
+        if (field === "day") updates.day = body.day!.trim();
+        if (field === "date") updates.date = body.date!.trim();
+        if (field === "time") updates.time = body.time!.trim();
+        if (field === "priceTag") updates.priceTag = body.priceTag!.trim();
+        if (field === "imageUrl") updates.imageUrl = body.imageUrl!.trim();
+      }
+    }
+    if (body.detail !== undefined) {
+      if (typeof body.detail !== "string" || !body.detail.trim()) return NextResponse.json({ error: "Post details are required." }, { status: 400 });
+      updates.detail = body.detail.trim();
+    }
+    if (body.bookingAddonPrice !== undefined) {
+      if (body.bookingAddonPrice !== null && (!Number.isSafeInteger(body.bookingAddonPrice) || body.bookingAddonPrice < 0 || body.bookingAddonPrice > 50_000_000)) {
+        return NextResponse.json({ error: "Booking add-on price must be a whole MWK amount between 0 and 50,000,000." }, { status: 400 });
+      }
+      const effectiveCategory = updates.category ?? (await db.select({ category: postsTable.category }).from(postsTable).where(eq(postsTable.id, body.id)).then(([post]) => post?.category));
+      if (body.bookingAddonPrice !== null && effectiveCategory !== "Offer") {
+        return NextResponse.json({ error: "Only Offer posts can have a booking add-on price." }, { status: 400 });
+      }
+      updates.bookingAddonPrice = body.bookingAddonPrice;
+    }
+    if (updates.category && updates.category !== "Offer") updates.bookingAddonPrice = null;
+    if (Object.keys(updates).length === 0) return NextResponse.json({ error: "No post changes were provided." }, { status: 400 });
+
     const [updated] = await db
       .update(postsTable)
-      .set({ isActive: body.isActive })
+      .set(updates)
       .where(eq(postsTable.id, body.id))
       .returning();
+    if (!updated) return NextResponse.json({ error: "Post not found." }, { status: 404 });
 
     await logAudit({
-      action: body.isActive ? "ACTIVITY_ACTIVATED" : "ACTIVITY_PAUSED", entity: "post", entityId: body.id,
-      summary: `Post ${body.isActive ? "activated" : "deactivated"} (id ${body.id}).`,
+      action: updates.isActive !== undefined
+        ? updates.isActive ? "ACTIVITY_ACTIVATED" : "ACTIVITY_PAUSED"
+        : "ACTIVITY_UPDATED",
+      entity: "post",
+      entityId: body.id,
+      summary: updates.isActive !== undefined
+        ? `Post ${updates.isActive ? "activated" : "deactivated"}: ${updated.title}.`
+        : `Post updated: ${updated.title} (${updated.category}).`,
       actor: "manager", ip: clientIp(request),
     });
 

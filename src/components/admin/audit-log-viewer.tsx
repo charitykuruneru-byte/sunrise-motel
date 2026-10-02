@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -203,51 +203,107 @@ export default function AuditLogViewer() {
 
 
   return (
-    <div className="sunrise-app-root">
-      <main style={{ maxWidth: 1000, margin: "0 auto", padding: "32px 16px 96px" }}>
-        <span className="eyebrow"><span className="eyebrow-line" /> ACCOUNTABILITY</span>
-        <h1 className="hero-headline" style={{ marginTop: 8 }}>Every action, in order.</h1>
-        <p className="hero-description">
-          Nothing here can be edited or deleted — by anyone, including a Super Admin. The details behind each row
-          are kept exactly as they were written, so a summary can always be checked against its evidence.
-        </p>
+    <div className="sunrise-app-root audit-log-page">
+      <style jsx global>{`
+        .audit-log-page main.audit-log-main { width: 100%; max-width: 1320px; margin: 0 auto; padding: 8px 0 64px; }
+        .audit-log-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+        .audit-log-hero-copy { max-width: 780px; }
+        .audit-log-hero h1 { margin: 10px 0 8px; color: var(--ink); font: 600 clamp(34px, 4vw, 50px)/1.04 var(--serif); letter-spacing: -0.035em; }
+        .audit-log-hero p { max-width: 720px; color: var(--muted); font-size: 14px; line-height: 1.7; }
+        .audit-log-readonly { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; padding: 10px 14px; border: 1px solid rgba(82,106,87,.2); border-radius: 999px; background: var(--sage-light); color: var(--sage); font-size: 12px; font-weight: 700; }
+        .audit-log-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 24px 0 18px; }
+        .audit-log-stat { min-width: 0; border: 1px solid rgba(23,21,19,.09); border-radius: 18px; padding: 18px; background: rgba(255,255,255,.82); box-shadow: 0 8px 30px rgba(23,21,19,.035); }
+        .audit-log-stat-icon { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 12px; background: var(--orange-light); color: var(--orange-deep); }
+        .audit-log-stat-label { margin-top: 14px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .11em; }
+        .audit-log-stat-value { margin-top: 4px; color: var(--ink); font-size: 27px; font-weight: 750; line-height: 1.15; }
+        .audit-log-stat-detail { margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+        .audit-log-families { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 16px; }
+        .audit-log-families .btn-action { min-height: 36px; padding: 0 13px; border: 1px solid rgba(23,21,19,.1); border-radius: 999px; background: rgba(255,255,255,.72); color: var(--muted); font-size: 12px; transition: border-color .18s, background .18s, color .18s; }
+        .audit-log-families .btn-action.is-active { border-color: var(--orange); background: var(--orange-light); color: var(--orange-deep); font-weight: 700; opacity: 1 !important; }
+        .audit-log-filter-panel { margin-top: 0; padding: 20px; border: 1px solid rgba(23,21,19,.09); border-radius: 18px; background: rgba(255,255,255,.78); box-shadow: 0 8px 30px rgba(23,21,19,.035); }
+        .audit-log-filter-title { margin-bottom: 14px; color: var(--ink); font-size: 14px; font-weight: 700; }
+        .audit-log-filter-fields { gap: 14px; }
+        .audit-log-filter-actions { gap: 8px; }
+        .audit-log-filter-note { margin-top: 14px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+        .audit-log-day { margin-top: 24px; }
+        .audit-log-day-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 2px 10px; border-bottom: 1px solid var(--line); color: var(--ink); }
+        .audit-log-day-heading small { color: var(--muted); }
+        .audit-log-events { display: grid; gap: 10px; margin-top: 12px; }
+        .audit-log-event { display: grid; grid-template-columns: minmax(230px, 1.1fr) minmax(180px, .7fr) auto; align-items: center; gap: 16px; padding: 17px; border: 1px solid rgba(23,21,19,.09); border-left: 3px solid var(--event-tone); border-radius: 15px; background: rgba(255,255,255,.86); box-shadow: 0 6px 20px rgba(23,21,19,.025); }
+        .audit-log-event-main, .audit-log-event-meta { display: grid; min-width: 0; gap: 5px; }
+        .audit-log-event-title { display: flex; align-items: center; gap: 9px; color: var(--ink); font-size: 13px; }
+        .audit-log-event-main small, .audit-log-event-meta small { overflow-wrap: anywhere; color: var(--muted); font-size: 11px; line-height: 1.45; }
+        .audit-log-event-meta strong { color: var(--ink); font-size: 13px; }
+        .audit-log-event-actions { justify-content: flex-end; }
+        .audit-log-details { grid-column: 1 / -1; min-width: 0; }
+        .audit-log-details pre { overflow-x: auto; border: 1px solid rgba(23,21,19,.08); background: #fbf9f6 !important; color: var(--ink); }
+        @media (max-width: 1100px) {
+          .audit-log-page main.audit-log-main { padding-top: 20px; }
+          .audit-log-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .audit-log-event { grid-template-columns: minmax(0, 1fr) minmax(150px, .6fr); }
+          .audit-log-event-actions { grid-column: 1 / -1; justify-content: flex-start; }
+        }
+        @media (max-width: 640px) {
+          .audit-log-page main.audit-log-main { padding: 18px 14px 48px; }
+          .audit-log-hero { align-items: flex-start; flex-direction: column; gap: 14px; }
+          .audit-log-stats { gap: 9px; }
+          .audit-log-stat { padding: 13px; border-radius: 15px; }
+          .audit-log-stat-value { font-size: 23px; }
+          .audit-log-filter-panel { padding: 14px; }
+          .audit-log-event { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 14px; }
+          .audit-log-event-actions, .audit-log-details { grid-column: auto; }
+        }
+      `}</style>
+      <main className="audit-log-main">
+        <section className="audit-log-hero">
+          <div className="audit-log-hero-copy">
+            <span className="eyebrow"><span className="eyebrow-line" /> ACCOUNTABILITY</span>
+            <h1>Every action, in order.</h1>
+            <p>
+              A protected, read-only record of changes across the property. Each event keeps its original details
+              so actions can be traced back to the account and evidence behind them.
+            </p>
+          </div>
+          <span className="audit-log-readonly"><Shield size={15} /> Read-only · append-only</span>
+        </section>
 
-        <div className="form-grid-2" style={{ marginTop: 20 }}>
-          <div style={{ border: "1px solid var(--line)", borderRadius: 16, padding: 16, background: "rgba(255,255,255,0.6)" }}>
-            <History size={16} />
-            <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7, marginTop: 8 }}>EVENTS IN VIEW</div>
-            <div style={{ fontSize: 24, fontWeight: 700 }}>{stats.total.toLocaleString()}</div>
-            <div style={{ fontSize: 12, opacity: 0.7 }}>{entries.length} on screen{stats.total > entries.length ? " (newest first)" : ""}</div>
+        <div className="audit-log-stats">
+          <div className="audit-log-stat">
+            <span className="audit-log-stat-icon"><History size={17} /></span>
+            <div className="audit-log-stat-label">EVENTS IN VIEW</div>
+            <div className="audit-log-stat-value">{stats.total.toLocaleString()}</div>
+            <div className="audit-log-stat-detail">{entries.length} on screen{stats.total > entries.length ? " · newest first" : ""}</div>
           </div>
-          <div style={{ border: "1px solid var(--line)", borderRadius: 16, padding: 16, background: "rgba(255,255,255,0.6)" }}>
-            <UserRound size={16} />
-            <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7, marginTop: 8 }}>PEOPLE ACTING</div>
-            <div style={{ fontSize: 24, fontWeight: 700 }}>{stats.people.toLocaleString()}</div>
-            <div style={{ fontSize: 12, opacity: 0.7 }}>distinct accounts behind those events</div>
+          <div className="audit-log-stat">
+            <span className="audit-log-stat-icon"><UserRound size={17} /></span>
+            <div className="audit-log-stat-label">PEOPLE ACTING</div>
+            <div className="audit-log-stat-value">{stats.people.toLocaleString()}</div>
+            <div className="audit-log-stat-detail">Distinct accounts behind these events</div>
           </div>
-          <div style={{ border: "1px solid var(--line)", borderRadius: 16, padding: 16, background: "rgba(255,255,255,0.6)" }}>
-            <Download size={16} />
-            <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7, marginTop: 8 }}>MONEY EVENTS</div>
-            <div style={{ fontSize: 24, fontWeight: 700 }}>{stats.money.toLocaleString()}</div>
-            <div style={{ fontSize: 12, opacity: 0.7 }}>payments, invoices, expenses, night audits</div>
+          <div className="audit-log-stat">
+            <span className="audit-log-stat-icon"><Download size={17} /></span>
+            <div className="audit-log-stat-label">MONEY EVENTS</div>
+            <div className="audit-log-stat-value">{stats.money.toLocaleString()}</div>
+            <div className="audit-log-stat-detail">Payments, invoices, expenses and audits</div>
           </div>
-          <div style={{ border: "1px solid var(--line)", borderRadius: 16, padding: 16, background: "rgba(255,255,255,0.6)" }}>
-            <AlertTriangle size={16} color={stats.failures > 0 ? TONE.bad : undefined} />
-            <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7, marginTop: 8 }}>REFUSED OR FAILED</div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: stats.failures > 0 ? TONE.bad : undefined }}>{stats.failures.toLocaleString()}</div>
-            <div style={{ fontSize: 12, opacity: 0.7 }}>failed sends, rejected payments, revoked invitations</div>
+          <div className="audit-log-stat">
+            <span className="audit-log-stat-icon" style={{ color: stats.failures > 0 ? TONE.bad : undefined, background: stats.failures > 0 ? "#fcebea" : undefined }}><AlertTriangle size={17} /></span>
+            <div className="audit-log-stat-label">REFUSED OR FAILED</div>
+            <div className="audit-log-stat-value" style={{ color: stats.failures > 0 ? TONE.bad : undefined }}>{stats.failures.toLocaleString()}</div>
+            <div className="audit-log-stat-detail">Failed sends, rejected payments and revoked invitations</div>
           </div>
         </div>
 
-        <div className="invoice-actions" style={{ marginTop: 16, flexWrap: "wrap" }}>
-          <button className="btn-action" type="button" style={{ opacity: family === "all" ? 1 : 0.55 }} onClick={() => setFamily("all")}>
+        <div className="audit-log-families">
+          <button className={`btn-action${family === "all" ? " is-active" : ""}`} type="button" aria-pressed={family === "all"} style={{ opacity: family === "all" ? 1 : 0.55 }} onClick={() => setFamily("all")}>
             All · {stats.total}
           </button>
           {stats.families.map((row) => (
             <button
               key={row.family}
-              className="btn-action"
+              className={`btn-action${family === row.family ? " is-active" : ""}`}
               type="button"
+              aria-pressed={family === row.family}
               style={{ opacity: family === row.family ? 1 : 0.55 }}
               onClick={() => setFamily(family === row.family ? "all" : row.family)}
             >
@@ -258,15 +314,15 @@ export default function AuditLogViewer() {
 
 
         <form
-          className="form-fields-group"
-          style={{ marginTop: 16 }}
+          className="form-fields-group audit-log-filter-panel"
           onSubmit={(event) => {
             event.preventDefault();
             setLoading(true);
             void load().finally(() => setLoading(false));
           }}
         >
-          <div className="form-grid-2">
+          <div className="audit-log-filter-title">Find an event</div>
+          <div className="form-grid-2 audit-log-filter-fields">
             <label className="form-input-label"><span>Search the summary, reference or email</span>
               <input value={q} onChange={(event) => setQ(event.target.value)} placeholder="e.g. SM-260930-S2AH" />
             </label>
@@ -274,7 +330,7 @@ export default function AuditLogViewer() {
               <input value={action} onChange={(event) => setAction(event.target.value)} placeholder="e.g. INVITE_SENT" />
             </label>
           </div>
-          <div className="form-grid-2">
+          <div className="form-grid-2 audit-log-filter-fields">
             <label className="form-input-label"><span>Actor (name or email)</span>
               <input value={actor} onChange={(event) => setActor(event.target.value)} placeholder="e.g. willardkulemeka8" />
             </label>
@@ -283,7 +339,7 @@ export default function AuditLogViewer() {
               <label className="form-input-label"><span>Until</span><input type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label>
             </div>
           </div>
-          <div className="invoice-actions" style={{ flexWrap: "wrap" }}>
+          <div className="invoice-actions audit-log-filter-actions" style={{ flexWrap: "wrap" }}>
             <button className="admin-btn admin-btn-primary" type="submit" disabled={loading}>
               {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />} Apply filters
             </button>
@@ -295,7 +351,7 @@ export default function AuditLogViewer() {
             <a className="btn-action" href={exportHref("csv")}><Download size={13} /> CSV for Excel</a>
             <a className="btn-action" href={exportHref("pdf")}><FileText size={13} /> PDF</a>
           </div>
-          <p style={{ fontSize: 12, opacity: 0.7 }}>
+          <p className="audit-log-filter-note">
             {activeFilters.length > 0
               ? `Filtered by ${activeFilters.join(" · ")} — the cards above count only these rows.`
               : "Showing everything on record. Exports use whatever filters are set here."}
@@ -311,20 +367,20 @@ export default function AuditLogViewer() {
         ) : null}
 
         {days.map(([day, rows]) => (
-          <section key={day} style={{ marginTop: 20 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderBottom: "1px solid var(--line)", paddingBottom: 6 }}>
+          <section key={day} className="audit-log-day">
+            <div className="audit-log-day-heading">
               <strong>{new Date(`${day}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</strong>
               <small style={{ opacity: 0.6 }}>{rows.length} event{rows.length === 1 ? "" : "s"}</small>
             </div>
-            <div className="invoice-list">
+            <div className="audit-log-events">
               {rows.map((entry) => {
                 const tone = toneOf(entry.action);
                 const guestId = guestIdOf(entry);
                 const expanded = open === entry.id;
                 return (
-                  <article key={entry.id} className="invoice-row" style={{ borderLeft: `3px solid ${TONE[tone]}`, alignItems: "start", flexWrap: "wrap" }}>
-                    <div style={{ minWidth: 260 }}>
-                      <strong style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <article key={entry.id} className="audit-log-event" style={{ "--event-tone": TONE[tone] } as CSSProperties}>
+                    <div className="audit-log-event-main">
+                      <strong className="audit-log-event-title">
                         <span style={{ width: 8, height: 8, borderRadius: 999, background: TONE[tone], display: "inline-block" }} />
                         {readable(entry.action)}
                       </strong>
@@ -336,7 +392,7 @@ export default function AuditLogViewer() {
                         {entry.ip ? ` · ${entry.ip}` : ""}
                       </small>
                     </div>
-                    <div>
+                    <div className="audit-log-event-meta">
                       <strong>{new Date(entry.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</strong>
                       <small>
                         {entry.entity}
@@ -344,7 +400,7 @@ export default function AuditLogViewer() {
                         {entry.targetEmail ? ` · ${entry.targetEmail}` : ""}
                       </small>
                     </div>
-                    <div className="invoice-actions" style={{ flexWrap: "wrap" }}>
+                    <div className="invoice-actions audit-log-event-actions" style={{ flexWrap: "wrap" }}>
                       <button className="btn-action" type="button" onClick={() => setOpen(expanded ? null : entry.id)}>
                         {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />} Details
                       </button>
@@ -369,7 +425,7 @@ export default function AuditLogViewer() {
                       ) : null}
                     </div>
                     {expanded ? (
-                      <div style={{ flexBasis: "100%", marginTop: 8 }}>
+                      <div className="audit-log-details">
                         <pre style={{ overflowX: "auto", fontSize: 12, background: "rgba(0,0,0,0.04)", padding: 12, borderRadius: 12, margin: 0 }}>
                           {JSON.stringify(entry.details ?? entry.metadataJson ?? {}, null, 2)}
                         </pre>
@@ -391,4 +447,3 @@ export default function AuditLogViewer() {
     </div>
   );
 }
-

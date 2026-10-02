@@ -33,7 +33,7 @@ export async function GET(request: Request) {
       db
         .select()
         .from(bookings)
-        .where(and(inArray(bookings.status, ["confirmed", "checked_in"]), ne(bookings.assignedRoomId, ""))),
+        .where(inArray(bookings.status, ["confirmed", "checked_in"])),
       db.select().from(messageThreadsTable).where(ne(messageThreadsTable.status, "closed")),
       db.select().from(serviceTasksTable).where(inArray(serviceTasksTable.status, ["open", "assigned", "in_progress"])),
       db.select().from(folioItemsTable).where(eq(folioItemsTable.status, "open")),
@@ -45,9 +45,15 @@ export async function GET(request: Request) {
     const accountByGuest = new Map(accounts.map((a) => [a.guestId, a]));
 
     const map = rooms.map((room) => {
-      const occupant = liveBookings.find(
-        (b) => b.assignedRoomId === room.id && b.checkIn <= today && today < b.checkOut,
-      );
+      const occupant = liveBookings.find((booking) => {
+        const stayingToday =
+          booking.status === "checked_in"
+            ? booking.checkIn <= today && today <= booking.checkOut
+            : booking.checkIn <= today && today < booking.checkOut;
+        if (!stayingToday) return false;
+        if (booking.assignedRoomId) return booking.assignedRoomId === room.id;
+        return booking.assignedRoom?.replace(/\D/g, "") === room.roomNumber.replace(/\D/g, "");
+      });
       const arrivalToday = liveBookings.find((b) => b.assignedRoomId === room.id && b.checkIn === today);
       const departureToday = liveBookings.find((b) => b.assignedRoomId === room.id && b.checkOut === today);
       const totals = folioTotals(folio.filter((item) => item.roomNumber === room.roomNumber));

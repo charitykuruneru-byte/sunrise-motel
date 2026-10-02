@@ -128,7 +128,7 @@ const QUICK = [
 export default function GuestApp() {
   const [loading, setLoading] = useState(true);
   const [home, setHome] = useState<Home | null>(null);
-  const [tab, setTab] = useState<Tab>("home");
+  const [tab, setTabState] = useState<Tab>("home");
   const [toast, setToast] = useState("");
   const [busy, setBusy] = useState(false);
   const [login, setLogin] = useState("");
@@ -137,11 +137,32 @@ export default function GuestApp() {
   const [authOpen, setAuthOpen] = useState(false);
   const [inviteNotice, setInviteNotice] = useState(false);
 
+  const setTab = (nextTab: Tab) => {
+    setTabState(nextTab);
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("tab") === nextTab) return;
+    url.searchParams.set("tab", nextTab);
+    window.history.pushState({ guestTab: nextTab }, "", url);
+  };
+
   // ---- What's on + the two unread badges (Part 3.1/3.5) --------------------
   // Exactly two tabs carry a badge — What's on and Messages. More than two and
   // badges stop meaning anything. The "seen" markers live on the device only.
   const whatsOn = useWhatsOnFeed();
   const [unreadMessages, setUnreadMessages] = useState(0);
+
+  useEffect(() => {
+    const syncTabFromUrl = () => {
+      const wanted = new URLSearchParams(window.location.search).get("tab");
+      if (wanted && [...TABS.map((item) => item.id), ...MY_STAY_SUBVIEWS].includes(wanted as Tab)) {
+        setTabState(wanted as Tab);
+      }
+    };
+    syncTabFromUrl();
+    window.addEventListener("popstate", syncTabFromUrl);
+    return () => window.removeEventListener("popstate", syncTabFromUrl);
+  }, []);
 
   const countUnreadMessages = (threads: Home["threads"] | undefined) => {
     let seenAt = 0;
@@ -251,7 +272,7 @@ export default function GuestApp() {
 
   if (!home) {
     return (
-      <main className="min-h-screen bg-[var(--ivory)] px-4 py-10">
+      <main className="guest-app-page min-h-screen bg-[var(--ivory)] px-4 py-10">
         <div className="mx-auto max-w-md space-y-4">
           <div className="rounded-xl border border-[var(--line)] bg-white p-6 shadow-sm">
           <p className="text-[11px] font-black tracking-widest text-[var(--orange-deep)]">SUNRISE MOTEL</p>
@@ -370,7 +391,7 @@ export default function GuestApp() {
     );
   }
   return (
-    <main className="min-h-screen bg-[var(--ivory)] pb-24">
+    <main className="guest-app-page min-h-screen bg-[var(--ivory)] pb-24">
       <header className="sticky top-0 z-10 border-b border-[var(--line)] bg-white/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -565,6 +586,7 @@ export default function GuestApp() {
           return (
             <button
               key={item.id}
+              type="button"
               onClick={() => {
                 setTab(item.id);
                 if (item.id === "whats-on") whatsOn.markSeen();
@@ -572,10 +594,11 @@ export default function GuestApp() {
               }}
               className={`app-tab ${current ? "is-active" : ""}`}
               aria-current={current ? "page" : undefined}
+              aria-label={badge > 0 ? `${item.label}, ${badge} unread` : item.label}
             >
               <Icon size={17} />
               {item.label}
-              {badge > 0 && <span className="app-tab-badge badge-pop">{badge > 9 ? "9+" : badge}</span>}
+              {badge > 0 && <span className="app-tab-badge badge-pop" aria-hidden="true">{badge > 9 ? "9+" : badge}</span>}
             </button>
           );
         })}
@@ -1436,5 +1459,4 @@ function Stat({ label, value, detail }: { label: string; value: string; detail: 
     </div>
   );
 }
-
 

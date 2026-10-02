@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { bookings, roomTypesTable } from "@/db/schema";
+import { bookings, roomTypeRatesTable, roomTypesTable } from "@/db/schema";
 import { seedDatabaseIfEmpty } from "@/db/seed";
-import { and, ne, sql } from "drizzle-orm";
+import { and, inArray, ne, sql } from "drizzle-orm";
 import { blockedCountByRoomType } from "@/lib/room-blocks";
+import { calculateStayQuote } from "@/lib/pricing";
+import { setting } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +23,31 @@ export async function GET(request: Request) {
     const today = new Date().toISOString().slice(0, 10);
     const checkIn = searchParams.get("checkIn") || today;
     const checkOut = searchParams.get("checkOut") || today;
+    const guests = Math.max(1, Math.min(20, Number(searchParams.get("guests")) || 1));
 
     const allRoomTypes = await db.select().from(roomTypesTable).where(sql`${roomTypesTable.isActive} = true`);
+    const roomRates = allRoomTypes.length
+      ? await db
+          .select({
+            roomTypeId: roomTypeRatesTable.roomTypeId,
+            kind: roomTypeRatesTable.kind,
+            label: roomTypeRatesTable.label,
+            startDate: roomTypeRatesTable.startDate,
+            endDate: roomTypeRatesTable.endDate,
+            minNights: roomTypeRatesTable.minNights,
+            nightlyRate: roomTypeRatesTable.nightlyRate,
+            isActive: roomTypeRatesTable.isActive,
+          })
+          .from(roomTypeRatesTable)
+          .where(inArray(roomTypeRatesTable.roomTypeId, allRoomTypes.map((room) => room.id)))
+      : [];
+    const ratesByRoomType = new Map<string, typeof roomRates>();
+    for (const rate of roomRates) {
+      const rates = ratesByRoomType.get(rate.roomTypeId) ?? [];
+      rates.push(rate);
+      ratesByRoomType.set(rate.roomTypeId, rates);
+    }
+    const taxInclusive = (await setting("PRICE_TAX_MODE")) !== "exclusive";
 
     const overlapping = await db
       .select({ roomTypeId: bookings.roomTypeId, reference: bookings.reference, checkIn: bookings.checkIn, checkOut: bookings.checkOut, status: bookings.status })
@@ -49,6 +74,14 @@ export async function GET(request: Request) {
           : available === 1
             ? `Only 1 of ${room.totalInventory} rooms left`
             : `${available} of ${room.totalInventory} rooms available`;
+      const stayQuote = calculateStayQuote({
+        room,
+        rates: (ratesByRoomType.get(room.id) ?? []).filter((rate) => rate.isActive),
+        checkIn,
+        checkOut,
+        guests,
+        taxInclusive,
+      });
 
       return {
         id: room.id,
@@ -56,10 +89,21 @@ export async function GET(request: Request) {
         slug: room.slug,
         description: room.description,
         rate: room.rate,
+        taxRateBp: room.taxRateBp,
+        taxInclusive,
+        stayQuote: {
+          nights: stayQuote.nights,
+          nightlySubtotal: stayQuote.nightlySubtotal,
+          subtotal: stayQuote.subtotal,
+          discount: stayQuote.discount,
+          taxRateBp: stayQuote.taxRateBp,
+          taxAmount: stayQuote.taxAmount,
+          taxInclusive: stayQuote.taxInclusive,
+          total: stayQuote.total,
+        },
         // Added: the weekend rate and VAT show on /stay when a manager sets them, so
         // "Fri & Sat costs more" is visible before the guest picks dates.
         weekendPrice: room.weekendPrice,
-        taxRateBp: room.taxRateBp,
         totalInventory: room.totalInventory,
         bookedCount: booked,
         blockedCount: blocked,
@@ -75,7 +119,7 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json({ checkIn, checkOut, rooms, overlappingBookings: overlapping.length });
+    return NextResponse.json({ checkIn, checkOut, guests, taxInclusive, rooms, overlappingBookings: overlapping.length });
   } catch (error) {
     console.error("Availability check failed:", error);
     return NextResponse.json({ error: "Failed to calculate availability." }, { status: 500 });

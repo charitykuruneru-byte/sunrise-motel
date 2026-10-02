@@ -4,11 +4,13 @@ import { useRef, useState } from 'react'
 type Props = {
   onUploadComplete: (url: string) => void;
   currentImage?: string | null;
+  previewAlt?: string;
+  onUploadStateChange?: (uploading: boolean) => void;
 };
 
 // File-picker uploader: drag & drop or click, preview + progress,
 // uploads to /api/upload (Vercel Blob) and returns the public URL.
-export default function ImageUploader({ onUploadComplete, currentImage }: Props) {
+export default function ImageUploader({ onUploadComplete, currentImage, previewAlt = "Upload preview", onUploadStateChange }: Props) {
   const [preview, setPreview] = useState<string | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const [done, setDone] = useState(false);
@@ -20,13 +22,13 @@ export default function ImageUploader({ onUploadComplete, currentImage }: Props)
     setDone(false);
     setPreview(URL.createObjectURL(file));
     setProgress(0);
+    onUploadStateChange?.(true);
+    const tick = window.setInterval(() => setProgress((p) => (p === null ? 0 : Math.min(90, p + 15))), 250);
     try {
       const form = new FormData();
       form.append("file", file);
       // Indeterminate-ish progress (fetch has no upload events): animate to 90%.
-      const tick = window.setInterval(() => setProgress((p) => (p === null ? 0 : Math.min(90, p + 15))), 250);
       const res = await fetch("/api/upload", { method: "POST", body: form });
-      window.clearInterval(tick);
       const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
       if (!res.ok || !data.url) throw new Error(data.error || "Upload failed.");
       setProgress(100);
@@ -35,6 +37,9 @@ export default function ImageUploader({ onUploadComplete, currentImage }: Props)
     } catch (e) {
       setProgress(null);
       setError(e instanceof Error ? e.message : "Upload failed.");
+    } finally {
+      window.clearInterval(tick);
+      onUploadStateChange?.(false);
     }
   };
 
@@ -46,7 +51,7 @@ export default function ImageUploader({ onUploadComplete, currentImage }: Props)
   return (
     <div style={{ border: '1px dashed var(--line)', borderRadius: 8, padding: 14, display: 'grid', gap: 10 }}>
       {(preview || currentImage) && (
-        <img src={preview ?? currentImage ?? ''} alt="Upload preview" style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 6 }} />
+        <img src={preview ?? currentImage ?? ''} alt={previewAlt} style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 6 }} />
       )}
       <div
         onClick={() => inputRef.current?.click()}

@@ -29,6 +29,7 @@ export default async function DineRoute() {
         price: row.price,
         img: row.imageUrl,
         isAvailable: row.isAvailable,
+        isSpecial: row.isSpecial,
       }));
     }
   } catch {

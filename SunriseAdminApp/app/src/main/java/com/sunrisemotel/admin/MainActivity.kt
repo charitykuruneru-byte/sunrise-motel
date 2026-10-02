@@ -272,7 +272,6 @@ class MainActivity : AppCompatActivity() {
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
         val last = prefs.getLong(KEY_LAST_CHECK, 0)
         if (System.currentTimeMillis() - last < 24 * 60 * 60 * 1000L) return
-        prefs.edit().putLong(KEY_LAST_CHECK, System.currentTimeMillis()).apply()
         thread {
             try {
                 val endpoint = BuildConfig.BASE_URL.trimEnd('/') + "/api/version?app=admin"
@@ -281,18 +280,27 @@ class MainActivity : AppCompatActivity() {
                 conn.readTimeout = 8000
                 val body = conn.getInputStream().bufferedReader().readText()
                 val json = JSONObject(body)
-                val remoteCode = json.optInt("latestVersionCode", BuildConfig.VERSION_CODE)
-                if (remoteCode <= BuildConfig.VERSION_CODE) return@thread
-                val name = json.optString("latestVersionName", "")
-                val apkUrl = json.optString("apkUrl", "")
-                if (apkUrl.isBlank()) return@thread
-                val force = json.optBoolean("forceUpdate", false)
-                val notes = json.optJSONArray("whatsNew")?.let { arr ->
-                    (0 until arr.length()).map { arr.optString(it) }.filter { it.isNotBlank() }
-                } ?: emptyList()
-                runOnUiThread { showUpdateDialog(name, apkUrl, force, notes) }
+                val remoteCode = json.optInt("latestVersionCode", -1)
+                if (remoteCode < 1) throw IllegalStateException("Version response has no valid latestVersionCode")
+                if (remoteCode > BuildConfig.VERSION_CODE) {
+                    val name = json.optString("latestVersionName", "").trim()
+                    val apkUrl = json.optString("apkUrl", "").trim()
+                    val apkUri = Uri.parse(apkUrl)
+                    if (name.isBlank() || apkUri.scheme != "https" || apkUri.host != "github.com" ||
+                        apkUri.path != "/charitykuruneru-byte/sunrise-motel/releases/latest/download/SunriseManager.apk"
+                    ) {
+                        throw IllegalStateException("Version response has an invalid name or APK URL")
+                    }
+                    val force = json.optBoolean("forceUpdate", false)
+                    val notes = json.optJSONArray("whatsNew")?.let { arr ->
+                        (0 until arr.length()).map { arr.optString(it) }.filter { it.isNotBlank() }
+                    } ?: emptyList()
+                    runOnUiThread { showUpdateDialog(name, apkUrl, force, notes) }
+                }
+                prefs.edit().putLong(KEY_LAST_CHECK, System.currentTimeMillis()).apply()
             } catch (e: Exception) {
                 // Offline, cold cache, DNS hiccup — the portal still loads.
+                // Keep the check due so a transient failure cannot hide an update for a day.
                 Log.w(TAG, "Version check failed: ${e.message}")
             }
         }

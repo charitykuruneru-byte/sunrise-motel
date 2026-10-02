@@ -14,14 +14,21 @@
    repo Settings → Secrets → Actions → New secret `KEYSTORE_BASE64` → paste.
    The workflow restores it before every build, so every APK shares one signature.
 3. NEVER delete the `.jks`. Lose it = new signature = duplicates forever.
-   `versionCode` goes +1 every release (currently 4 / "1.3") with the same
+   `versionCode` goes +1 every release (currently 5 / "1.4") with the same
    `applicationId com.sunrisemotel.app` → Android shows "Updating…".
    The manager app (`SunriseAdminApp`, `com.sunrisemotel.admin`) is signed with
    this SAME keystore by relative path, so there is still only one secret to keep.
-4. Users already seeing 2 icons: keep the NEW one (v1.2+), uninstall the old v1.0.
-5. Version truth for the in-app update prompt lives in `public/version.json`
-   (bump `latestVersionCode` with every `versionCode`) — the guest app reads
-   `/api/version`, the manager app reads `/api/version?app=admin`.
+4. Keep `applicationId` and the release keystore unchanged. Android only replaces
+   an installed copy when the package ID matches, the signature is the same, and
+   the incoming `versionCode` is higher.
+5. Keep `public/version.json` synchronized with `versionCode` and `versionName`.
+   The Android release workflow checks both apps' metadata before building and
+   runs when either app or either version file changes. It attaches both signed
+   APKs to a GitHub Release on `main`.
+6. Website changes appear in the WebView apps after reload. Changes to the
+   Android wrapper itself require a new signed APK release; the apps check
+   `/api/version` (guest) and `/api/version?app=admin` (manager) and offer the
+   update through Android's installer.
 
 ## Broadcast push (Firebase) — 2 files from YOU to activate
 1. Firebase console (https://console.firebase.google.com) → Add project

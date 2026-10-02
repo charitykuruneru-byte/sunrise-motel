@@ -20,6 +20,7 @@ type Order = {
   overdue: boolean;
   items: OrderLine[];
 };
+type MenuImage = { name: string; imageUrl: string };
 
 const COLUMNS: { key: "placed" | "accepted" | "preparing" | "ready"; label: string; next: string; nextLabel: string }[] = [
   { key: "placed", label: "New", next: "accept", nextLabel: "Accept" },
@@ -43,6 +44,7 @@ export default function DeskOrders({
   const [busy, setBusy] = useState(false);
   const [rejectFor, setRejectFor] = useState<string | null>(null);
   const [reason, setReason] = useState("");
+  const [menuImages, setMenuImages] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     const data = await api<{
@@ -58,6 +60,19 @@ export default function DeskOrders({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    let active = true;
+    void api<{ items: MenuImage[] }>("/api/desk/menu")
+      .then((data) => {
+        if (!active) return;
+        setMenuImages(Object.fromEntries(data.items.map((item) => [item.name.trim().toLowerCase(), item.imageUrl])));
+      })
+      .catch((error) => {
+        if (active) setToast(error instanceof Error ? `Meal photos could not be loaded: ${error.message}` : "Meal photos could not be loaded.");
+      });
+    return () => { active = false; };
+  }, [setToast]);
 
   const run = async (label: string, work: () => Promise<unknown>) => {
     if (readOnly) return;
@@ -79,54 +94,72 @@ export default function DeskOrders({
 
   return (
     <div className="space-y-4">
-      <section className="flex flex-wrap items-center gap-3">
-        <h2 className="flex items-center gap-2 text-sm font-bold">
-          <UtensilsCrossed size={16} className="text-[#f8c66b]" /> Order board
-        </h2>
-        <span className="text-[11px] text-white/50">
-          {totals.live} live · {money(totals.revenueToday)} ordered today · {totals.voids} voided lines
-        </span>
-        <span className="ml-auto flex items-center gap-1 text-[11px] text-white/50">
-          <Timer size={12} /> anything over 20 minutes is highlighted
-        </span>
+      <section className="desk-orders-heading">
+        <div>
+          <span className="desk-orders-eyebrow"><UtensilsCrossed size={14} /> RESTAURANT SERVICE</span>
+          <h2>Order board</h2>
+          <p>Track every meal from guest request to delivery.</p>
+        </div>
+        <div className="desk-orders-summary">
+          <span><strong>{totals.live}</strong> live orders</span>
+          <span><strong>{money(totals.revenueToday)}</strong> ordered today</span>
+          <span><strong>{totals.voids}</strong> voided lines</span>
+        </div>
+        <div className="desk-orders-wait-note"><Timer size={13} /> Orders waiting over 20 minutes are highlighted.</div>
       </section>
-      <section className="grid gap-3 lg:grid-cols-4">
+      <section className="desk-order-board grid gap-3 lg:grid-cols-4">
         {COLUMNS.map((column) => (
           <div key={column.key} className={CARD}>
-            <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-white/60">
-              {column.label} ({board[column.key]?.length ?? 0})
+            <h3 className={`desk-order-column-heading desk-order-column-${column.key} mb-2 text-xs font-bold uppercase tracking-wide text-white/60`}>
+              <span>{column.label}</span>
+              <span className="desk-order-column-count">{board[column.key]?.length ?? 0}</span>
             </h3>
             <div className="space-y-2">
-              {(board[column.key] ?? []).length === 0 && <p className="text-[11px] text-white/40">Nothing here.</p>}
+              {(board[column.key] ?? []).length === 0 && (
+                <p className="desk-order-empty">No {column.label.toLowerCase()} orders right now.</p>
+              )}
               {(board[column.key] ?? []).map((order) => (
                 <div
                   key={order.id}
-                  className={`rounded border p-2.5 text-xs ${
+                  className={`desk-order-card rounded border p-2.5 text-xs ${
                     order.overdue ? "border-rose-500/50 bg-rose-500/10" : "border-white/10 bg-black/20"
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="desk-order-card-heading flex items-start justify-between gap-2">
                     <div>
-                      <p className="font-bold">
-                        {order.roomNumber ? `Room ${order.roomNumber}` : "Counter"} · {order.orderNumber}
+                      <p className="desk-order-number font-bold">
+                        <span>{order.orderNumber}</span>
+                        <span className="desk-order-destination">{order.roomNumber ? `Room ${order.roomNumber}` : "Counter"}</span>
                       </p>
-                      <p className="text-[11px] text-white/60">
-                        {order.guestName ?? "Guest"} · {order.service === "takeaway" ? "takeaway" : "to the room"}
+                      <p className="desk-order-guest text-[11px] text-white/60">
+                        {order.guestName ?? "Guest"} <span>·</span> {order.service === "takeaway" ? "Takeaway" : "Room service"}
                       </p>
                     </div>
-                    <span className={`text-[11px] font-bold ${order.overdue ? "text-rose-200" : "text-white/50"}`}>
-                      {order.waitingMinutes} min
+                    <span className={`desk-order-wait ${order.overdue ? "is-overdue" : ""}`}>
+                      <Timer size={11} /> {order.waitingMinutes} min
                     </span>
                   </div>
-                  <ul className="mt-1.5 space-y-0.5 text-[11px] text-white/75">
-                    {order.items.map((line) => (
-                      <li key={line.id} className={line.status === "voided" ? "line-through opacity-50" : ""}>
-                        {line.qty}× {line.name} — {money(line.amount)}
-                      </li>
-                    ))}
+                  <ul className="desk-order-lines">
+                    {order.items.map((line) => {
+                      const imageUrl = menuImages[line.name.trim().toLowerCase()];
+                      return (
+                        <li key={line.id} className={`desk-order-line ${line.status === "voided" ? "is-voided" : ""}`}>
+                          {imageUrl ? (
+                            <img src={imageUrl} alt="" loading="lazy" />
+                          ) : (
+                            <span className="desk-order-line-placeholder" aria-hidden="true"><UtensilsCrossed size={14} /></span>
+                          )}
+                          <span className="desk-order-line-copy">
+                            <strong>{line.qty}× {line.name}</strong>
+                            <small>{money(line.unitPrice)} each</small>
+                          </span>
+                          <strong className="desk-order-line-total">{money(line.amount)}</strong>
+                        </li>
+                      );
+                    })}
                   </ul>
-                  {order.note && <p className="mt-1 text-[11px] text-[#f8c66b]">Note: {order.note}</p>}
-                  <p className="mt-1 text-[11px] font-bold">Total {money(order.total)}</p>
+                  {order.note && <p className="desk-order-note"><strong>Guest note</strong>{order.note}</p>}
+                  <p className="desk-order-total mt-1 text-[11px] font-bold"><span>Order total</span><strong>{money(order.total)}</strong></p>
                   {!readOnly && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       <button
@@ -179,24 +212,30 @@ export default function DeskOrders({
         ))}
       </section>
 
-      <section className={CARD}>
-        <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-white/60">
-          History (delivered &amp; rejected)
-        </h3>
-        <div className="space-y-1">
-          {history.length === 0 && <p className="text-[11px] text-white/40">No closed orders yet.</p>}
+      <section className={`${CARD} desk-order-history`}>
+        <div className="desk-order-history-heading">
+          <div>
+            <h3>Recent order history</h3>
+            <p>Delivered and rejected orders</p>
+          </div>
+          <span>{Math.min(history.length, 25)} of {history.length}</span>
+        </div>
+        <div className="desk-order-history-list">
+          {history.length === 0 && <p className="desk-order-empty">Completed orders will appear here.</p>}
           {history.slice(0, 25).map((order) => (
-            <div
-              key={order.id}
-              className="flex flex-wrap items-center justify-between border-b border-white/5 py-1.5 text-[11px]"
-            >
-              <span>
-                {order.roomNumber ? `Room ${order.roomNumber}` : "Counter"} · {order.orderNumber} · {order.guestName}
-              </span>
-              <span className="text-white/60">
-                {ORDER_STATUS_LABEL[order.status] ?? order.status} · {money(order.total)}
-                {order.rejectedReason ? ` · ${order.rejectedReason}` : ""}
-              </span>
+            <div key={order.id} className="desk-order-history-row">
+              <div className="desk-order-history-main">
+                <strong>{order.orderNumber}</strong>
+                <span>{order.roomNumber ? `Room ${order.roomNumber}` : "Counter"} · {order.guestName ?? "Guest"}</span>
+                <small>{order.items.length} {order.items.length === 1 ? "item" : "items"}</small>
+              </div>
+              <div className="desk-order-history-result">
+                <span className={`desk-order-history-status ${order.status === "rejected" ? "is-rejected" : "is-delivered"}`}>
+                  {ORDER_STATUS_LABEL[order.status] ?? order.status}
+                </span>
+                <strong>{money(order.total)}</strong>
+              </div>
+              {order.rejectedReason && <p className="desk-order-history-reason">Reason: {order.rejectedReason}</p>}
             </div>
           ))}
         </div>

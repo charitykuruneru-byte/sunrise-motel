@@ -42,12 +42,11 @@ export async function POST(request: Request) {
       badge: str(body.badge) || null,
       features: Array.isArray(body.features) ? JSON.stringify(body.features) : "[]",
       images: Array.isArray(body.images) ? JSON.stringify(body.images) : "[]",
-      // PRICING (added): defaults preserve today's behaviour — weekend 0 means "same as
-      // rate", tax 1650bp means 16.50% VAT, no discounts unless asked for.
+      // PRICING (added): weekend 0 means "same as rate"; VAT defaults to 17.5%.
       weekendPrice: Math.max(0, Math.round(Number(body.weekendPrice) || 0)),
       extraBedPrice: Math.max(0, Math.round(Number(body.extraBedPrice) || 0)),
       cleaningFee: Math.max(0, Math.round(Number(body.cleaningFee) || 0)),
-      taxRateBp: body.taxPercent !== undefined ? Math.max(0, Math.round((Number(body.taxPercent) || 0) * 100)) : Math.max(0, Math.round(Number(body.taxRateBp ?? 1650) || 0)),
+      taxRateBp: body.taxPercent !== undefined ? Math.max(0, Math.round((Number(body.taxPercent) || 0) * 100)) : Math.max(0, Math.round(Number(body.taxRateBp ?? 1750) || 0)),
       minNights: Math.max(1, Math.round(Number(body.minNights) || 1)),
       weeklyDiscountBp: Math.max(0, Math.round(Number(body.weeklyDiscountBp) || 0)),
       monthlyDiscountBp: Math.max(0, Math.round(Number(body.monthlyDiscountBp) || 0)),

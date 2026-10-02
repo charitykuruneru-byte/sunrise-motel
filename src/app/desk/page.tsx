@@ -5,8 +5,8 @@ import DeskConsole from "@/components/desk/desk-console";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Front desk & admin console | Sunrise Motel",
-  description: "Arrivals, room map, orders, guest issues, payments and folios in one place.",
+  title: "Front desk | Sunrise Motel",
+  description: "A clear workspace for guest arrivals, rooms, service requests and payments.",
   robots: { index: false, follow: false },
 };
 

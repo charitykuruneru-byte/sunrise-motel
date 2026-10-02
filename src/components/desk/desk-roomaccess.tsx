@@ -262,7 +262,7 @@ export default function DeskRoomAccess({
                       <KeyRound size={14} /> New PIN
                     </button>
                     <button
-                      className={BTN}
+                      className={BTN_DANGER}
                       disabled={busy || readOnly}
                       onClick={() => {
                         setClosingId(session.sessionId);
@@ -356,4 +356,3 @@ export default function DeskRoomAccess({
     </div>
   );
 }
-

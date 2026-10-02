@@ -176,8 +176,10 @@ export default function DeskRooms({
               .map((room) => (
                 <button
                   key={room.id}
+                  type="button"
+                  aria-pressed={selected?.id === room.id}
                   onClick={() => setSelected(room)}
-                  className={`rounded-lg border p-3 text-left ${
+                  className={`desk-room-card rounded-lg border p-3 text-left ${
                     ROOM_STATE_STYLE[room.state] ?? "border-white/10 bg-white/[0.03]"
                   } ${selected?.id === room.id ? "ring-2 ring-[#f28c18]" : ""}`}
                 >
@@ -250,7 +252,7 @@ export default function DeskRooms({
                   )}
                   {selected.occupant.status === "checked_in" && (
                     <button
-                      className={BTN}
+                      className={BTN_PRIMARY}
                       disabled={busy}
                       onClick={() => {
                         // The printed card dies with the stay, so stop showing it.
@@ -282,7 +284,7 @@ export default function DeskRooms({
                         value={inviteEmail}
                         onChange={(e) => setInviteEmail(e.target.value)}
                       />
-                      <button className={BTN} disabled={busy} onClick={() => invite(selected.occupant!.bookingId)}>
+                      <button className={BTN_PRIMARY} disabled={busy} onClick={() => invite(selected.occupant!.bookingId)}>
                         Email guest setup link
                       </button>
                     </>
@@ -377,4 +379,3 @@ function AssignPicker({
     </div>
   );
 }
-

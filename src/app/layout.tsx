@@ -1,11 +1,17 @@
 import type { Metadata, Viewport } from "next";
+import type { CSSProperties } from "react";
 import type { ReactNode } from "react";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import themeConfig from "../../theme.config.json";
 import "./globals.css";
 import "./inner-pages.css";
 import "./enhancements.css";
 import "./site-nav.css";
 import "./animations.css";
+import "./desk-navigation.css";
+import "./desk-menu.css";
+import "./desk-orders.css";
+import "./desk-messenger.css";
 
 /**
  * The absolute origin every relative URL in `metadata` is resolved against — the
@@ -58,14 +64,31 @@ export const viewport: Viewport = {
   themeColor: "#D4A017",
 };
 
+const themeVariables = {
+  "--orange": themeConfig.colors.primary,
+  "--orange-deep": themeConfig.colors.secondary,
+  "--ink": themeConfig.colors.text,
+  "--ivory": themeConfig.colors.background,
+  "--ivory-deep": themeConfig.colors.surfaceMuted,
+  "--sand": themeConfig.colors.sand,
+  "--sage": themeConfig.colors.success,
+  "--sage-light": themeConfig.colors.successSurface,
+  "--muted": themeConfig.colors.muted,
+  "--radius-sm": themeConfig.buttonRadius.default,
+  "--radius-md": themeConfig.cardRadius.default,
+  "--radius-lg": themeConfig.cardRadius.roomAndEditorial,
+  "--serif": themeConfig.font.display,
+  "--sans": themeConfig.font.body,
+} as CSSProperties;
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         {/* The manifest and theme colour come from metadata/viewport above, so
             /admin can point at its own manifest without fighting this one. */}
       </head>
-      <body>
+      <body style={themeVariables}>
         <ServiceWorkerRegister />
         {children}
       </body>

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import PushOptIn from "@/components/push-opt-in";
+import guestAppVersion from "../../../public/version.json";
+import managerAppVersion from "../../../public/version-admin.json";
 
 // Live data: never prerendered — see src/lib/revalidate.ts
 export const dynamic = "force-dynamic";
@@ -20,8 +22,9 @@ export default function DownloadPage() {
         <span className="eyebrow"><span className="eyebrow-line" /> ANDROID APPS</span>
         <h1 className="hero-headline" style={{ marginTop: 8 }}>Two apps, one website.</h1>
         <p className="hero-description">
-          Both apps open our website directly, so anything we change there appears in the app automatically — no
-          separate update needed. The guest app is for guests; the manager app is for the desk and the office.
+          Both Android apps open the live website, so website changes appear after a refresh. New Android wrapper
+          releases are signed for in-place updates; installed web apps refresh through the browser when an update is ready.
+          The guest app is for guests; Sunrise Manager is for the desk and office.
         </p>
 
         <div id="guest-app" className="extras-calculator-box" style={{ marginTop: 24 }}>
@@ -30,10 +33,10 @@ export default function DownloadPage() {
             Rooms, live availability, booking, tracking and your account. Free, and nothing on the website needs it.
           </p>
           <a href={GUEST_APK} className="btn-submit-booking-request" style={{ marginTop: 14, textDecoration: "none" }}>
-            Download SunriseMotel.apk (v1.3)
+            Download SunriseMotel.apk (v{guestAppVersion.latestVersionName})
           </a>
           <p style={{ marginTop: 10, fontSize: 12, color: "var(--muted)" }}>
-            Package com.sunrisemotel.app · version 1.3 · Internet access only.
+            Package com.sunrisemotel.app · version {guestAppVersion.latestVersionName} · Internet access only.
           </p>
         </div>
 
@@ -44,16 +47,16 @@ export default function DownloadPage() {
             sign-in as the portal.
           </p>
           <a href={MANAGER_APK} className="btn-submit-booking-request" style={{ marginTop: 14, textDecoration: "none" }}>
-            Download SunriseManager.apk
+            Download SunriseManager.apk (v{managerAppVersion.latestVersionName})
           </a>
           <p style={{ marginTop: 10, fontSize: 12, color: "var(--muted)" }}>
-            Package com.sunrisemotel.admin · or install the portal from your browser: Android Chrome → ⋮ → Install app;
+            Package com.sunrisemotel.admin · version {managerAppVersion.latestVersionName} · or install the portal from your browser: Android Chrome → ⋮ → Install app;
             iPhone Safari → Share → Add to Home Screen.
           </p>
           <p style={{ marginTop: 10, fontSize: 12, color: "var(--muted)" }}>
-            <strong>Already installed an older copy?</strong> The first builds were signed with a test key, so Android
-            cannot upgrade them in place: uninstall the old icon once, then install this one. From this version on,
-            every update installs straight over the top.
+            <strong>Already installed an older copy?</strong> These releases keep the app package IDs and release
+            signing identity. Android can install a newer signed version over the existing app; if Android reports a
+            signature conflict, keep the installed app and contact the front desk before uninstalling it.
           </p>
         </div>
 
@@ -70,8 +73,8 @@ export default function DownloadPage() {
         </p>
 
         <ol style={{ marginTop: 28, display: "grid", gap: 14, fontSize: 14, lineHeight: 1.6 }}>
-          <li><strong>1. Guest Android app</strong> — download the APK above, allow your browser to install apps if prompted, then tap Install.</li>
-          <li><strong>2. Sunrise Manager</strong> — open the portal above in Android Chrome and choose Install app from the browser menu.</li>
+          <li><strong>1. Guest Android app</strong> — download the APK above, allow your browser to install apps if prompted, then tap Install. Future signed releases can update it in place.</li>
+          <li><strong>2. Sunrise Manager</strong> — download the manager APK above, or open the portal in Android Chrome and choose Install app from the browser menu.</li>
           <li><strong>3. iPhone or iPad</strong> — open either app option in Safari, tap Share, then Add to Home Screen.</li>
         </ol>
 
@@ -80,13 +83,15 @@ export default function DownloadPage() {
           <p style={{ fontSize: 13, color: "var(--muted)" }}>
             On Android Chrome tap ⋮ → “Install app”. On iPhone Safari tap Share → “Add to Home Screen”.
             Same site, same bookings — just an icon on your home screen. The manager portal installs the same way, with
-            its own name and icon.
+            its own name and icon. Browser-installed apps receive website updates through the browser; accept the Sunrise
+            update notice or reload when prompted.
           </p>
         </div>
 
         <p style={{ marginTop: 20, fontSize: 12, color: "var(--muted)" }}>
-          The guest APK is attached to the latest release. Sunrise Manager installs from its browser-based portal and
-          asks staff to sign in. Photos are picked through the system file chooser.
+          Both APKs are attached to the latest Android release. Sunrise Manager asks staff to sign in. Photos are picked
+          through the system file chooser. APK releases are built and published by the Android release workflow in this
+          repository.
         </p>
       </main>
     </div>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, Loader2, RefreshCw, Shield, Wrench } from "lucide-react";
+import { AdminPageFrame } from "@/components/admin/admin-navigation";
 
 /**
  * HOUSEKEEPING BOARD — every room in the column that matches its real state.
@@ -81,8 +82,9 @@ export default function HousekeepingPage() {
   };
 
   return (
+    <AdminPageFrame>
     <div className="sunrise-app-root">
-      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 16px 96px" }}>
+      <main className="manager-tool-page" style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 16px 96px" }}>
         <span className="eyebrow"><span className="eyebrow-line" /> HOUSEKEEPING</span>
         <h1 className="hero-headline" style={{ marginTop: 8 }}>Who is cleaning what, right now.</h1>
         <p className="hero-description">
@@ -104,7 +106,7 @@ export default function HousekeepingPage() {
           {COLUMNS.map((column) => {
             const columnRooms = rooms.filter((room) => columnOf(room) === column.key);
             return (
-              <section key={column.key} style={{ border: "1px solid var(--line)", borderRadius: 16, padding: 12, background: "rgba(255,255,255,0.6)" }}>
+              <section key={column.key} className="manager-board-column" style={{ border: "1px solid var(--line)", borderRadius: 16, padding: 12, background: "rgba(255,255,255,0.6)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                   <strong>{column.title}</strong>
                   <small>{columnRooms.length}</small>
@@ -112,7 +114,7 @@ export default function HousekeepingPage() {
                 <small style={{ opacity: 0.7 }}>{column.hint}</small>
                 <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
                   {columnRooms.map((room) => (
-                    <article key={room.id} style={{ border: "1px solid var(--line)", borderRadius: 12, padding: 10, background: "#fff" }}>
+                    <article key={room.id} className="manager-board-room" style={{ border: "1px solid var(--line)", borderRadius: 12, padding: 10, background: "#fff" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                         <strong>{room.roomNumber}</strong>
                         <small>{room.roomType}</small>
@@ -161,6 +163,7 @@ export default function HousekeepingPage() {
         </div>
       </main>
     </div>
+    </AdminPageFrame>
   );
 }
 

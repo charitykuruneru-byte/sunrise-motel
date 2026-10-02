@@ -144,67 +144,91 @@ export default function UserManagement() {
     void post("PATCH", { action, id: user.id });
   };
 
+  const activeUsers = users.filter((user) => user.status === "active").length;
+  const inactiveUsers = users.filter((user) => user.status !== "active").length;
+  const openInvitations = invitations.filter((invite) => !["accepted", "revoked"].includes(invite.status)).length;
+  const failedInvitations = invitations.filter((invite) => invite.status === "failed" || Boolean(invite.deliveryError)).length;
+
   if (error && users.length === 0) return <main className="admin-page"><section className="admin-content-section"><p role="alert">{error}</p></section></main>;
 
   return (
     <main className="admin-page">
-      <header className="admin-page-header">
-        <div><p className="eyebrow"><span className="eyebrow-line" /> ACCOUNT CONTROL</p><h1>Users</h1><p>Invitations, access and roles for Sunrise Motel.</p></div>
+      <header className="admin-page-header admin-users-header">
+        <div>
+          <p className="eyebrow"><span className="eyebrow-line" /> PEOPLE &amp; ACCESS</p>
+          <h1>Users</h1>
+          <p>Staff accounts, invitations and access roles.</p>
+        </div>
         <a className="admin-btn" href="/admin"><Users size={15} /> Admin dashboard</a>
       </header>
-      {error && <p className="admin-alert admin-alert-error" role="alert">{error}</p>}
-      {notice && <p className="admin-alert admin-alert-success" role="status">{notice}</p>}
+      <div className="admin-users-content">
+        {error && <p className="admin-alert admin-alert-error" role="alert">{error}</p>}
+        {notice && <p className="admin-alert admin-alert-success" role="status">{notice}</p>}
 
-      {canManage ? (
-        <section className="admin-content-section">
-          <div className="section-toolbar"><div className="toolbar-info"><h2>Invite a user</h2><p>Setup links expire after 7 days and can only be used once.</p></div><button className="admin-btn" type="button" disabled={busy} onClick={() => void inviteAll()}><Mail size={14} /> Invite all 3 default emails</button></div>
-          <form className="admin-modal-form admin-inline-form" onSubmit={invite}>
-            <div className="form-grid-2">
-              <label><span>Full name</span><input required minLength={2} maxLength={160} value={name} onChange={(event) => setName(event.target.value)} /></label>
-              <label><span>Email</span><input required type="email" maxLength={180} value={email} onChange={(event) => setEmail(event.target.value)} /></label>
-            </div>
-            <label><span>Role</span><select value={role} onChange={(event) => setRole(event.target.value)}>{ROLES.map((item) => <option value={item} key={item}>{roleName(item)}</option>)}</select></label>
-            <button className="admin-btn admin-btn-primary" type="submit" disabled={busy}>{busy ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />} Send invite</button>
-          </form>
+        <section className="user-access-overview" aria-label="Access summary">
+          <div className="user-access-stat user-access-stat-active"><span className="user-access-stat-icon"><Check size={16} /></span><div><small>Active accounts</small><strong>{activeUsers}</strong></div></div>
+          <div className="user-access-stat"><span className="user-access-stat-icon"><Users size={16} /></span><div><small>Other statuses</small><strong>{inactiveUsers}</strong></div></div>
+          {canManage ? <div className="user-access-stat user-access-stat-invites"><span className="user-access-stat-icon"><Mail size={16} /></span><div><small>Open invitations</small><strong>{openInvitations}</strong></div></div> : null}
+          {canManage ? <div className={`user-access-stat ${failedInvitations ? "user-access-stat-warning" : ""}`}><span className="user-access-stat-icon"><Clock3 size={16} /></span><div><small>Delivery issues</small><strong>{failedInvitations}</strong></div></div> : null}
         </section>
-      ) : null}
 
-      <section className="admin-content-section">
-        <div className="section-toolbar"><div className="toolbar-info"><h2>Staff accounts</h2><p>{canManage ? "Access changes are immediate and are recorded in the audit trail." : "Read-only staff directory."}</p></div></div>
-        <div className="invoice-list">
-          {users.map((user) => (
-            <div className="invoice-row" key={user.id}>
-              <div><strong>{user.name}</strong><small>{user.email ?? "Email visible to Super Admin only"}{user.invitedBy ? ` · invited by ${user.invitedBy}` : ""}</small></div>
-              <div><strong>{roleName(user.role)}</strong><small>{user.status}{user.lastLogin ? ` · last login ${new Date(user.lastLogin).toLocaleString()}` : " · never signed in"}</small></div>
-              {canManage ? <div className="invoice-actions">
-                <select aria-label={`Change role for ${user.name}`} value={user.role} disabled={busy || user.status === "deleted"} onChange={(event) => void post("PATCH", { action: "role", id: user.id, role: event.target.value })}>{ROLES.map((item) => <option value={item} key={item}>{roleName(item)}</option>)}</select>
-                {user.status === "active" ? <button className="btn-action" type="button" disabled={busy} onClick={() => userAction(user, "deactivate")}><UserRoundX size={14} /> Deactivate</button> : user.status === "deactivated" ? <button className="btn-action" type="button" disabled={busy} onClick={() => userAction(user, "activate")}><Check size={14} /> Activate</button> : null}
-                {user.status !== "deleted" ? <button className="btn-action btn-danger-text" type="button" disabled={busy} onClick={() => userAction(user, "delete")}><Trash2 size={14} /> Delete</button> : null}
-              </div> : null}
+        {canManage ? (
+          <section className="user-invite-panel" aria-labelledby="user-invite-heading">
+            <div className="user-invite-panel-heading">
+              <span className="user-invite-icon"><Plus size={18} /></span>
+              <div><p className="user-section-kicker">NEW TEAM MEMBER</p><h2 id="user-invite-heading">Invite a user</h2><p>Setup links expire after 7 days and can only be used once.</p></div>
+              <button className="admin-btn user-bulk-invite" type="button" disabled={busy} onClick={() => void inviteAll()}><Mail size={14} /> Invite all 3 defaults</button>
             </div>
-          ))}
-          {users.length === 0 ? <p className="empty-state">No staff accounts found.</p> : null}
-        </div>
-      </section>
+            <form className="admin-modal-form user-invite-form" onSubmit={invite}>
+              <label><span>Full name</span><input required minLength={2} maxLength={160} value={name} onChange={(event) => setName(event.target.value)} /></label>
+              <label><span>Email address</span><input required type="email" maxLength={180} value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+              <label><span>Access role</span><select value={role} onChange={(event) => setRole(event.target.value)}>{ROLES.map((item) => <option value={item} key={item}>{roleName(item)}</option>)}</select></label>
+              <button className="admin-btn admin-btn-primary" type="submit" disabled={busy}>{busy ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />} Send invite</button>
+            </form>
+          </section>
+        ) : <p className="user-readonly-note"><Shield size={15} /> Read-only directory. User access is managed by a Super Admin.</p>}
 
-      {canManage ? <section className="admin-content-section">
-        <div className="section-toolbar"><div className="toolbar-info"><h2>Invitations</h2><p>Failed deliveries can be retried after email service is restored.</p></div><button className="admin-btn" type="button" disabled={busy} onClick={() => void load()}><RefreshCw size={14} /> Refresh</button></div>
-        <div className="invoice-list">
-          {invitations.map((invite) => (
-            <div className="invoice-row" key={invite.id}>
-              <div><strong>{invite.name}</strong><small>{invite.email} · invited by {invite.invitedByName}</small></div>
-              <div><strong>{roleName(invite.role)}</strong><small><Clock3 size={12} /> {invite.status} · expires {new Date(invite.expiresAt).toLocaleString()}</small>{invite.deliveryError ? <small>{invite.deliveryError}</small> : null}{invite.deliveryError && invite.updatedAt ? <small>Last attempt {new Date(invite.updatedAt).toLocaleString()} — press Retry send to deliver it now.</small> : null}</div>
-              <div className="invoice-actions">
-                {invite.status !== "accepted" && invite.status !== "revoked" ? <button className="btn-action" type="button" disabled={busy} onClick={() => void post("PATCH", { action: "resend", id: invite.id })}><RefreshCw size={14} /> {invite.status === "failed" ? "Retry send" : "Resend"}</button> : null}
-                {invite.status !== "accepted" && invite.status !== "revoked" ? <button className="btn-action" type="button" disabled={busy} onClick={() => void copyLink(invite)}><Copy size={14} /> Copy link</button> : null}
-                {invite.status !== "accepted" && invite.status !== "revoked" ? <button className="btn-action btn-danger-text" type="button" disabled={busy} onClick={() => void revoke(invite)}><X size={14} /> Revoke</button> : null}
-              </div>
-            </div>
-          ))}
-          {invitations.length === 0 ? <p className="empty-state">No invitations yet.</p> : null}
-        </div>
-      </section> : null}
-      <footer className="admin-foot"><Shield size={13} /> Super Admin actions only · audit trail records every change</footer>
+        <section className="user-section" aria-labelledby="staff-directory-heading">
+          <div className="user-section-heading"><div><p className="user-section-kicker">TEAM</p><h2 id="staff-directory-heading">Staff directory</h2><p>{canManage ? "Access changes take effect immediately and are recorded in the audit trail." : "Read-only staff directory."}</p></div><button className="admin-btn" type="button" disabled={busy} onClick={() => void load()}><RefreshCw size={14} /> Refresh</button></div>
+          <div className="user-directory-list">
+            {users.map((user) => (
+              <article className="user-directory-row" key={user.id}>
+                <span className="user-avatar" aria-hidden="true">{user.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase()}</span>
+                <div className="user-directory-identity"><strong>{user.name}</strong><small>{user.email ?? "Email visible to Super Admin only"}{user.invitedBy ? ` · invited by ${user.invitedBy}` : ""}</small></div>
+                <div className="user-directory-role"><span className={`user-role-chip user-role-${user.role.replaceAll("_", "-")}`}>{roleName(user.role)}</span><small className={`user-status user-status-${user.status.replaceAll("_", "-")}`}>{user.status.replaceAll("_", " ")}</small></div>
+                <small className="user-last-login">{user.lastLogin ? `Last login ${new Date(user.lastLogin).toLocaleString()}` : "Never signed in"}</small>
+                {canManage ? <div className="user-row-actions">
+                  <select aria-label={`Change role for ${user.name}`} value={user.role} disabled={busy || user.status === "deleted"} onChange={(event) => void post("PATCH", { action: "role", id: user.id, role: event.target.value })}>{ROLES.map((item) => <option value={item} key={item}>{roleName(item)}</option>)}</select>
+                  {user.status === "active" ? <button className="btn-action" type="button" disabled={busy} onClick={() => userAction(user, "deactivate")}><UserRoundX size={14} /> Deactivate</button> : user.status === "deactivated" ? <button className="btn-action" type="button" disabled={busy} onClick={() => userAction(user, "activate")}><Check size={14} /> Activate</button> : null}
+                  {user.status !== "deleted" ? <button className="btn-action btn-danger-text" type="button" disabled={busy} onClick={() => userAction(user, "delete")}><Trash2 size={14} /> Delete</button> : null}
+                </div> : null}
+              </article>
+            ))}
+            {users.length === 0 ? <p className="empty-state">No staff accounts found.</p> : null}
+          </div>
+        </section>
+
+        {canManage ? <section className="user-section" aria-labelledby="invitation-heading">
+          <div className="user-section-heading"><div><p className="user-section-kicker">DELIVERY QUEUE</p><h2 id="invitation-heading">Invitations</h2><p>Failed deliveries can be retried after email service is restored.</p></div><span className="user-section-count">{openInvitations} open</span></div>
+          <div className="user-invitation-list">
+            {invitations.map((invite) => (
+              <article className={`user-invitation-row ${invite.deliveryError ? "has-delivery-error" : ""}`} key={invite.id}>
+                <span className="user-avatar user-avatar-invite" aria-hidden="true"><Mail size={16} /></span>
+                <div className="user-directory-identity"><strong>{invite.name}</strong><small>{invite.email} · invited by {invite.invitedByName}</small></div>
+                <div className="user-directory-role"><span className={`user-role-chip user-role-${invite.role.replaceAll("_", "-")}`}>{roleName(invite.role)}</span><small className={`user-status user-status-${invite.status.replaceAll("_", "-")}`}>{invite.status.replaceAll("_", " ")}</small></div>
+                <div className="user-invitation-meta"><small>Expires {new Date(invite.expiresAt).toLocaleString()}</small>{invite.deliveryError ? <small className="user-delivery-error">{invite.deliveryError}</small> : null}{invite.deliveryError && invite.updatedAt ? <small>Last attempt {new Date(invite.updatedAt).toLocaleString()}</small> : null}</div>
+                <div className="user-row-actions">
+                  {invite.status !== "accepted" && invite.status !== "revoked" ? <button className="btn-action" type="button" disabled={busy} onClick={() => void post("PATCH", { action: "resend", id: invite.id })}><RefreshCw size={14} /> {invite.status === "failed" ? "Retry send" : "Resend"}</button> : null}
+                  {invite.status !== "accepted" && invite.status !== "revoked" ? <button className="btn-action" type="button" disabled={busy} onClick={() => void copyLink(invite)}><Copy size={14} /> Copy link</button> : null}
+                  {invite.status !== "accepted" && invite.status !== "revoked" ? <button className="btn-action btn-danger-text" type="button" disabled={busy} onClick={() => void revoke(invite)}><X size={14} /> Revoke</button> : null}
+                </div>
+              </article>
+            ))}
+            {invitations.length === 0 ? <p className="empty-state">No invitations yet.</p> : null}
+          </div>
+        </section> : null}
+        <footer className="admin-foot"><Shield size={13} /> Super Admin actions only · audit trail records every change</footer>
+      </div>
     </main>
   );
 }

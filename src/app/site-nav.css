@@ -80,8 +80,40 @@
 /* ---- Mobile: sticky bar that carries the primary action everywhere ---- */
 .site-sticky-bar { display: none; }
 
+@media (max-width: 1180px) {
+  .header-nav-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 16px;
+    gap: 8px;
+    background: #171513;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+  .header-nav-menu.is-visible { display: flex; }
+  .menu-toggle-btn { display: block; }
+  .site-primary-nav { flex-direction: column; align-items: stretch; gap: 0; margin-left: 0; }
+  .site-nav-item {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    padding: 14px 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .site-nav-item.is-active::after { display: none; }
+  .site-nav-item .nav-item-sub { display: none; }
+}
+
 @media (max-width: 1050px) {
   .site-primary-nav { gap: 14px; }
+  .site-nav-item .nav-item-sub { display: none; }
+}
 
 @media (max-width: 900px) {
   .utility-location { display: none; }
@@ -240,6 +272,7 @@
 .push-opt-in-btn:disabled { opacity: 0.6; cursor: default; }
 .push-opt-in-btn.is-on { background: rgba(242, 140, 24, 0.18); border-color: rgba(242, 140, 24, 0.55); color: #ffd7a3; }
 .push-opt-in-note { font-size: 12px; line-height: 1.5; color: rgba(255, 255, 255, 0.62); max-width: 34ch; }
+
 /* Light pages (e.g. /download) — same control, ink on paper instead of white on charcoal. */
 .push-opt-in--light .push-opt-in-heading { color: var(--ink); }
 .push-opt-in--light .push-opt-in-intro { color: var(--muted); }
@@ -288,7 +321,4 @@
   .btn-whatsapp-header span { display: none; }
   .utility-item, .utility-link { font-size: 10px; }
   .site-sticky-bar a { font-size: 11px; }
-}
-
-  .site-nav-item .nav-item-sub { display: none; }
 }

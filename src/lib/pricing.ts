@@ -99,6 +99,19 @@ export type StayQuote = {
   meetsMinimumNights: boolean;
 };
 
+/** Calculate VAT in whole MWK without changing the advertised inclusive price. */
+export function calculateVat(amount: number, taxRateBp: number, taxInclusive: boolean) {
+  const taxableAmount = Math.max(0, Math.round(amount));
+  const rateBp = Math.max(0, Math.round(taxRateBp));
+  const taxAmount = taxInclusive
+    ? taxableAmount - Math.round((taxableAmount * 10_000) / (10_000 + rateBp))
+    : Math.round((taxableAmount * rateBp) / 10_000);
+  return {
+    taxAmount,
+    totalAmount: taxInclusive ? taxableAmount : taxableAmount + taxAmount,
+  };
+}
+
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function parseDay(date: string) {
@@ -220,12 +233,10 @@ export function calculateStayQuote(opts: {
   const discountAmount = Math.round((beforeDiscount * discountBp) / 10_000);
   const subtotal = Math.max(0, beforeDiscount - discountAmount);
 
-  const taxRateBp = Math.max(0, Math.round(Number(opts.room.taxRateBp ?? 1650)));
+  const taxRateBp = Math.max(0, Math.round(Number(opts.room.taxRateBp ?? 1750)));
   const taxInclusive = opts.taxInclusive ?? true;
-  // Inclusive: the gross is the price, and VAT is the slice inside it (gross × bp ÷ (10000+bp)).
-  // Exclusive: VAT is added on top of the net.
-  const netOfTax = taxInclusive ? Math.round((subtotal * 10_000) / (10_000 + taxRateBp)) : subtotal;
-  const taxAmount = taxInclusive ? subtotal - netOfTax : Math.round((subtotal * taxRateBp) / 10_000);
+  const { taxAmount, totalAmount } = calculateVat(subtotal, taxRateBp, taxInclusive);
+  const netOfTax = taxInclusive ? subtotal - taxAmount : subtotal;
   const minimumNights = Math.max(1, Math.round(Number(opts.room.minNights) || 1));
 
   return {
@@ -243,15 +254,14 @@ export function calculateStayQuote(opts: {
     taxAmount,
     netOfTax,
     taxInclusive,
-    total: taxInclusive ? subtotal : subtotal + taxAmount,
+    total: totalAmount,
     currency: "MWK",
     minimumNights,
     meetsMinimumNights: nights >= minimumNights,
   };
 }
 
-/** "16.50%" from 1650 basis points — for the UI and invoices. */
+/** "17.50%" from 1750 basis points — for the UI and invoices. */
 export function taxLabel(bp: number) {
   return `${(bp / 100).toFixed(2)}%`;
 }
-

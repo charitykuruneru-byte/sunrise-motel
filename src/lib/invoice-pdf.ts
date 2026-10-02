@@ -19,8 +19,13 @@ export type InvoiceData = {
   adults: number;
   children: number;
   nightlyRate: number;
+  roomSubtotal?: number;
+  discountAmount?: number;
   extras: InvoiceExtra[];
   extrasTotal: number;
+  taxAmount?: number | null;
+  taxRateBp?: number | null;
+  taxInclusive?: boolean | null;
   totalAmount: number;
   amountPaid: number;
   requests?: string | null;
@@ -112,7 +117,7 @@ export async function buildInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
 
   const isPaid = d.amountPaid >= d.totalAmount && d.totalAmount > 0;
   const isCancelled = d.status === "cancelled";
-  const docTitle = isCancelled ? "CANCELLED PRO-FORMA" : isPaid ? "TAX INVOICE / RECEIPT" : "PRO-FORMA INVOICE";
+  const docTitle = isCancelled ? "CANCELLED PRO-FORMA" : isPaid ? "PAYMENT CONFIRMATION" : "PRO-FORMA INVOICE";
 
   // Top band + emblem
   page.drawRectangle({ x: 0, y: height - 10, width, height: 10, color: ORANGE });
@@ -159,10 +164,13 @@ export async function buildInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
   rightText(page, "AMOUNT (MWK)", width - M - 10, y, 8, bold, WHITE);
   y -= 26;
 
-  const roomSubtotal = d.nightlyRate * d.nights;
+  const roomSubtotal = d.roomSubtotal ?? d.nightlyRate * d.nights;
   const rows: { desc: string; qty: string; unit: string; amount: number | null }[] = [
-    { desc: `${d.roomType} accommodation`, qty: String(d.nights), unit: money(d.nightlyRate), amount: roomSubtotal },
+    { desc: `${d.roomType} accommodation`, qty: `${d.nights} night${d.nights === 1 ? "" : "s"}`, unit: "Stay total", amount: roomSubtotal },
   ];
+  if ((d.discountAmount ?? 0) > 0) {
+    rows.push({ desc: "Stay discount", qty: "1", unit: "Discount", amount: -(d.discountAmount ?? 0) });
+  }
   const extrasWithAmounts = d.extras.filter((e) => typeof e.amount === "number");
   if (d.extras.length > 0 && extrasWithAmounts.length === d.extras.length) {
     for (const e of d.extras) rows.push({ desc: e.label, qty: "1", unit: money(e.amount ?? 0), amount: e.amount ?? 0 });
@@ -187,9 +195,13 @@ export async function buildInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
     rightText(page, value, width - M - 10, y, strong ? 10.5 : 9.5, strong ? bold : font, color);
     y -= 16;
   };
-  line("Subtotal (room)", money(roomSubtotal));
+  line("Accommodation", money(roomSubtotal));
+  if ((d.discountAmount ?? 0) > 0) line("Discount", `-${money(d.discountAmount ?? 0)}`);
   line("Extras", money(d.extrasTotal));
-  line("Taxes & levies", "Included / as configured", false, MUTED);
+  const taxLabel = d.taxRateBp == null
+    ? "VAT"
+    : `VAT ${(d.taxRateBp / 100).toFixed(2)}%${d.taxInclusive ? " (included)" : ""}`;
+  line(taxLabel, d.taxAmount == null ? "See final tax document" : money(d.taxAmount), false, MUTED);
   page.drawLine({ start: { x: totalsX, y: y + 10 }, end: { x: width - M, y: y + 10 }, thickness: 1, color: ORANGE });
   y -= 4;
   line("TOTAL", money(d.totalAmount), true);
@@ -220,8 +232,8 @@ export async function buildInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
   text(
     page,
     isPaid
-      ? "Thank you — this document confirms payment received. Keep it for your records."
-      : "This pro-forma invoice is a quotation for the requested stay and is not a payment receipt. A receipt is issued once payment is verified.",
+      ? "Payment has been recorded. This confirmation is not an MRA tax invoice or fiscal receipt."
+      : "PRO-FORMA ONLY — this quotation is not an MRA tax invoice or fiscal receipt. An official fiscal document is issued separately where required.",
     M,
     footerY + 10,
     8,

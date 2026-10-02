@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { bookings } from "@/db/schema";
+import { bookings, invoicesTable } from "@/db/schema";
 import { buildInvoicePdf, parseExtras } from "@/lib/invoice-pdf";
 import { eq } from "drizzle-orm";
 
@@ -12,6 +12,7 @@ export async function GET(_request: Request, context: { params: Promise<{ refere
     const ref = decodeURIComponent(reference).trim().toUpperCase();
     const [booking] = await db.select().from(bookings).where(eq(bookings.reference, ref)).limit(1);
     if (!booking) return NextResponse.json({ error: `No booking found for reference ${ref}.` }, { status: 404 });
+    const [invoice] = await db.select().from(invoicesTable).where(eq(invoicesTable.bookingId, booking.id)).limit(1);
 
     const pdf = await buildInvoicePdf({
       invoiceNumber: booking.invoiceNumber || `INV-${booking.reference}`,
@@ -29,8 +30,13 @@ export async function GET(_request: Request, context: { params: Promise<{ refere
       adults: booking.adults,
       children: booking.children,
       nightlyRate: booking.nightlyRate,
+      roomSubtotal: invoice?.subtotal,
+      discountAmount: booking.discount,
       extras: parseExtras(booking.extras),
-      extrasTotal: Math.max(0, booking.totalAmount - booking.nightlyRate * booking.nights),
+      extrasTotal: invoice?.extrasTotal ?? parseExtras(booking.extras).reduce((sum, extra) => sum + (extra.amount ?? 0), 0),
+      taxAmount: invoice?.taxAmount,
+      taxRateBp: invoice?.taxRateBp,
+      taxInclusive: invoice?.taxInclusive,
       totalAmount: booking.totalAmount,
       amountPaid: booking.amountPaid,
       requests: booking.requests,

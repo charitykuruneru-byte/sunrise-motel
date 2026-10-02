@@ -15,7 +15,7 @@
 
 import { BellRing, Loader2, RefreshCw, Star, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { api, BTN, BTN_PRIMARY, CARD, INPUT } from "./shared";
+import { api, BTN, BTN_DANGER, BTN_PRIMARY, CARD, INPUT } from "./shared";
 
 type ReviewRow = {
   id: string;
@@ -187,7 +187,7 @@ export default function DeskReviews({
                     {isAdmin ? (
                       <>
                     <button
-                      className={BTN}
+                      className={review.isPublished ? BTN_DANGER : BTN_PRIMARY}
                       disabled={busy || readOnly}
                       onClick={() => void moderate(review, { isPublished: !review.isPublished })}
                     >
@@ -195,7 +195,7 @@ export default function DeskReviews({
                       {review.isPublished ? "Hide" : "Publish"}
                     </button>
                     <button
-                      className={BTN}
+                      className={review.isFeatured ? BTN : BTN_PRIMARY}
                       disabled={busy || readOnly || !review.isPublished}
                       title={
                         review.isPublished
@@ -381,4 +381,3 @@ export default function DeskReviews({
     </div>
   );
 }
-

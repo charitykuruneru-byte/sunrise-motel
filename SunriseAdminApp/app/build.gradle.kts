@@ -13,8 +13,8 @@ android {
         applicationId = "com.sunrisemotel.admin"
         minSdk = 21
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
         // Single place to change the website URL. The manager app opens /admin.
         buildConfigField("String", "BASE_URL", "\"https://sunrise-motel.vercel.app\"")
         // The path appended to BASE_URL — one place to change it.

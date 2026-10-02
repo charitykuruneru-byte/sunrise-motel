@@ -16,8 +16,8 @@ import { NextResponse, type NextRequest } from "next/server";
 const CACHEABLE = ["/api/images/", "/api/uploads/"];
 
 export function middleware(request: NextRequest) {
-  const response = NextResponse.next();
   const { pathname } = request.nextUrl;
+  const response = NextResponse.next();
   if (!CACHEABLE.some((prefix) => pathname.startsWith(prefix))) {
     response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
   }

@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Calendar, Loader2, RefreshCw, Shield, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Calendar, Loader2, RefreshCw, Shield, Trash2 } from "lucide-react";
+import { AdminPageFrame } from "@/components/admin/admin-navigation";
 
 /**
  * ROOM CALENDAR — 30 nights, one row per physical room.
@@ -23,6 +25,19 @@ type Unassigned = { id: string; reference: string; guestName: string; roomType: 
 
 const REASONS = ["maintenance", "hold", "ooo", "other"];
 
+function nextCalendarDay(value: string) {
+  const date = new Date(`${value}T12:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+function nightsInRange(start: string, end: string) {
+  if (!start || !end) return 0;
+  const startMs = Date.parse(`${start}T12:00:00.000Z`);
+  const endMs = Date.parse(`${end}T12:00:00.000Z`);
+  return Math.max(0, Math.round((endMs - startMs) / 86_400_000));
+}
+
 export default function CalendarPage() {
   const [days, setDays] = useState<string[]>([]);
   const [rooms, setRooms] = useState<GridRoom[]>([]);
@@ -30,29 +45,35 @@ export default function CalendarPage() {
   const [unassigned, setUnassigned] = useState<Unassigned[]>([]);
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [today, setToday] = useState("");
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [form, setForm] = useState({ roomNumber: "", startDate: "", endDate: "", reason: "maintenance", note: "" });
 
   const load = useCallback(async () => {
-    const response = await fetch("/api/admin/calendar", { cache: "no-store" });
-    const data = (await response.json()) as {
-      days?: string[];
-      rooms?: GridRoom[];
-      stays?: Stay[];
-      unassigned?: Unassigned[];
-      blocks?: Block[];
-      today?: string;
-      error?: string;
-    };
-    if (!response.ok) throw new Error(data.error ?? "Could not load the calendar.");
-    setDays(data.days ?? []);
-    setRooms(data.rooms ?? []);
-    setStays(data.stays ?? []);
-    setUnassigned(data.unassigned ?? []);
-    setBlocks(data.blocks ?? []);
-    setToday(data.today ?? "");
+    setLoading(true);
+    try {
+      const response = await fetch("/api/admin/calendar", { cache: "no-store" });
+      const data = (await response.json()) as {
+        days?: string[];
+        rooms?: GridRoom[];
+        stays?: Stay[];
+        unassigned?: Unassigned[];
+        blocks?: Block[];
+        today?: string;
+        error?: string;
+      };
+      if (!response.ok) throw new Error(data.error ?? "Could not load the calendar.");
+      setDays(data.days ?? []);
+      setRooms(data.rooms ?? []);
+      setStays(data.stays ?? []);
+      setUnassigned(data.unassigned ?? []);
+      setBlocks(data.blocks ?? []);
+      setToday(data.today ?? "");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -135,17 +156,31 @@ export default function CalendarPage() {
     return { background: "#d7efd9", title: "Free" };
   };
 
-  return (
-    <div className="sunrise-app-root">
-      <main style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 16px 96px" }}>
-        <span className="eyebrow"><span className="eyebrow-line" /> ROOMS</span>
-        <h1 className="hero-headline" style={{ marginTop: 8 }}>Thirty nights, every room.</h1>
-        <p className="hero-description">
-          Click any night to start a block from that date. A block is not a drawing: those nights stop being
-          sellable on the website, because availability subtracts blocked rooms exactly as it subtracts live bookings.
-        </p>
+  const selectNight = (room: GridRoom, night: string) => {
+    setForm((current) => ({
+      ...current,
+      roomNumber: room.roomNumber,
+      startDate: night,
+      endDate: nextCalendarDay(night),
+    }));
+  };
 
-        <form onSubmit={block} className="form-fields-group" style={{ marginTop: 20 }}>
+  return (
+    <AdminPageFrame>
+    <div className="sunrise-app-root">
+      <main className="manager-tool-page" style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 16px 96px" }}>
+        <div className="calendar-page-heading">
+          <div>
+            <Link href="/admin" className="calendar-back-link"><ArrowLeft size={14} /> Manager dashboard</Link>
+            <span className="eyebrow"><span className="eyebrow-line" /> ROOM OPERATIONS</span>
+            <h1 className="hero-headline" style={{ marginTop: 8 }}>Room calendar</h1>
+            <p className="hero-description">Thirty nights across every physical room. Assign stays and block maintenance dates from the same live inventory.</p>
+          </div>
+          <div className="calendar-date-summary"><Calendar size={16} /><span>Today</span><strong>{today || "Loading…"}</strong></div>
+        </div>
+
+        <form onSubmit={block} className="form-fields-group calendar-block-form" style={{ marginTop: 20 }}>
+          <div className="calendar-form-heading"><div><span className="user-section-kicker">INVENTORY CONTROL</span><h2>Block room nights</h2><p>Blocked dates are removed from public availability.</p></div></div>
           <div className="form-grid-2">
             <label className="form-input-label"><span>Room</span>
               <select value={form.roomNumber} onChange={(e) => setForm({ ...form, roomNumber: e.target.value })} required>
@@ -164,6 +199,7 @@ export default function CalendarPage() {
             <label className="form-input-label"><span>Sellable again from</span><input type="date" required value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} /></label>
           </div>
           <label className="form-input-label"><span>Note</span><input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="e.g. plumber booked for the 3rd" /></label>
+          {form.roomNumber && form.startDate && form.endDate ? <div className="calendar-selection-summary"><Calendar size={15} /><span><strong>Room {form.roomNumber}</strong> · {form.startDate} to {form.endDate}</span><small>{nightsInRange(form.startDate, form.endDate)} night(s)</small></div> : null}
           <button type="submit" className="admin-btn admin-btn-primary" disabled={busy}>
             {busy ? <Loader2 size={14} className="animate-spin" /> : <Calendar size={14} />} Block those nights
           </button>
@@ -172,18 +208,25 @@ export default function CalendarPage() {
         {error ? <div className="booking-error-banner" style={{ marginTop: 16 }}><Shield size={14} /><span>{error}</span></div> : null}
         {notice ? <div className="booking-error-banner" style={{ marginTop: 16, borderColor: "var(--sage)" }}><span>{notice}</span></div> : null}
 
-        <div className="section-toolbar" style={{ marginTop: 24 }}>
-          <div className="toolbar-info"><h2>Room × night</h2><p>Green free · blue a stay is in that room · red blocked · yellow needs attention today.</p></div>
+        <div className="section-toolbar calendar-grid-toolbar" style={{ marginTop: 24 }}>
+          <div className="toolbar-info"><h2>Room × night</h2><p>Stay dates are shown per physical room; unassigned bookings are listed below.</p></div>
           <button className="admin-btn" type="button" disabled={busy} onClick={() => void load()}><RefreshCw size={14} /> Refresh</button>
         </div>
-        <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 16 }}>
-          <table style={{ borderCollapse: "collapse", fontSize: 12, minWidth: 900 }}>
+        <div className="calendar-legend" aria-label="Calendar legend">
+          <span><i className="calendar-swatch calendar-swatch-free" /> Free</span>
+          <span><i className="calendar-swatch calendar-swatch-stay" /> Assigned stay</span>
+          <span><i className="calendar-swatch calendar-swatch-block" /> Blocked</span>
+          <span><i className="calendar-swatch calendar-swatch-attention" /> Room needs attention</span>
+          <span><i className="calendar-swatch calendar-swatch-today" /> Today</span>
+        </div>
+        <div className="calendar-grid-scroll" role="region" aria-label="Room availability by night. Scroll horizontally to see all dates." tabIndex={0} aria-busy={loading}>
+          {loading ? <div className="calendar-grid-loading"><Loader2 size={18} className="animate-spin" /> Loading room calendar…</div> : rooms.length === 0 ? <div className="calendar-grid-loading">No physical rooms are available to display.</div> : <table className="calendar-grid-table">
             <thead>
               <tr>
-                <th style={{ position: "sticky", left: 0, background: "var(--paper, #fff)", textAlign: "left", padding: "8px 10px" }}>Room</th>
+                <th className="calendar-room-heading" scope="col">Room</th>
                 {days.map((day) => (
-                  <th key={day} style={{ padding: "6px 4px", fontWeight: day === today ? 800 : 500, whiteSpace: "nowrap" }}>
-                    {day.slice(8)}<br /><small>{day.slice(5, 7)}</small>
+                  <th key={day} className={day === today ? "calendar-today-heading" : ""} scope="col" aria-label={day}>
+                    <small>{new Date(`${day}T12:00:00`).toLocaleDateString("en", { weekday: "short" })}</small><strong>{day.slice(8)}</strong><small>{day.slice(5, 7)}</small>
                   </th>
                 ))}
               </tr>
@@ -191,24 +234,28 @@ export default function CalendarPage() {
             <tbody>
               {rooms.map((room) => (
                 <tr key={room.id}>
-                  <td style={{ position: "sticky", left: 0, background: "var(--paper, #fff)", padding: "6px 10px", whiteSpace: "nowrap" }}>
-                    <strong>{room.roomNumber}</strong><br /><small>{room.roomType}</small>
-                  </td>
+                  <th className="calendar-room-heading calendar-room-row-heading" scope="row"><strong>{room.roomNumber}</strong><small>{room.roomType}</small></th>
                   {days.map((day) => {
                     const tone = cellTone(room, day);
                     return (
                       <td
                         key={day}
+                        className={`calendar-cell ${day === today ? "is-today" : ""} ${form.roomNumber === room.roomNumber && form.startDate === day ? "is-selected" : ""}`}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={form.roomNumber === room.roomNumber && form.startDate === day}
+                        aria-label={`${room.roomNumber}, ${day}: ${tone.title}. Select to block this night.`}
                         title={`${room.roomNumber} · ${day} · ${tone.title}`}
-                        onClick={() => setForm({ ...form, roomNumber: room.roomNumber, startDate: day, endDate: day })}
-                        style={{ background: tone.background, border: "1px solid rgba(0,0,0,0.06)", cursor: "pointer", minWidth: 26, height: 30 }}
+                        onClick={() => selectNight(room, day)}
+                        onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectNight(room, day); } }}
+                        style={{ background: tone.background }}
                       />
                     );
                   })}
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table>}
         </div>
 
 
@@ -257,6 +304,7 @@ export default function CalendarPage() {
         </div>
       </main>
     </div>
+    </AdminPageFrame>
   );
 }
 

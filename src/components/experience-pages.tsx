@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import SafeImage from "@/components/safe-image";
+import { BookingOfferOptions, useBookingOffers } from "@/components/booking-offers";
 import SiteNav from "@/components/site-nav";
 import { SunriseLogo } from "@/components/sunrise-logo";
 // The photographs of this property, as the run that looked at every file decided
@@ -70,6 +71,7 @@ export type DineItem = {
   price: number;
   img: string;
   isAvailable: boolean;
+  isSpecial?: boolean;
 };
 
 const formatMoney = (value: number) =>
@@ -298,6 +300,8 @@ export function StayPage() {
   const [breakfastQty, setBreakfastQty] = useState(0);
   const [transfer, setTransfer] = useState(false);
   const [lateOut, setLateOut] = useState(false);
+  const [selectedOfferIds, setSelectedOfferIds] = useState<string[]>([]);
+  const { offers: bookingOffers, loading: bookingOffersLoading, error: bookingOffersError } = useBookingOffers();
   const [submitting, setSubmitting] = useState(false);
   const [bookingRef, setBookingRef] = useState("");
   const [bookingError, setBookingError] = useState("");
@@ -341,7 +345,13 @@ export function StayPage() {
     fetchRooms();
   }, [checkIn, checkOut]);
 
-  const extrasTotal = (breakfastQty * 8500 * nights) + (transfer ? 25000 : 0) + (lateOut ? 15000 : 0);
+  const extrasTotal =
+    (breakfastQty * 8500 * nights) +
+    (transfer ? 25000 : 0) +
+    (lateOut ? 15000 : 0) +
+    bookingOffers
+      .filter((offer) => selectedOfferIds.includes(offer.id))
+      .reduce((total, offer) => total + offer.nightlyPrice * nights, 0);
   const grandTotal = bookingRoom ? (bookingRoom.rate * nights) + extrasTotal : 0;
 
   const handleBookingSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -355,7 +365,9 @@ export function StayPage() {
     const phone = String(formData.get("phone") ?? "").trim();
     const email = String(formData.get("email") ?? "").trim();
     const arrival = String(formData.get("arrival") ?? "").trim();
-    const requests = String(formData.get("requests") ?? "").trim();
+    const travelPurpose = String(formData.get("travelPurpose") ?? "").trim();
+    const guestRequests = String(formData.get("requests") ?? "").trim();
+    const requests = [travelPurpose ? `Trip purpose: ${travelPurpose}` : "", guestRequests].filter(Boolean).join(" · ");
 
     try {
       const res = await fetch("/api/bookings", {
@@ -368,13 +380,7 @@ export function StayPage() {
           checkOut,
           adults,
           children,
-          nightlyRate: bookingRoom.rate,
-          extrasTotal,
-          extras: [
-            ...(breakfastQty > 0 ? [{ label: `Daily breakfast × ${breakfastQty} guest${breakfastQty > 1 ? "s" : ""} (${nights} nights)`, amount: breakfastQty * 8500 * nights }] : []),
-            ...(transfer ? [{ label: "Airport shuttle (one-way)", amount: 25000 }] : []),
-            ...(lateOut ? [{ label: "Late check-out until 15:00", amount: 15000 }] : []),
-          ],
+          extraSelections: { breakfastQty, transfer, lateCheckout: lateOut, offerIds: selectedOfferIds },
           guestName,
           phone,
           email: email || null,
@@ -442,6 +448,24 @@ export function StayPage() {
                   />
                 </div>
                 <small className="date-hint">{formatStayDate(checkIn)} · from 14:00</small>
+              </div>
+              <div className="search-field">
+                <label>Check-out</label>
+                <div className="input-icon-wrap">
+                  <Calendar size={15} />
+                  <input
+                    type="date"
+                    value={checkOut}
+                    min={addDays(checkIn, 1)}
+                    max={addDays(checkIn, 30)}
+                    onChange={(e) => {
+                      const nextNights = nightsBetween(checkIn, e.target.value);
+                      if (nextNights >= 1 && nextNights <= 30) setCheckOut(e.target.value);
+                    }}
+                    required
+                  />
+                </div>
+                <small className="date-hint">Departure by 10:00</small>
               </div>
               <div className="search-field">
                 <label>Nights</label>
@@ -584,6 +608,7 @@ export function StayPage() {
                         setBreakfastQty(0);
                         setTransfer(false);
                         setLateOut(false);
+                        setSelectedOfferIds([]);
                       }}
                     >
                       Book Now <ArrowRight size={15} />
@@ -640,6 +665,10 @@ export function StayPage() {
                   const r = activeSlideshow;
                   setActiveSlideshow(null);
                   setBookingRoom(r);
+                  setBreakfastQty(0);
+                  setTransfer(false);
+                  setLateOut(false);
+                  setSelectedOfferIds([]);
                 }}
               >
                 Book This Room <ArrowRight size={15} />
@@ -712,6 +741,16 @@ export function StayPage() {
                     </label>
                   </div>
 
+                  <BookingOfferOptions
+                    offers={bookingOffers}
+                    loading={bookingOffersLoading}
+                    error={bookingOffersError}
+                    nights={nights}
+                    selectedIds={selectedOfferIds}
+                    onSelectionChange={(offerId, checked) => setSelectedOfferIds((current) =>
+                      checked ? [...current, offerId] : current.filter((id) => id !== offerId),
+                    )}
+                  />
                   <div className="live-calculation-summary">
                     <div className="calc-row"><span>Base Room ({nights} nights):</span><span>{formatMoney(bookingRoom.rate * nights)}</span></div>
                     {extrasTotal > 0 && <div className="calc-row extras-line"><span>Selected Extras:</span><span>+{formatMoney(extrasTotal)}</span></div>}
@@ -735,10 +774,20 @@ export function StayPage() {
                       <input name="email" type="email" placeholder="guest@example.com" />
                     </label>
                   </div>
-                  <label className="form-input-label">
-                    <span>Arrival Time / Special Requests</span>
-                    <input name="requests" placeholder="e.g. Late check-in after 20:00" />
-                  </label>
+                  <div className="form-grid-2">
+                    <label className="form-input-label">
+                      <span>Purpose of stay</span>
+                      <select name="travelPurpose" defaultValue="">
+                        <option value="">Choose if you like</option>
+                        <option value="Work / business">Work / business</option>
+                        <option value="Personal / leisure">Personal / leisure</option>
+                      </select>
+                    </label>
+                    <label className="form-input-label">
+                      <span>Arrival time / special requests</span>
+                      <input name="requests" placeholder="e.g. Late check-in after 20:00" />
+                    </label>
+                  </div>
                 </div>
 
                 {bookingError && <div className="booking-error-banner"><AlertCircle size={15} /><span>{bookingError}</span></div>}
@@ -864,7 +913,7 @@ export function DinePage({ items }: { items?: DineItem[] } = {}) {
                 </div>
               </div>
               <div>
-                <span>{item.category}</span>
+                <span>{item.category}{item.isSpecial ? " · Today's special" : ""}</span>
                 <h3>{item.name}</h3>
                 <p>{item.description}</p>
                 <div className="menu-page-card-bottom">

@@ -26,13 +26,16 @@ import {
   ShieldCheck,
   Trash2,
   Upload,
+  Utensils,
   Users,
   X,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AdminNavigation, AdminSection } from "@/components/admin/admin-navigation";
 import ImageUploader from "@/components/ImageUploader";
+import SafeImage from "@/components/safe-image";
 import { SunriseLogo } from "@/components/sunrise-logo";
 import { formatMalawi } from "@/lib/time";
 
@@ -91,12 +94,24 @@ type InvoiceItem = {
   createdAt: string;
 };
 
-type PostItem = { id: string; title: string; category: string; day: string | null; date: string | null; time: string | null; detail: string; priceTag: string | null; imageUrl: string | null; isActive: boolean };
-type GalleryItem = { id: string; title: string; category: string; imageUrl: string; altText: string; caption: string | null };
+type PostItem = { id: string; title: string; category: string; day: string | null; date: string | null; time: string | null; detail: string; priceTag: string | null; bookingAddonPrice: number | null; imageUrl: string | null; isActive: boolean };
+type MenuAdminItem = { id: string; name: string; category: string; description: string; price: number; imageUrl: string; isAvailable: boolean; isSpecial: boolean };
+type GalleryItem = { id: string; title: string; category: string; imageUrl: string; altText: string; caption: string | null; displayOrder: number };
+type RoomAdminItem = { id: string; name: string; rate: number; weekendPrice?: number; totalInventory: number; isActive: boolean; images: string | string[] };
 type AuditEntry = { id: string; action: string; entity: string; entityId: string | null; reference: string | null; summary: string | null; actor: string; actorLabel: string | null; ip: string | null; createdAt: string };
 
 const STATUSES = ["pending", "awaiting_payment", "confirmed", "checked_in", "checked_out", "cancelled"];
 const money = (v: number) => `MWK ${Math.round(v).toLocaleString("en-US")}`;
+const roomImageUrls = (images: RoomAdminItem["images"]): string[] => {
+  if (Array.isArray(images)) return images.filter((image): image is string => typeof image === "string" && image.length > 0);
+  try {
+    const parsed: unknown = JSON.parse(images);
+    return Array.isArray(parsed) ? parsed.filter((image): image is string => typeof image === "string" && image.length > 0) : [];
+  } catch (error) {
+    console.error("Room images are not valid JSON.", error);
+    return [];
+  }
+};
 // All timestamps are stored as UTC instants (timestamptz) and displayed in
 // Africa/Blantyre (Malawi, UTC+2) so records are accurate everywhere.
 const when = (iso: string | Date | null | undefined) => `${formatMalawi(iso, { withYear: true })} CAT`;
@@ -113,7 +128,7 @@ const EVENT_LABEL: Record<string, string> = {
 
 export default function AdminPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<"bookings" | "invoices" | "gallery" | "posts" | "audit" | "staff" | "rooms" | "reports">("bookings");
+  const [tab, setTab] = useState<"overview" | "bookings" | "invoices" | "gallery" | "posts" | "menu" | "audit" | "staff" | "rooms" | "reports">("overview");
   const [busy, setBusy] = useState(false);
   const [emailTesting, setEmailTesting] = useState(false);
   const [toast, setToast] = useState("");
@@ -122,6 +137,10 @@ export default function AdminPage() {
   const [invoices, setInvoices] = useState<InvoiceItem[]>([]);
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [posts, setPosts] = useState<PostItem[]>([]);
+  const [postsError, setPostsError] = useState("");
+  const [menuItems, setMenuItems] = useState<MenuAdminItem[]>([]);
+  const [menuLoading, setMenuLoading] = useState(false);
+  const [menuError, setMenuError] = useState("");
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
   const [auditQuery, setAuditQuery] = useState("");
   const [auditEntity, setAuditEntity] = useState("all");
@@ -133,11 +152,21 @@ export default function AdminPage() {
   } | null>(null);
   const [reminders, setReminders] = useState<{ pendingCount: number; reminderDue: { id: string; reference: string; bookingNumber: string | null; guestName: string; hours: number }[] } | null>(null);
   const [staffList, setStaffList] = useState<{ id: string; staffCode: string; name: string; email: string; phone: string | null; role: string; isActive: boolean; lastLoginAt: string | null }[]>([]);
-  const [roomsList, setRoomsList] = useState<{ id: string; name: string; rate: number; totalInventory: number; isActive: boolean }[]>([]);
-  const [roomForm, setRoomForm] = useState({ id: "", name: "", rate: "", totalInventory: "3", weekendPrice: "", extraBedPrice: "", cleaningFee: "", taxPercent: "16.5", minNights: "1", weeklyDiscountPercent: "", monthlyDiscountPercent: "" });
+  const [roomsList, setRoomsList] = useState<RoomAdminItem[]>([]);
+  const [roomForm, setRoomForm] = useState({ id: "", name: "", rate: "", totalInventory: "3", weekendPrice: "", extraBedPrice: "", cleaningFee: "", taxPercent: "17.5", minNights: "1", weeklyDiscountPercent: "", monthlyDiscountPercent: "" });
+  const [roomImages, setRoomImages] = useState<string[]>([]);
+  const [showAddRoom, setShowAddRoom] = useState(false);
+  const [editingRoom, setEditingRoom] = useState<RoomAdminItem | null>(null);
+  const [roomEditForm, setRoomEditForm] = useState({ rate: "", weekendPrice: "", totalInventory: "" });
+  const [roomEditImages, setRoomEditImages] = useState<string[]>([]);
+  const [roomBusy, setRoomBusy] = useState(false);
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [bookingSort, setBookingSort] = useState<"recent" | "checkIn" | "amount">("recent");
+  const [invoiceQuery, setInvoiceQuery] = useState("");
+  const [invoiceStatus, setInvoiceStatus] = useState("all");
+  const [invoiceSort, setInvoiceSort] = useState<"recent" | "oldest" | "amount">("recent");
 
   const [selected, setSelected] = useState<BookingItem | null>(null);
   const [events, setEvents] = useState<BookingEvent[]>([]);
@@ -148,15 +177,30 @@ export default function AdminPage() {
   const [emailState, setEmailState] = useState<{ tone: "ok" | "warn" | "err"; text: string } | null>(null);
 
   const [showAddImage, setShowAddImage] = useState(false);
+  const [editingImage, setEditingImage] = useState<GalleryItem | null>(null);
   const [imgTitle, setImgTitle] = useState("");
   const [imgUrl, setImgUrl] = useState("");
   const [imgAlt, setImgAlt] = useState("");
   const [imgCategory, setImgCategory] = useState("Rooms");
   const [imgCaption, setImgCaption] = useState("");
+  const [imgOrder, setImgOrder] = useState("0");
+  const [imageUploading, setImageUploading] = useState(false);
+  const [galleryQuery, setGalleryQuery] = useState("");
+  const [galleryCategory, setGalleryCategory] = useState("all");
+  const [gallerySort, setGallerySort] = useState<"order" | "title" | "category">("order");
+  const [selectedImageIds, setSelectedImageIds] = useState<Set<string>>(new Set());
+  const [galleryBusy, setGalleryBusy] = useState(false);
 
   const [showAddPost, setShowAddPost] = useState(false);
-  const [post, setPost] = useState({ title: "", category: "Event", day: "SAT", date: "26", time: "12:00 — 20:00", detail: "", priceTag: "", imageUrl: "" });
+  const [editingPost, setEditingPost] = useState<PostItem | null>(null);
+  const [post, setPost] = useState({ title: "", category: "Event", day: "SAT", date: "26", time: "12:00 — 20:00", detail: "", priceTag: "", bookingAddonPrice: "", imageUrl: "" });
   const [notifyAppUsers, setNotifyAppUsers] = useState(false);
+  const [menuForm, setMenuForm] = useState({ name: "", category: "Mains", description: "", price: "", imageUrl: "/images/food-grill.jpg", isAvailable: true, isSpecial: false });
+  const [editingMenuId, setEditingMenuId] = useState("");
+  const [showMenuEditor, setShowMenuEditor] = useState(false);
+  const [menuBusy, setMenuBusy] = useState(false);
+  const [menuImageUploading, setMenuImageUploading] = useState(false);
+  const menuEditTitleId = "menu-edit-dialog-title";
 
   // --- Manager login gate (staff or admin account, legacy password still works) ---
   const [authed, setAuthed] = useState(false);
@@ -177,6 +221,26 @@ export default function AdminPage() {
   const isRestaurantManager = isAdmin || sessionUser?.role === "restaurant_manager";
   const isManager = isMotelManager || isRestaurantManager;
   const canViewUsers = isAdmin || sessionUser?.role === "motel_manager" || sessionUser?.role === "restaurant_manager";
+
+  useEffect(() => {
+    const syncSection = () => {
+      const requestedSection = new URLSearchParams(window.location.search).get("section");
+      const validSections: AdminSection[] = ["overview", "bookings", "invoices", "gallery", "posts", "menu", "rooms", "reports"];
+      if (requestedSection && validSections.includes(requestedSection as AdminSection)) {
+        setTab(requestedSection as AdminSection);
+      }
+    };
+    syncSection();
+    window.addEventListener("popstate", syncSection);
+    return () => window.removeEventListener("popstate", syncSection);
+  }, []);
+
+  const selectTab = (nextTab: typeof tab) => {
+    setTab(nextTab);
+    const url = new URL(window.location.href);
+    url.searchParams.set("section", nextTab);
+    window.history.replaceState(null, "", url);
+  };
 
   const notify = (text: string) => {
     setToast(text);
@@ -199,13 +263,36 @@ export default function AdminPage() {
   const loadAll = async () => {
     if (!authed) return;
     setBusy(true);
+    if (isRestaurantManager) {
+      setMenuLoading(true);
+      setMenuError("");
+      void (async () => {
+        try {
+          const menuResponse = await fetch("/api/admin/menu");
+          const menuData = await menuResponse.json();
+          if (!menuResponse.ok) throw new Error(menuData.error || "Could not load menu items.");
+          setMenuItems(menuData.items ?? []);
+        } catch (error) {
+          console.error("Admin menu load failed", error);
+          setMenuError(error instanceof Error ? error.message : "Could not load menu items.");
+        } finally {
+          setMenuLoading(false);
+        }
+      })();
+    }
     try {
       const [b, i, g, p, a, d, r] = await Promise.all([fetch("/api/admin/bookings"), fetch("/api/admin/invoices"), fetch("/api/admin/gallery"), fetch("/api/admin/posts"), fetch("/api/admin/audit?limit=200"), fetch("/api/admin/dashboard"), fetch("/api/admin/reminders")]);
       const [bj, ij, gj, pj, aj, dj, rj] = await Promise.all([b.json(), i.json(), g.json(), p.json(), a.json(), d.json(), r.json()]);
       setBookingsList(bj.bookings ?? []);
       setInvoices(ij.invoices ?? []);
       setGallery(gj.images ?? []);
-      setPosts(pj.posts ?? []);
+      if (!p.ok) {
+        setPosts([]);
+        setPostsError(pj.error || "Could not load posts.");
+      } else {
+        setPosts(pj.posts ?? []);
+        setPostsError("");
+      }
       setAuditEntries(aj.entries ?? []);
       setDashboard(dj.totals ? dj : null);
       setReminders(rj.pendingCount !== undefined ? rj : null);
@@ -286,7 +373,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (authed) loadAll();
-  }, [authed, isAdmin, isMotelManager]);
+  }, [authed, isAdmin, isMotelManager, isRestaurantManager]);
 
   // ---- The sign-in pop-up (front desk, not a maze) ---------------------------
   // It can always be closed — the cross, a tap on the dark background, or Escape —
@@ -435,38 +522,160 @@ export default function AdminPage() {
     loadAll();
   };
 
+  const openAddImage = () => {
+    setEditingImage(null);
+    setImgTitle("");
+    setImgUrl("");
+    setImgAlt("");
+    setImgCategory("Rooms");
+    setImgCaption("");
+    setImgOrder(String(Math.max(0, ...gallery.map((image) => image.displayOrder ?? 0)) + 1));
+    setShowAddImage(true);
+  };
+
+  const openEditImage = (image: GalleryItem) => {
+    setEditingImage(image);
+    setImgTitle(image.title);
+    setImgUrl(image.imageUrl);
+    setImgAlt(image.altText);
+    setImgCategory(image.category);
+    setImgCaption(image.caption ?? "");
+    setImgOrder(String(image.displayOrder ?? 0));
+    setShowAddImage(true);
+  };
+
+  const closeImageEditor = () => {
+    setShowAddImage(false);
+    setEditingImage(null);
+  };
+
   const addImage = async (e: FormEvent) => {
     e.preventDefault();
-    const res = await fetch("/api/admin/gallery", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: imgTitle, imageUrl: imgUrl, category: imgCategory, caption: imgCaption, altText: imgAlt }) });
-    const data = await res.json();
-    if (data.image) {
-      setGallery((prev) => [data.image, ...prev]);
-      setShowAddImage(false);
-      setImgTitle("");
-      setImgUrl("");
-      setImgAlt("");
-      setImgCaption("");
+    setGalleryBusy(true);
+    try {
+      const isEditing = editingImage !== null;
+      const res = await fetch("/api/admin/gallery", {
+        method: isEditing ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...(isEditing ? { id: editingImage.id } : {}),
+          title: imgTitle,
+          imageUrl: imgUrl,
+          category: imgCategory,
+          caption: imgCaption,
+          altText: imgAlt.trim() || imgTitle.trim(),
+          displayOrder: Number(imgOrder),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.image) throw new Error(data.error || `Could not ${isEditing ? "save" : "add"} picture.`);
+      setGallery((prev) => isEditing
+        ? prev.map((image) => image.id === data.image.id ? data.image : image)
+        : [...prev, data.image]);
+      closeImageEditor();
       router.refresh();
-      notify("Picture added to the gallery");
-    } else notify(data.error || "Could not add picture");
+      notify(isEditing ? "Picture changes saved" : "Picture added to the gallery");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Could not save picture.");
+    } finally {
+      setGalleryBusy(false);
+    }
   };
 
   const removeImage = async (id: string) => {
-    if (!confirm("Remove this picture from the public gallery?")) return;
-    const res = await fetch(`/api/admin/gallery?id=${id}`, { method: "DELETE" });
-    if (res.ok) {
+    const image = gallery.find((item) => item.id === id);
+    if (!confirm(`Remove “${image?.title ?? "this picture"}” from the public gallery? This cannot be undone.`)) return;
+    setGalleryBusy(true);
+    try {
+      const res = await fetch(`/api/admin/gallery?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not remove picture.");
       setGallery((prev) => prev.filter((g) => g.id !== id));
+      setSelectedImageIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
       router.refresh();
+      notify(data.message || "Picture removed.");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Could not remove picture.");
+    } finally {
+      setGalleryBusy(false);
     }
+  };
+
+  const removeSelectedImages = async () => {
+    const ids = [...selectedImageIds];
+    if (!ids.length || !confirm(`Remove ${ids.length} selected picture${ids.length === 1 ? "" : "s"} from the public gallery? This cannot be undone.`)) return;
+    setGalleryBusy(true);
+    try {
+      const params = new URLSearchParams();
+      ids.forEach((id) => params.append("id", id));
+      const res = await fetch(`/api/admin/gallery?${params.toString()}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not remove selected pictures.");
+      const removedIds = new Set(ids);
+      setGallery((prev) => prev.filter((image) => !removedIds.has(image.id)));
+      setSelectedImageIds(new Set());
+      router.refresh();
+      notify(data.message || `${data.removed} pictures removed.`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Could not remove selected pictures.");
+    } finally {
+      setGalleryBusy(false);
+    }
+  };
+
+  const openNewPost = () => {
+    setEditingPost(null);
+    setPost({ title: "", category: "Event", day: "SAT", date: "26", time: "12:00 — 20:00", detail: "", priceTag: "", bookingAddonPrice: "", imageUrl: "" });
+    setNotifyAppUsers(false);
+    setShowAddPost(true);
+  };
+
+  const openEditPost = (item: PostItem) => {
+    setEditingPost(item);
+    setPost({
+      title: item.title,
+      category: item.category,
+      day: item.day ?? "",
+      date: item.date ?? "",
+      time: item.time ?? "",
+      detail: item.detail,
+      priceTag: item.priceTag ?? "",
+      bookingAddonPrice: item.bookingAddonPrice === null ? "" : String(item.bookingAddonPrice),
+      imageUrl: item.imageUrl ?? "",
+    });
+    setNotifyAppUsers(false);
+    setShowAddPost(true);
+  };
+
+  const closePostEditor = () => {
+    setShowAddPost(false);
+    setEditingPost(null);
   };
 
   const addPost = async (e: FormEvent) => {
     e.preventDefault();
-    const res = await fetch("/api/admin/posts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(post) });
-    const data = await res.json();
-    if (data.post) {
-      setPosts((prev) => [data.post, ...prev]);
-      setShowAddPost(false);
+    const isEditing = editingPost !== null;
+    try {
+      const res = await fetch("/api/admin/posts", {
+        method: isEditing ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...post,
+          ...(isEditing ? { id: editingPost.id } : {}),
+          bookingAddonPrice: post.category === "Offer" && post.bookingAddonPrice !== "" ? Number(post.bookingAddonPrice) : null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.post) throw new Error(data.error || `Could not ${isEditing ? "save" : "publish"} this post.`);
+      setPosts((prev) => isEditing
+        ? prev.map((item) => item.id === data.post.id ? data.post : item)
+        : [data.post, ...prev]);
+      closePostEditor();
+      if (isEditing) {
+        notify("Post and booking offer saved.");
+        router.refresh();
+        return;
+      }
       // The post itself is already live and already alerted every subscribed device
       // (the API does that automatically) — this line just tells the truth about it.
       const push: { delivered?: number; devices?: number; reason?: string } = data.push || {};
@@ -500,9 +709,97 @@ export default function AdminPage() {
       } else {
         notify(`Post published${alertNote}`);
       }
-      setPost({ title: "", category: "Event", day: "SAT", date: "26", time: "12:00 — 20:00", detail: "", priceTag: "", imageUrl: "" });
       router.refresh();
-    } else notify(data.error || "Could not publish");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Could not save this post.");
+    }
+  };
+
+  const saveMenuItem = async (event: FormEvent) => {
+    event.preventDefault();
+    setMenuBusy(true);
+    try {
+      const res = await fetch("/api/admin/menu", {
+        method: editingMenuId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...menuForm, price: Number(menuForm.price), ...(editingMenuId ? { id: editingMenuId } : {}) }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.item) throw new Error(data.error || "Could not save menu item.");
+      setMenuItems((items) => editingMenuId
+        ? items.map((item) => item.id === data.item.id ? data.item : item)
+        : [...items, data.item].sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)));
+      setShowMenuEditor(false);
+      setEditingMenuId("");
+      setMenuForm({ name: "", category: "Mains", description: "", price: "", imageUrl: "/images/food-grill.jpg", isAvailable: true, isSpecial: false });
+      notify(editingMenuId ? "Menu item updated." : "Menu item added.");
+      router.refresh();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Could not save menu item.");
+    } finally {
+      setMenuBusy(false);
+    }
+  };
+
+  const editMenuItem = (item: MenuAdminItem) => {
+    setEditingMenuId(item.id);
+    setShowMenuEditor(true);
+    setMenuForm({
+      name: item.name,
+      category: item.category,
+      description: item.description,
+      price: String(item.price),
+      imageUrl: item.imageUrl,
+      isAvailable: item.isAvailable,
+      isSpecial: item.isSpecial,
+    });
+  };
+
+  const addMenuItem = () => {
+    setEditingMenuId("");
+    setMenuForm({ name: "", category: "Mains", description: "", price: "", imageUrl: "/images/food-grill.jpg", isAvailable: true, isSpecial: false });
+    setShowMenuEditor(true);
+  };
+
+  const closeMenuEditor = () => {
+    if (menuBusy) return;
+    setShowMenuEditor(false);
+    setEditingMenuId("");
+    setMenuForm({ name: "", category: "Mains", description: "", price: "", imageUrl: "/images/food-grill.jpg", isAvailable: true, isSpecial: false });
+  };
+
+  const toggleMenuAvailability = async (item: MenuAdminItem) => {
+    try {
+      const res = await fetch("/api/admin/menu", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, isAvailable: !item.isAvailable }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.item) throw new Error(data.error || "Could not update item availability.");
+      setMenuItems((items) => items.map((current) => current.id === item.id ? data.item : current));
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Could not update item availability.");
+    }
+  };
+
+  const removeMenuItem = async (item: MenuAdminItem) => {
+    if (!confirm(`Remove "${item.name}" from the menu? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/admin/menu?id=${encodeURIComponent(item.id)}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not remove menu item.");
+      setMenuItems((items) => items.filter((current) => current.id !== item.id));
+      if (editingMenuId === item.id) {
+        setShowMenuEditor(false);
+        setEditingMenuId("");
+        setMenuForm({ name: "", category: "Mains", description: "", price: "", imageUrl: "/images/food-grill.jpg", isAvailable: true, isSpecial: false });
+      }
+      notify("Menu item removed.");
+      router.refresh();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Could not remove menu item.");
+    }
   };
 
   const removePost = async (id: string) => {
@@ -525,29 +822,88 @@ export default function AdminPage() {
 
   const addRoom = async (e: FormEvent) => {
     e.preventDefault();
-    const res = await fetch("/api/admin/rooms", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...roomForm,
-        rate: Number(roomForm.rate),
-        totalInventory: Number(roomForm.totalInventory),
-        // The form speaks percent because that is how a rate is written on paper;
-        // the API stores basis points so 16.5% cannot drift into 16% by rounding.
-        weekendPrice: Number(roomForm.weekendPrice) || 0,
-        extraBedPrice: Number(roomForm.extraBedPrice) || 0,
-        cleaningFee: Number(roomForm.cleaningFee) || 0,
-        taxPercent: Number(roomForm.taxPercent) || 0,
-        minNights: Number(roomForm.minNights) || 1,
-        weeklyDiscountBp: Math.round((Number(roomForm.weeklyDiscountPercent) || 0) * 100),
-        monthlyDiscountBp: Math.round((Number(roomForm.monthlyDiscountPercent) || 0) * 100),
-      }),
+    if (roomImages.length === 0) {
+      notify("Select at least one room photo from Pictures before adding this room.");
+      return;
+    }
+    setRoomBusy(true);
+    try {
+      const res = await fetch("/api/admin/rooms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...roomForm,
+          rate: Number(roomForm.rate),
+          totalInventory: Number(roomForm.totalInventory),
+          images: roomImages,
+          // The form speaks percent; the API stores basis points for hundredth-percent precision.
+          weekendPrice: Number(roomForm.weekendPrice) || 0,
+          extraBedPrice: Number(roomForm.extraBedPrice) || 0,
+          cleaningFee: Number(roomForm.cleaningFee) || 0,
+          taxPercent: Number(roomForm.taxPercent) || 0,
+          minNights: Number(roomForm.minNights) || 1,
+          weeklyDiscountBp: Math.round((Number(roomForm.weeklyDiscountPercent) || 0) * 100),
+          monthlyDiscountBp: Math.round((Number(roomForm.monthlyDiscountPercent) || 0) * 100),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.room) throw new Error(data.error || "Could not add room.");
+      setRoomForm({ id: "", name: "", rate: "", totalInventory: "3", weekendPrice: "", extraBedPrice: "", cleaningFee: "", taxPercent: "17.5", minNights: "1", weeklyDiscountPercent: "", monthlyDiscountPercent: "" });
+      setRoomImages([]);
+      setShowAddRoom(false);
+      notify(`Room added: ${data.room.name}.`);
+      loadAll();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Could not add room.");
+    } finally {
+      setRoomBusy(false);
+    }
+  };
+
+  const closeAddRoom = () => {
+    if (roomBusy) return;
+    setShowAddRoom(false);
+    setRoomForm({ id: "", name: "", rate: "", totalInventory: "3", weekendPrice: "", extraBedPrice: "", cleaningFee: "", taxPercent: "17.5", minNights: "1", weeklyDiscountPercent: "", monthlyDiscountPercent: "" });
+    setRoomImages([]);
+  };
+
+  const openRoomEditor = (room: RoomAdminItem) => {
+    setEditingRoom(room);
+    setRoomEditForm({
+      rate: String(room.rate),
+      weekendPrice: String(room.weekendPrice ?? 0),
+      totalInventory: String(room.totalInventory),
     });
-    const data = await res.json();
-    if (!res.ok) { notify(data.error || "Could not add room"); return; }
-    setRoomForm({ id: "", name: "", rate: "", totalInventory: "3", weekendPrice: "", extraBedPrice: "", cleaningFee: "", taxPercent: "16.5", minNights: "1", weeklyDiscountPercent: "", monthlyDiscountPercent: "" });
-    notify(`Room added: ${data.room.name}.`);
-    loadAll();
+    setRoomEditImages(roomImageUrls(room.images));
+  };
+
+  const saveRoom = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!editingRoom) return;
+    setRoomBusy(true);
+    try {
+      const response = await fetch("/api/admin/rooms", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingRoom.id,
+          rate: Number(roomEditForm.rate),
+          weekendPrice: Number(roomEditForm.weekendPrice) || 0,
+          totalInventory: Number(roomEditForm.totalInventory),
+          images: roomEditImages,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.room) throw new Error(data.error || "Could not update room.");
+      setRoomsList((rooms) => rooms.map((room) => room.id === data.room.id ? data.room : room));
+      setEditingRoom(null);
+      notify(`${data.room.name} updated.`);
+      router.refresh();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Could not update room.");
+    } finally {
+      setRoomBusy(false);
+    }
   };
 
   const toggleRoom = async (id: string, isActive: boolean) => {
@@ -566,12 +922,56 @@ export default function AdminPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return bookingsList.filter((b) => {
+    const matches = bookingsList.filter((b) => {
       if (statusFilter !== "all" && b.status !== statusFilter) return false;
       if (!q) return true;
-      return [b.reference, b.guestName, b.phone, b.email ?? "", b.roomType, b.assignedRoom ?? ""].some((v) => v.toLowerCase().includes(q));
+      return [b.reference, b.bookingNumber ?? "", b.invoiceNumber ?? "", b.guestName, b.phone, b.email ?? "", b.roomType, b.assignedRoom ?? ""].some((value) => value.toLowerCase().includes(q));
     });
-  }, [bookingsList, query, statusFilter]);
+    return matches.sort((left, right) => {
+      if (bookingSort === "checkIn") return left.checkIn.localeCompare(right.checkIn);
+      if (bookingSort === "amount") return right.totalAmount - left.totalAmount;
+      return Date.parse(right.createdAt) - Date.parse(left.createdAt);
+    });
+  }, [bookingsList, query, statusFilter, bookingSort]);
+
+  const filteredInvoices = useMemo(() => {
+    const search = invoiceQuery.trim().toLowerCase();
+    const matches = invoices.filter((invoice) => {
+      if (invoiceStatus !== "all" && invoice.status.toLowerCase() !== invoiceStatus) return false;
+      if (!search) return true;
+      return [invoice.invoiceNumber, invoice.bookingRef, invoice.guestName, invoice.guestEmail ?? "", invoice.roomType]
+        .some((value) => value.toLowerCase().includes(search));
+    });
+    return matches.sort((left, right) => {
+      if (invoiceSort === "amount") return right.totalAmount - left.totalAmount;
+      const dateOrder = Date.parse(left.createdAt) - Date.parse(right.createdAt);
+      return invoiceSort === "oldest" ? dateOrder : -dateOrder;
+    });
+  }, [invoices, invoiceQuery, invoiceStatus, invoiceSort]);
+
+  const filteredGallery = useMemo(() => {
+    const search = galleryQuery.trim().toLocaleLowerCase();
+    const matches = gallery.filter((image) => {
+      if (galleryCategory !== "all" && image.category !== galleryCategory) return false;
+      if (!search) return true;
+      return [image.title, image.category, image.altText, image.caption ?? ""]
+        .some((value) => value.toLocaleLowerCase().includes(search));
+    });
+    return matches.sort((left, right) => {
+      if (gallerySort === "title") return left.title.localeCompare(right.title);
+      if (gallerySort === "category") return left.category.localeCompare(right.category) || left.displayOrder - right.displayOrder;
+      return left.displayOrder - right.displayOrder || left.title.localeCompare(right.title);
+    });
+  }, [gallery, galleryQuery, galleryCategory, gallerySort]);
+
+  const toggleVisibleImageSelection = () => {
+    setSelectedImageIds((previous) => {
+      const next = new Set(previous);
+      const allVisibleSelected = filteredGallery.length > 0 && filteredGallery.every((image) => next.has(image.id));
+      filteredGallery.forEach((image) => allVisibleSelected ? next.delete(image.id) : next.add(image.id));
+      return next;
+    });
+  };
 
   const stats = useMemo(() => {
     const live = bookingsList.filter((b) => b.status !== "cancelled");
@@ -586,6 +986,47 @@ export default function AdminPage() {
   }, [bookingsList]);
 
   const waLink = (b: BookingItem, text: string) => `https://wa.me/${b.phone.replace(/\D/g, "")}?text=${encodeURIComponent(text)}`;
+  const renderRoomImagePicker = (selectedImages: string[], onSelectionChange: (url: string, checked: boolean) => void) => {
+    const roomPictures = gallery.filter((image) => image.category === "Rooms");
+    const unlistedCurrentImages = selectedImages
+      .filter((url) => !roomPictures.some((image) => image.imageUrl === url))
+      .map((url, index) => ({
+        id: `current-room-image-${index}`,
+        title: "Existing photo — not in Pictures",
+        imageUrl: url,
+        altText: "Existing room photo",
+      }));
+    const selectablePictures = [...roomPictures, ...unlistedCurrentImages];
+    return (
+      <fieldset className="room-image-picker">
+        <legend>Room photos from Pictures</legend>
+        <p>Select one or more room photos from the admin Pictures gallery. The first selected photo is used as the main room image.</p>
+        {selectablePictures.length > 0 ? (
+          <div className="room-image-picker-grid">
+            {selectablePictures.map((image) => (
+              <label key={image.id} className={selectedImages.includes(image.imageUrl) ? "selected" : ""}>
+                <input
+                  type="checkbox"
+                  checked={selectedImages.includes(image.imageUrl)}
+                  onChange={(event) => onSelectionChange(image.imageUrl, event.target.checked)}
+                />
+                <SafeImage src={image.imageUrl} alt={image.altText || image.title} width={240} height={150} />
+                <span>{image.title}</span>
+              </label>
+            ))}
+          </div>
+        ) : (
+          <div className="room-image-picker-empty">
+            <span>No pictures are categorized as Rooms yet.</span>
+            <button type="button" className="admin-btn admin-btn-secondary" onClick={() => selectTab("gallery")}>Open Pictures</button>
+          </div>
+        )}
+      </fieldset>
+    );
+  };
+  const activeNavigationSection: AdminSection = ["overview", "bookings", "invoices", "gallery", "posts", "menu", "rooms", "reports"].includes(tab as AdminSection)
+    ? (tab as AdminSection)
+    : "overview";
 
   return (
     <div className="admin-portal">
@@ -656,25 +1097,92 @@ export default function AdminPage() {
           promise rather than a picture: while it is locked the keyboard cannot
           wander into the blurred cards behind the pop-up either. */}
       <div className={authed ? "" : "admin-locked-blur"} aria-hidden={!authed} inert={!authed}>
-        <div className="admin-stats">
-        <div className="stat"><span>Requests</span><strong>{stats.total}</strong></div>
-        <div className="stat stat-warn"><span>Pending review{reminders && reminders.pendingCount > 0 ? ` (${reminders.pendingCount})` : ""}</span><strong>{stats.pending}</strong></div>
-        <div className="stat stat-info"><span>Awaiting payment</span><strong>{stats.awaiting}</strong></div>
-        <div className="stat stat-ok"><span>Confirmed / in-house</span><strong>{stats.confirmed}</strong></div>
-        <div className="stat"><span>Collected</span><strong>{money(stats.collected)}</strong></div>
-        <div className="stat"><span>Outstanding</span><strong>{money(stats.outstanding)}</strong></div>
-      </div>
+      <div className="admin-shell">
+        <AdminNavigation
+          activeSection={activeNavigationSection}
+          onSectionChange={selectTab}
+          counts={{ bookings: bookingsList.length, invoices: invoices.length, gallery: gallery.length, posts: posts.length, menu: menuItems.length, rooms: roomsList.length, users: staffList.length }}
+          canViewUsers={canViewUsers}
+          isRestaurantManager={isRestaurantManager}
+          isMotelManager={isMotelManager}
+        />
+
+        <main className="admin-main-panel">
+      {tab === "overview" && (
+      <>
+      <section className="admin-dashboard-intro" aria-labelledby="admin-dashboard-heading">
+        <div>
+          <span className="admin-dashboard-eyebrow"><LayoutDashboard size={14} /> MANAGER OVERVIEW</span>
+          <h1 id="admin-dashboard-heading">Good day{sessionUser?.name ? `, ${sessionUser.name.split(" ")[0]}` : ""}.</h1>
+          <p>Bookings, money and property updates in one place.</p>
+        </div>
+        <div className={`admin-live-status ${busy ? "is-refreshing" : ""}`} aria-live="polite">
+          <span className="admin-live-dot" />
+          <span>{busy ? "Refreshing live records" : "Live records"}</span>
+          <small>{busy ? "Updating bookings, invoices and activity" : "Malawi time · use Refresh to check again"}</small>
+        </div>
+      </section>
+
+      <section className="admin-dashboard-categories" aria-label="Dashboard totals">
+        <div className="admin-stat-category admin-stat-category-bookings">
+          <div className="admin-stat-category-heading"><Calendar size={15} /><div><strong>Reservations</strong><small>Stay activity</small></div></div>
+          <div className="admin-stats admin-stats-core">
+            <div className="stat"><span>Total requests</span><strong>{stats.total}</strong></div>
+            <div className="stat stat-warn"><span>Pending review{reminders && reminders.pendingCount > 0 ? ` (${reminders.pendingCount})` : ""}</span><strong>{stats.pending}</strong></div>
+            <div className="stat stat-ok"><span>Confirmed / in-house</span><strong>{stats.confirmed}</strong></div>
+          </div>
+        </div>
+        <div className="admin-stat-category admin-stat-category-money">
+          <div className="admin-stat-category-heading"><CreditCard size={15} /><div><strong>Money</strong><small>Collections and balances</small></div></div>
+          <div className="admin-stats admin-stats-core">
+            <div className="stat stat-info"><span>Awaiting payment</span><strong>{stats.awaiting}</strong></div>
+            <div className="stat"><span>Collected</span><strong>{money(stats.collected)}</strong></div>
+            <div className="stat"><span>Outstanding</span><strong>{money(stats.outstanding)}</strong></div>
+          </div>
+        </div>
+      </section>
 
       {dashboard && (
-        <div className="admin-stats admin-stats-revenue">
-          <div className="stat"><span>Today — bookings</span><strong>{dashboard.today.bookings}</strong><em>{money(dashboard.today.revenue)}</em></div>
-          <div className="stat"><span>Week — bookings</span><strong>{dashboard.week.bookings}</strong><em>{money(dashboard.week.revenue)}</em></div>
-          <div className="stat"><span>Month — bookings</span><strong>{dashboard.month.bookings}</strong><em>{money(dashboard.month.revenue)}</em></div>
-          <div className="stat"><span>Paid bookings</span><strong>{dashboard.totals.paid}</strong><em>Collected {money(dashboard.totals.collected)}</em></div>
-          <div className="stat stat-bad"><span>Cancelled loss</span><strong>{money(dashboard.totals.cancelledLoss)}</strong><em>{dashboard.totals.cancelled} cancelled</em></div>
-          <div className="stat"><span>Session</span><strong>{sessionUser ? (sessionUser.role === "admin" ? "Admin" : sessionUser.staffCode) : "—"}</strong><em>{sessionUser?.name ?? ""}</em></div>
-        </div>
+        <section className="admin-stat-category admin-stat-category-performance" aria-label="Performance by period">
+          <div className="admin-stat-category-heading"><Flame size={15} /><div><strong>Performance</strong><small>Actual booking and revenue totals</small></div></div>
+          <div className="admin-stats admin-stats-revenue">
+            <div className="stat"><span>Today</span><strong>{dashboard.today.bookings} bookings</strong><em>{money(dashboard.today.revenue)} revenue</em></div>
+            <div className="stat"><span>This week</span><strong>{dashboard.week.bookings} bookings</strong><em>{money(dashboard.week.revenue)} revenue</em></div>
+            <div className="stat"><span>This month</span><strong>{dashboard.month.bookings} bookings</strong><em>{money(dashboard.month.revenue)} revenue</em></div>
+            <div className="stat"><span>Paid bookings</span><strong>{dashboard.totals.paid}</strong><em>Collected {money(dashboard.totals.collected)}</em></div>
+            <div className="stat stat-bad"><span>Cancelled loss</span><strong>{money(dashboard.totals.cancelledLoss)}</strong><em>{dashboard.totals.cancelled} cancelled</em></div>
+          </div>
+        </section>
       )}
+
+      <section className="admin-action-center" aria-labelledby="admin-action-heading">
+        <div className="admin-action-heading">
+          <div><span className="admin-dashboard-eyebrow">NEXT ACTIONS</span><h2 id="admin-action-heading">What needs attention</h2></div>
+          <span className="admin-action-total">Current records · refresh to update</span>
+        </div>
+        <div className="admin-action-grid">
+          <button className="admin-action-card admin-action-card-warm" type="button" onClick={() => { selectTab("bookings"); setStatusFilter("pending"); }}>
+            <span className="admin-action-icon"><Clock size={18} /></span>
+            <span className="admin-action-copy"><strong>Review requests</strong><small>{reminders?.reminderDue.length ? `${reminders.reminderDue.length} waiting beyond the follow-up window` : "Pending guest bookings"}</small></span>
+            <span className="admin-action-count">{stats.pending}</span>
+          </button>
+          <a className="admin-action-card admin-action-card-green" href="/desk?tab=money">
+            <span className="admin-action-icon"><CreditCard size={18} /></span>
+            <span className="admin-action-copy"><strong>Payments &amp; folios</strong><small>{stats.awaiting ? "Bookings still awaiting payment" : "Open the room-bill workspace"}</small></span>
+            <span className="admin-action-count">{stats.awaiting}</span>
+          </a>
+          {canViewUsers && <a className="admin-action-card admin-action-card-ink" href="/admin/calendar">
+            <span className="admin-action-icon"><BedDouble size={18} /></span>
+            <span className="admin-action-copy"><strong>Room calendar</strong><small>{roomsList.filter((room) => room.isActive).length} active room types</small></span>
+            <span className="admin-action-arrow">→</span>
+          </a>}
+          <button className="admin-action-card admin-action-card-content" type="button" onClick={() => selectTab("posts")}>
+            <span className="admin-action-icon"><Flame size={18} /></span>
+            <span className="admin-action-copy"><strong>Property updates</strong><small>{posts.filter((post) => post.isActive).length} live posts · {gallery.length} pictures</small></span>
+            <span className="admin-action-arrow">→</span>
+          </button>
+        </div>
+      </section>
 
       {reminders && reminders.reminderDue.length > 0 && (
         <div className="reminder-banner">
@@ -686,35 +1194,40 @@ export default function AdminPage() {
           <button className="admin-btn admin-btn-secondary" onClick={runReminders}><Send size={14} /> Send reminders</button>
         </div>
       )}
+      </>
+      )}
 
-      <nav className="admin-tabs">
-        <button className={tab === "bookings" ? "active" : ""} onClick={() => setTab("bookings")}><Calendar size={15} /> Bookings ({bookingsList.length})</button>
-        <button className={tab === "invoices" ? "active" : ""} onClick={() => setTab("invoices")}><FileText size={15} /> Invoices ({invoices.length})</button>
-        <button className={tab === "gallery" ? "active" : ""} onClick={() => setTab("gallery")}><ImageIcon size={15} /> Pictures ({gallery.length})</button>
-        <button className={tab === "posts" ? "active" : ""} onClick={() => setTab("posts")}><Flame size={15} /> Posts ({posts.length})</button>
-        <a className="admin-btn" href="/admin/audit-logs" style={{ textDecoration: "none" }}><History size={15} /> Audit trail</a>
-        {canViewUsers && <a className="admin-btn" href="/admin/users" style={{ textDecoration: "none" }}><Users size={15} /> Users{isAdmin ? ` (${staffList.length})` : ""}</a>}
-        {isMotelManager && <button className={tab === "rooms" ? "active" : ""} onClick={() => setTab("rooms")}><BedDouble size={15} /> Rooms ({roomsList.length})</button>}
-        <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}><Download size={15} /> Reports</button>
-        <a className="admin-btn" href="/admin/notifications" style={{ textDecoration: "none" }}><Send size={15} /> App push</a>
-        {canViewUsers && <a className="admin-btn" href="/admin/finance" style={{ textDecoration: "none" }}><CreditCard size={15} /> Finance &amp; night audit</a>}
-        {canViewUsers && <a className="admin-btn" href="/admin/calendar" style={{ textDecoration: "none" }}><Calendar size={15} /> Room calendar</a>}
-        {canViewUsers && <a className="admin-btn" href="/admin/housekeeping" style={{ textDecoration: "none" }}><BedDouble size={15} /> Housekeeping</a>}
-      </nav>
-
-      {/* ---------------- BOOKINGS ---------------- */}
-      {tab === "bookings" && (
+          {/* ---------------- BOOKINGS ---------------- */}
+          {tab === "bookings" && (
         <section className="admin-content-section">
+          <div className="section-toolbar admin-bookings-toolbar">
+            <div className="toolbar-info"><h2>Bookings</h2><p>Guest requests and stay progress.</p></div>
+            <div className="admin-bookings-toolbar-meta">
+              <span>{filtered.length} shown · {bookingsList.length} total</span>
+              <label className="admin-booking-sort"><span>Sort</span>
+                <select aria-label="Sort bookings" value={bookingSort} onChange={(event) => setBookingSort(event.target.value as typeof bookingSort)}>
+                  <option value="recent">Newest request</option>
+                  <option value="checkIn">Check-in soonest</option>
+                  <option value="amount">Highest total</option>
+                </select>
+              </label>
+            </div>
+          </div>
           <div className="admin-search-row">
             <label className="admin-search">
               <Search size={16} />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Follow a booking: reference (SM-…), guest name, phone or email" />
+              <input aria-label="Search bookings" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Booking or invoice number, guest, phone, email, room" />
               {query && <button onClick={() => setQuery("")} aria-label="Clear search"><X size={14} /></button>}
             </label>
-            <div className="filter-chips">
-              {["all", ...STATUSES].map((s) => (
-                <button key={s} className={statusFilter === s ? "active" : ""} onClick={() => setStatusFilter(s)}>{s === "all" ? "All" : s.replace("_", " ")}</button>
-              ))}
+            <div className="filter-chips" role="group" aria-label="Filter bookings by status">
+              {["all", ...STATUSES].map((s) => {
+                const count = s === "all" ? bookingsList.length : bookingsList.filter((booking) => booking.status === s).length;
+                return (
+                  <button key={s} type="button" aria-pressed={statusFilter === s} className={statusFilter === s ? "active" : ""} onClick={() => setStatusFilter(s)}>
+                    <span>{s === "all" ? "All" : s.replace("_", " ")}</span><em>{count}</em>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -764,11 +1277,40 @@ export default function AdminPage() {
           <div className="section-toolbar">
             <div className="toolbar-info"><h2>Invoices & receipts</h2><p>Every booking gets a pro-forma automatically. Recording full payment converts it to a receipt. Download or email the PDF.</p></div>
           </div>
+          {invoices.length > 0 && (
+            <div className="invoice-controls">
+              <label className="admin-search">
+                <Search size={16} />
+                <input aria-label="Search invoices" value={invoiceQuery} onChange={(event) => setInvoiceQuery(event.target.value)} placeholder="Invoice number, booking reference, guest, email, or room" />
+                {invoiceQuery && <button type="button" onClick={() => setInvoiceQuery("")} aria-label="Clear invoice search"><X size={14} /></button>}
+              </label>
+              <div className="invoice-filter-row">
+                <div className="filter-chips" role="group" aria-label="Filter invoices by status">
+                  {["all", "proforma", "sent", "paid", "cancelled"].map((status) => {
+                    const count = status === "all" ? invoices.length : invoices.filter((invoice) => invoice.status.toLowerCase() === status).length;
+                    return <button key={status} type="button" aria-pressed={invoiceStatus === status} className={invoiceStatus === status ? "active" : ""} onClick={() => setInvoiceStatus(status)}><span>{status === "all" ? "All" : status}</span><em>{count}</em></button>;
+                  })}
+                </div>
+                <div className="admin-bookings-toolbar-meta">
+                  <span>{filteredInvoices.length} shown · {invoices.length} total</span>
+                  <label className="admin-booking-sort"><span>Sort</span>
+                    <select aria-label="Sort invoices" value={invoiceSort} onChange={(event) => setInvoiceSort(event.target.value as typeof invoiceSort)}>
+                      <option value="recent">Newest</option>
+                      <option value="oldest">Oldest</option>
+                      <option value="amount">Highest total</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
           {invoices.length === 0 ? (
             <div className="empty-state"><FileText size={34} /><p>No invoices yet.</p></div>
+          ) : filteredInvoices.length === 0 ? (
+            <div className="empty-state"><Search size={34} /><p>No invoices match these filters.</p></div>
           ) : (
             <div className="invoice-list">
-              {invoices.map((inv) => (
+              {filteredInvoices.map((inv) => (
                 <article key={inv.id} className="invoice-row">
                   <div className="inv-main">
                     <strong>{inv.invoiceNumber}</strong>
@@ -782,7 +1324,7 @@ export default function AdminPage() {
                   <span className={`status-pill inv-${inv.status}`}>{inv.status}</span>
                   <div className="inv-actions">
                     <a className="btn-action btn-pdf" href={`/api/invoices/${inv.bookingRef}`} download><Download size={14} /> PDF</a>
-                    <button className="btn-action btn-view" onClick={() => { const b = bookingsList.find((x) => x.reference === inv.bookingRef); if (b) { setTab("bookings"); openBooking(b); } }}><Mail size={14} /> Email</button>
+                    <button className="btn-action btn-view" onClick={() => { const b = bookingsList.find((x) => x.reference === inv.bookingRef); if (b) { selectTab("bookings"); openBooking(b); } }}><Mail size={14} /> Email</button>
                   </div>
                 </article>
               ))}
@@ -795,23 +1337,88 @@ export default function AdminPage() {
       {tab === "gallery" && (
         <section className="admin-content-section">
           <div className="section-toolbar">
-            <div className="toolbar-info"><h2>Pictures & gallery</h2><p>Upload photos from your phone or paste an image link. Remove anything outdated — changes are live immediately.</p></div>
+            <div className="toolbar-info"><h2>Pictures & gallery</h2><p>Manage the photos guests see across the website. Edit descriptions, group pictures, and set the order they appear.</p></div>
             {isMotelManager
-              ? <button className="admin-btn admin-btn-primary" onClick={() => setShowAddImage(true)}><Plus size={15} /> Add picture</button>
+              ? <button className="admin-btn admin-btn-primary" onClick={openAddImage}><Plus size={15} /> Add picture</button>
               : <small className="hint">Admins only — staff can view the gallery here.</small>}
           </div>
+
+          <div className="gallery-admin-overview" aria-label="Gallery overview">
+            <div><strong>{gallery.length}</strong><span>Total pictures</span></div>
+            <div><strong>{new Set(gallery.map((image) => image.category)).size}</strong><span>Categories in use</span></div>
+            <div><strong>{filteredGallery.length}</strong><span>Matching this view</span></div>
+          </div>
+
+          <div className="gallery-admin-controls">
+            <label className="gallery-admin-search">
+              <span className="sr-only">Search pictures</span>
+              <Search size={16} aria-hidden="true" />
+              <input type="search" value={galleryQuery} onChange={(event) => setGalleryQuery(event.target.value)} placeholder="Search title, caption or alt text" />
+            </label>
+            <label>
+              <span className="sr-only">Filter by category</span>
+              <select value={galleryCategory} onChange={(event) => setGalleryCategory(event.target.value)}>
+                <option value="all">All categories</option>
+                {["Rooms", "Property", "Dining", "Events", "Work"].map((category) => (
+                  <option key={category} value={category}>{category} ({gallery.filter((image) => image.category === category).length})</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span className="sr-only">Sort pictures</span>
+              <select value={gallerySort} onChange={(event) => setGallerySort(event.target.value as typeof gallerySort)}>
+                <option value="order">Sort: website order</option>
+                <option value="title">Sort: title A–Z</option>
+                <option value="category">Sort: category</option>
+              </select>
+            </label>
+          </div>
+
+          {isMotelManager && gallery.length > 0 && (
+            <div className="gallery-admin-bulkbar">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={filteredGallery.length > 0 && filteredGallery.every((image) => selectedImageIds.has(image.id))}
+                  onChange={toggleVisibleImageSelection}
+                  aria-label="Select all visible pictures"
+                />
+                Select visible ({filteredGallery.length})
+              </label>
+              <span>{selectedImageIds.size} selected</span>
+              <button className="btn-delete" onClick={removeSelectedImages} disabled={galleryBusy || selectedImageIds.size === 0}>
+                <Trash2 size={13} /> Remove selected
+              </button>
+            </div>
+          )}
+
+          {filteredGallery.length === 0 ? (
+            <div className="gallery-admin-empty">
+              <ImageIcon size={24} aria-hidden="true" />
+              <strong>{gallery.length === 0 ? "Your gallery is ready for its first picture" : "No pictures match these filters"}</strong>
+              <p>{gallery.length === 0 ? "Add a real motel photo, then give it a clear title and description for guests." : "Try another search or category, or clear the filters to see all pictures."}</p>
+              {gallery.length > 0 && <button className="admin-btn admin-btn-secondary" onClick={() => { setGalleryQuery(""); setGalleryCategory("all"); }}>Clear filters</button>}
+              {gallery.length === 0 && isMotelManager && <button className="admin-btn admin-btn-primary" onClick={openAddImage}><Plus size={15} /> Add first picture</button>}
+            </div>
+          ) : (
           <div className="gallery-admin-grid">
-            {gallery.map((img) => (
-              <div key={img.id} className="gallery-admin-card">
-                <div className="card-image-wrap"><img src={img.imageUrl} alt={img.altText} /><span className="card-category-badge">{img.category}</span></div>
-                <div className="card-body">
-                  <strong>{img.title}</strong>
-                  {img.caption && <p>{img.caption}</p>}
-                  {isMotelManager && <div className="card-actions"><button className="btn-delete" onClick={() => removeImage(img.id)}><Trash2 size={13} /> Remove</button></div>}
+            {filteredGallery.map((img) => (
+              <article key={img.id} className={`gallery-admin-card ${selectedImageIds.has(img.id) ? "is-selected" : ""}`}>
+                <div className="card-image-wrap">
+                  <SafeImage src={img.imageUrl} alt={img.altText || img.title} width={1000} height={750} className="gallery-admin-photo" />
+                  <span className="card-category-badge">{img.category}</span>
+                  {isMotelManager && <label className="gallery-card-select"><input type="checkbox" checked={selectedImageIds.has(img.id)} onChange={() => setSelectedImageIds((prev) => { const next = new Set(prev); next.has(img.id) ? next.delete(img.id) : next.add(img.id); return next; })} aria-label={`Select ${img.title}`} /></label>}
                 </div>
-              </div>
+                <div className="card-body">
+                  <div className="gallery-card-heading"><strong>{img.title}</strong><span>#{img.displayOrder}</span></div>
+                  {img.caption && <p>{img.caption}</p>}
+                  <small className="gallery-card-alt"><span>Image description</span>{img.altText || "Uses the title as its description."}</small>
+                  {isMotelManager && <div className="card-actions"><button className="admin-btn admin-btn-secondary" onClick={() => openEditImage(img)}><FileText size={13} /> Edit details</button><button className="btn-delete" onClick={() => removeImage(img.id)} disabled={galleryBusy}><Trash2 size={13} /> Remove</button></div>}
+                </div>
+              </article>
             ))}
           </div>
+          )}
         </section>
       )}
 
@@ -821,9 +1428,10 @@ export default function AdminPage() {
           <div className="section-toolbar">
             <div className="toolbar-info"><h2>Posts, events & offers</h2><p>Publish braai days, happy hour, match days and offers. Pause or delete anything that has passed.</p></div>
             {isRestaurantManager
-              ? <button className="admin-btn admin-btn-primary" onClick={() => setShowAddPost(true)}><Plus size={15} /> New post</button>
+              ? <button className="admin-btn admin-btn-primary" onClick={openNewPost}><Plus size={15} /> New post</button>
               : <small className="hint">Admins only — staff can view posts here.</small>}
           </div>
+          {postsError && <div className="booking-error-banner" role="alert"><X size={14} /><span>{postsError}</span></div>}
           <div className="posts-admin-grid">
             {posts.map((p) => (
               <article key={p.id} className={`post-admin-card ${!p.isActive ? "post-inactive" : ""}`}>
@@ -835,10 +1443,12 @@ export default function AdminPage() {
                     <small className="time-line"><Clock size={12} /> {p.time || "All day"}</small>
                     <p>{p.detail}</p>
                     {p.priceTag && <strong className="price-tag-badge">{p.priceTag}</strong>}
+                    {p.bookingAddonPrice !== null && <strong className="price-tag-badge">Booking add-on · {money(p.bookingAddonPrice)} / room-night</strong>}
                   </div>
                 </div>
                 {isRestaurantManager && (
                   <div className="post-admin-actions">
+                    <button className="admin-btn admin-btn-secondary" onClick={() => openEditPost(p)}><FileText size={13} /> Edit details</button>
                     <button className={`btn-toggle ${p.isActive ? "btn-active" : "btn-paused"}`} onClick={() => togglePost(p)}>{p.isActive ? "Live" : "Paused"}</button>
                     <button className="btn-delete-post" onClick={() => removePost(p.id)}><Trash2 size={13} /> Delete</button>
                   </div>
@@ -847,6 +1457,126 @@ export default function AdminPage() {
             ))}
           </div>
         </section>
+      )}
+
+      {/* ---------------- MENU MANAGEMENT ---------------- */}
+      {tab === "menu" && isRestaurantManager && (
+        <section className="admin-content-section">
+          <div className="section-toolbar">
+            <div className="toolbar-info">
+              <h2>Restaurant menu &amp; prices</h2>
+              <p>Prices are MWK per dish. Changes update the guest menu; front-desk staff can still only mark dishes sold out.</p>
+            </div>
+            <div className="inline-actions">
+              <span className="admin-action-total">{menuItems.length} item{menuItems.length === 1 ? "" : "s"}</span>
+              <button type="button" className="admin-btn admin-btn-primary" onClick={addMenuItem}><Plus size={14} /> Add menu item</button>
+            </div>
+          </div>
+          {menuError && <div className="booking-error-banner" role="alert"><X size={14} /><span>{menuError}</span></div>}
+
+          {menuLoading ? (
+            <div className="empty-state" role="status"><Loader2 size={22} className="spin" /><p>Loading menu items…</p></div>
+          ) : menuError ? null : menuItems.length === 0 ? (
+            <div className="empty-state"><Utensils size={28} /><p>No menu items have been added yet.</p></div>
+          ) : (
+            <div className="invoice-list">
+              {menuItems.map((item) => (
+                <article key={item.id} className="invoice-row menu-admin-row">
+                  <div className="menu-admin-item">
+                    <SafeImage
+                      src={item.imageUrl}
+                      alt={`${item.name} meal`}
+                      width={160}
+                      height={120}
+                      className="menu-admin-thumb"
+                      fallbackLabel="Meal photo"
+                    />
+                    <div className="inv-main">
+                      <strong>{item.name}{item.isSpecial ? " · Special" : ""}</strong>
+                      <span>{item.category} · {item.description}</span>
+                      <small>{item.isAvailable ? "Available to order" : "Sold out / unavailable"}</small>
+                    </div>
+                  </div>
+                  <div className="inv-money"><strong>{money(item.price)}</strong><small>per item</small></div>
+                  <div className="inv-actions">
+                    <button className="admin-btn admin-btn-secondary" type="button" onClick={() => editMenuItem(item)}>Edit</button>
+                    <button className="admin-btn" type="button" onClick={() => toggleMenuAvailability(item)}>{item.isAvailable ? "Mark sold out" : "Put back on sale"}</button>
+                    <button className="btn-delete-post" type="button" onClick={() => removeMenuItem(item)}><Trash2 size={13} /> Remove</button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {showMenuEditor && (
+        <div
+          className="modal-overlay"
+          onClick={(event) => { if (event.target === event.currentTarget) closeMenuEditor(); }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              closeMenuEditor();
+            }
+          }}
+        >
+          <div className="modal-dialog menu-edit-dialog" role="dialog" aria-modal="true" aria-labelledby={menuEditTitleId}>
+            <button className="modal-close-btn" type="button" onClick={closeMenuEditor} aria-label="Close menu item editor" disabled={menuBusy}><X size={18} /></button>
+            <div className="modal-head">
+              <span className="eyebrow"><span className="eyebrow-line" /> RESTAURANT MENU</span>
+              <h2 id={menuEditTitleId}>{editingMenuId ? "Edit menu item" : "Add a menu item"}</h2>
+              <p>{editingMenuId ? "Update the dish details, price, photo, and availability. Changes will appear on the guest menu." : "Enter the dish details, price, and photo to add it to the guest menu."}</p>
+            </div>
+            <form onSubmit={saveMenuItem} className="admin-modal-form">
+              <div className="form-grid-2">
+                <label><span>Dish name *</span><input autoFocus required maxLength={160} value={menuForm.name} onChange={(event) => setMenuForm({ ...menuForm, name: event.target.value })} placeholder="e.g. Chambo with nsima" /></label>
+                <label><span>Menu category *</span><input required maxLength={80} value={menuForm.category} onChange={(event) => setMenuForm({ ...menuForm, category: event.target.value })} placeholder="e.g. Mains, Drinks, Breakfast" /></label>
+              </div>
+              <div className="form-grid-2">
+                <label><span>Price (MWK per item) *</span><input required type="number" min="0" max="50000000" step="1" inputMode="numeric" value={menuForm.price} onChange={(event) => setMenuForm({ ...menuForm, price: event.target.value })} placeholder="e.g. 18500" /></label>
+                <label><span>Image path or HTTPS URL *</span><input required value={menuForm.imageUrl} onChange={(event) => setMenuForm({ ...menuForm, imageUrl: event.target.value })} placeholder="/images/food-grill.jpg" /></label>
+              </div>
+              <div className="menu-image-picker">
+                <span className="admin-form-label">Dish photo</span>
+                <p>Upload a new photo or choose an existing dining picture.</p>
+                <ImageUploader
+                  currentImage={menuForm.imageUrl}
+                  previewAlt={menuForm.name || "Menu item photo"}
+                  onUploadStateChange={setMenuImageUploading}
+                  onUploadComplete={(url) => setMenuForm((current) => ({ ...current, imageUrl: url }))}
+                />
+                <label>
+                  <span>Or use a picture from the gallery</span>
+                  <select value="" onChange={(event) => {
+                    const selectedImage = gallery.find((image) => image.id === event.target.value);
+                    if (selectedImage) setMenuForm((current) => ({ ...current, imageUrl: selectedImage.imageUrl }));
+                  }}>
+                    <option value="">Choose a dining picture…</option>
+                    {gallery.filter((image) => image.category === "Dining").map((image) => (
+                      <option key={image.id} value={image.id}>{image.title}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <label><span>Description *</span><textarea required maxLength={2000} rows={3} value={menuForm.description} onChange={(event) => setMenuForm({ ...menuForm, description: event.target.value })} placeholder="Describe ingredients, serving size, and what comes with the dish." /></label>
+              <div className="inline-actions">
+                <label><input type="checkbox" checked={menuForm.isAvailable} onChange={(event) => setMenuForm({ ...menuForm, isAvailable: event.target.checked })} /> Available to order</label>
+                <label><input type="checkbox" checked={menuForm.isSpecial} onChange={(event) => setMenuForm({ ...menuForm, isSpecial: event.target.checked })} /> Mark as a special</label>
+              </div>
+              <div className="inline-actions menu-edit-actions">
+                <button type="button" className="admin-btn admin-btn-secondary" onClick={closeMenuEditor} disabled={menuBusy}>Cancel</button>
+                <button type="submit" className="admin-btn admin-btn-primary" disabled={menuBusy || menuImageUploading}>
+                  {menuBusy
+                    ? <><Loader2 size={15} className="spin" /> Saving…</>
+                    : editingMenuId
+                      ? <><FileText size={14} /> Save menu changes</>
+                      : <><Plus size={14} /> Add menu item</>}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* ---------------- MANAGE BOOKING MODAL ---------------- */}
@@ -874,8 +1604,8 @@ export default function AdminPage() {
             <div className="manage-grid">
               <div className="manage-col">
                 <div className="admin-form-group">
-                  <label>Quick decision</label>
-                  <div className="inline-actions">
+                  <div className="admin-form-label">Quick decision</div>
+                  <div className="inline-actions" role="group" aria-label="Quick booking actions">
                     <button className="admin-btn admin-btn-primary" onClick={() => approveBooking(selected, "approve")}>Approve</button>
                     <button className="admin-btn admin-btn-secondary" onClick={() => approveBooking(selected, "confirm")}>Confirm</button>
                     <button className="admin-btn" onClick={() => approveBooking(selected, "follow_up")}><Send size={14} /> Follow-up</button>
@@ -884,36 +1614,36 @@ export default function AdminPage() {
                   </div>
                 </div>
                 <div className="admin-form-group">
-                  <label>Status</label>
-                  <div className="status-button-row">
+                  <div className="admin-form-label">Status</div>
+                  <div className="status-button-row" role="group" aria-label="Booking status">
                     {STATUSES.map((s) => (
-                      <button key={s} className={`status-btn ${selected.status === s ? "active" : ""}`} disabled={!isManager && !["confirmed", "cancelled"].includes(s)} title={!isManager && !["confirmed", "cancelled"].includes(s) ? "Manager action" : undefined} onClick={() => patchBooking(selected.id, { status: s })}>{s.replace("_", " ")}</button>
+                      <button key={s} type="button" aria-pressed={selected.status === s} className={`status-btn ${selected.status === s ? "active" : ""}`} disabled={!isManager && !["confirmed", "cancelled"].includes(s)} title={!isManager && !["confirmed", "cancelled"].includes(s) ? "Manager action" : undefined} onClick={() => patchBooking(selected.id, { status: s })}>{s.replace("_", " ")}</button>
                     ))}
                   </div>
                 </div>
                 {isMotelManager && (
                 <div className="admin-form-group">
-                  <label>Assign physical room (admin)</label>
+                  <label htmlFor="booking-room-input">Assign physical room (admin)</label>
                   <div className="input-with-button">
-                    <input value={roomInput} onChange={(e) => setRoomInput(e.target.value)} placeholder="e.g. Room 104" />
+                    <input id="booking-room-input" value={roomInput} onChange={(e) => setRoomInput(e.target.value)} placeholder="e.g. Room 104" />
                     <button className="admin-btn admin-btn-primary" onClick={() => patchBooking(selected.id, { assignedRoom: roomInput })}>Save</button>
                   </div>
                 </div>
                 )}
                 {isMotelManager && (
                 <div className="admin-form-group">
-                  <label>Record payment received (MWK, admin)</label>
+                  <label htmlFor="booking-payment-input">Record payment received (MWK, admin)</label>
                   <div className="input-with-button">
-                    <input type="number" value={paymentInput} onChange={(e) => setPaymentInput(e.target.value)} placeholder="e.g. 85000" />
+                    <input id="booking-payment-input" type="number" min="0" step="1" value={paymentInput} onChange={(e) => setPaymentInput(e.target.value)} placeholder="e.g. 85000" />
                     <button className="admin-btn admin-btn-primary" onClick={() => patchBooking(selected.id, { amountPaid: Number(paymentInput) })}><CreditCard size={14} /> Record</button>
                   </div>
                   <small className="hint">Full payment automatically confirms the booking and turns the pro-forma into a receipt.</small>
                 </div>
                 )}
                 <div className="admin-form-group">
-                  <label>Invoice</label>
+                  <div className="admin-form-label">Invoice</div>
                   <div className="input-with-button">
-                    <input type="email" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} placeholder="guest@email.com" />
+                    <input id="booking-invoice-email" aria-label="Invoice recipient email" type="email" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} placeholder="guest@email.com" />
                     <button className="admin-btn admin-btn-invoice" onClick={() => emailInvoice(selected)}><Mail size={14} /> Email PDF</button>
                   </div>
                   <div className="inline-actions">
@@ -928,7 +1658,7 @@ export default function AdminPage() {
 
               <div className="manage-col">
                 <div className="admin-form-group">
-                  <label>Timeline</label>
+                  <div className="admin-form-label">Timeline</div>
                   <ol className="timeline">
                     {events.length === 0 && <li className="tl-empty">Loading history…</li>}
                     {events.map((ev) => (
@@ -944,9 +1674,9 @@ export default function AdminPage() {
                   </ol>
                 </div>
                 <div className="admin-form-group">
-                  <label>Add a manager note</label>
+                  <label htmlFor="booking-note-input">Add a manager note</label>
                   <div className="input-with-button">
-                    <input value={noteInput} onChange={(e) => setNoteInput(e.target.value)} placeholder="e.g. Guest called, arriving 21:00" />
+                    <input id="booking-note-input" value={noteInput} onChange={(e) => setNoteInput(e.target.value)} placeholder="e.g. Guest called, arriving 21:00" />
                     <button className="admin-btn admin-btn-secondary" onClick={async () => { if (!noteInput.trim()) return; await patchBooking(selected.id, { action: "add_note", note: noteInput }); setNoteInput(""); }}><Send size={14} /> Note</button>
                   </div>
                 </div>
@@ -963,39 +1693,33 @@ export default function AdminPage() {
 
       {/* ---------------- ADD PICTURE ---------------- */}
       {showAddImage && (
-        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowAddImage(false); }}>
-          <div className="modal-dialog">
-            <button className="modal-close-btn" onClick={() => setShowAddImage(false)}><X size={18} /></button>
-            <div className="modal-head"><span className="eyebrow"><span className="eyebrow-line" /> PICTURES</span><h2>Add a picture</h2><p>Pick from your laptop or phone — it uploads to permanent cloud storage.</p></div>
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeImageEditor(); }}>
+          <div className="modal-dialog modal-wide gallery-editor-dialog">
+            <button className="modal-close-btn" onClick={closeImageEditor} aria-label="Close picture editor"><X size={18} /></button>
+            <div className="modal-head"><span className="eyebrow"><span className="eyebrow-line" /> PICTURES & GALLERY</span><h2>{editingImage ? "Edit picture details" : "Add a picture"}</h2><p>Choose the photo, then decide how guests will find and understand it on the website.</p></div>
             <form onSubmit={addImage} className="admin-modal-form">
-              <ImageUploader currentImage={imgUrl} onUploadComplete={(url) => { setImgUrl(url); if (!imgTitle) setImgTitle("Gallery photo"); notify("Photo uploaded — add a title and save"); }} />
-              {imgUrl && <img className="upload-preview" src={imgUrl} alt="Preview of the picture being added" />}
-              <p className="hint" style={{ marginTop: 6 }}>
-                Gallery standard: 1000 × 750 (4:3), WebP or JPEG, under about 120 KB. A 6 MB phone photo costs every
-                guest data money — compress before uploading. Real photographs of this motel only, and empty the room
-                first.
-              </p>
-              <label><span>Title</span><input required value={imgTitle} onChange={(e) => setImgTitle(e.target.value)} placeholder="e.g. Deluxe room — new curtains" /></label>
-              {/* Alt text describes the SCENE, never the file. It is what a screen
-                  reader reads out and what Google Images indexes (Part 5.6), so it is
-                  asked for here rather than silently copied from the title. */}
-              <label>
-                <span>Alt text — describe the scene</span>
-                <input
-                  value={imgAlt}
-                  onChange={(e) => setImgAlt(e.target.value)}
-                  placeholder="e.g. Deluxe room with a king bed, work desk and a window onto the garden"
-                />
-                <small className="hint">
-                  Never start with &quot;image of&quot; — the screen reader already says it is an image. Leave blank and the
-                  title is used.
-                </small>
-              </label>
-              <div className="form-grid-2">
-                <label><span>Category</span><select value={imgCategory} onChange={(e) => setImgCategory(e.target.value)}><option>Rooms</option><option>Property</option><option>Dining</option><option>Events</option><option>Work</option></select></label>
-                <label><span>Caption (optional)</span><input value={imgCaption} onChange={(e) => setImgCaption(e.target.value)} placeholder="Short caption" /></label>
+              <div className="gallery-editor-image">
+                <ImageUploader currentImage={imgUrl || null} previewAlt={imgAlt || imgTitle || "Selected gallery picture"} onUploadStateChange={setImageUploading} onUploadComplete={(url) => { setImgUrl(url); if (!imgTitle) setImgTitle("Gallery photo"); notify("Photo uploaded — review its details, then save"); }} />
+                <small>Use a clear, well-lit photo of the actual motel. Landscape images work best. Smaller WebP or JPEG files load faster for guests.</small>
+                <label><span>Image URL</span><input required type="text" value={imgUrl} onChange={(e) => setImgUrl(e.target.value)} placeholder="Upload a photo above or paste a URL (https://…)" /><small>Choose an upload above, or paste the full address of an image already online.</small></label>
               </div>
-              <button type="submit" className="admin-btn admin-btn-primary admin-btn-wide" disabled={!imgUrl}><Plus size={15} /> Save to gallery</button>
+              <div className="gallery-editor-fields">
+                <label><span>Picture title <i>Shown to guests</i></span><input required maxLength={160} value={imgTitle} onChange={(e) => setImgTitle(e.target.value)} placeholder="e.g. Deluxe room with garden view" /><small>Use a short, specific name so guests know what they are looking at.</small></label>
+                <label>
+                  <span>Accessibility description <i>Optional · title used if blank</i></span>
+                  <input maxLength={500} value={imgAlt} onChange={(e) => setImgAlt(e.target.value)} placeholder="e.g. King bed and work desk beside a window overlooking the garden" />
+                  <small>Describe the important visual details. Do not start with “image of”; leave blank to use the title.</small>
+                </label>
+                <div className="form-grid-2">
+                  <label><span>Website category</span><select value={imgCategory} onChange={(e) => setImgCategory(e.target.value)}><option>Rooms</option><option>Property</option><option>Dining</option><option>Events</option><option>Work</option></select><small>Helps visitors filter the public gallery.</small></label>
+                  <label><span>Gallery position</span><input required type="number" min="0" step="1" value={imgOrder} onChange={(e) => setImgOrder(e.target.value)} /><small>Lower numbers appear earlier on the website.</small></label>
+                </div>
+                <label><span>Guest-facing caption <i>Optional</i></span><textarea maxLength={500} rows={3} value={imgCaption} onChange={(e) => setImgCaption(e.target.value)} placeholder="Add helpful context, such as the room type or a feature guests will notice." /><small>Keep it useful and brief (up to 500 characters).</small></label>
+              </div>
+              <div className="gallery-editor-actions">
+                <button type="button" className="admin-btn admin-btn-secondary" onClick={closeImageEditor}>Cancel</button>
+                <button type="submit" className="admin-btn admin-btn-primary" disabled={!imgUrl.trim() || !imgTitle.trim() || galleryBusy || imageUploading}><FileText size={15} /> {galleryBusy ? "Saving…" : imageUploading ? "Photo uploading…" : editingImage ? "Save picture changes" : "Add picture to gallery"}</button>
+              </div>
             </form>
           </div>
         </div>
@@ -1003,10 +1727,10 @@ export default function AdminPage() {
 
       {/* ---------------- ADD POST ---------------- */}
       {showAddPost && (
-        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowAddPost(false); }}>
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) closePostEditor(); }}>
           <div className="modal-dialog">
-            <button className="modal-close-btn" onClick={() => setShowAddPost(false)}><X size={18} /></button>
-            <div className="modal-head"><span className="eyebrow"><span className="eyebrow-line" /> POSTS & EVENTS</span><h2>Publish a post</h2></div>
+            <button className="modal-close-btn" onClick={closePostEditor} aria-label="Close post editor"><X size={18} /></button>
+            <div className="modal-head"><span className="eyebrow"><span className="eyebrow-line" /> POSTS & EVENTS</span><h2>{editingPost ? "Edit post or offer" : "Publish a post"}</h2></div>
             <form onSubmit={addPost} className="admin-modal-form">
               <label><span>Title</span><input required value={post.title} onChange={(e) => setPost({ ...post, title: e.target.value })} placeholder="e.g. Saturday lawn braai" /></label>
               <div className="form-grid-2">
@@ -1017,6 +1741,22 @@ export default function AdminPage() {
                 <label><span>Time</span><input value={post.time} onChange={(e) => setPost({ ...post, time: e.target.value })} placeholder="12:00 — 20:00" /></label>
                 <label><span>Price tag</span><input value={post.priceTag} onChange={(e) => setPost({ ...post, priceTag: e.target.value })} placeholder="From MWK 22,000" /></label>
               </div>
+              {post.category === "Offer" && (
+                <label>
+                  <span>Optional booking add-on (MWK per room-night)</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="50000000"
+                    step="1"
+                    inputMode="numeric"
+                    value={post.bookingAddonPrice}
+                    onChange={(e) => setPost({ ...post, bookingAddonPrice: e.target.value })}
+                    placeholder="Leave blank if this is a display-only offer"
+                  />
+                  <small>Guests can select this when booking a room. The price is multiplied by the number of nights, per room. Enter 0 for a free booking add-on.</small>
+                </label>
+              )}
               <label><span>Picture</span>
                 <ImageUploader currentImage={post.imageUrl || null} onUploadComplete={(url) => setPost({ ...post, imageUrl: url })} />
                 <select value={post.imageUrl} onChange={(e) => setPost({ ...post, imageUrl: e.target.value })} style={{ marginTop: 8 }}>
@@ -1025,11 +1765,13 @@ export default function AdminPage() {
                 </select>
               </label>
               <label><span>Details</span><textarea required rows={3} value={post.detail} onChange={(e) => setPost({ ...post, detail: e.target.value })} placeholder="What, when, price and any terms…" /></label>
-              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+              {!editingPost && <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
                 <input type="checkbox" checked={notifyAppUsers} onChange={(e) => setNotifyAppUsers(e.target.checked)} />
                 <span>Also send push notification to app users</span>
-              </label>
-              <button type="submit" className="admin-btn admin-btn-primary admin-btn-wide"><Plus size={15} /> Publish</button>
+              </label>}
+              <button type="submit" className="admin-btn admin-btn-primary admin-btn-wide">
+                {editingPost ? <><FileText size={15} /> Save changes</> : <><Plus size={15} /> Publish</>}
+              </button>
             </form>
           </div>
         </div>
@@ -1109,11 +1851,30 @@ export default function AdminPage() {
       {tab === "rooms" && isMotelManager && (
         <section className="admin-content-section">
           <div className="section-toolbar">
-            <div className="toolbar-info"><h2>Rooms / services</h2><p>Only admins can add, hide or remove these.</p></div>
+            <div className="toolbar-info"><h2>Rooms / services</h2><p>Manage room rates and connect room photos from the Pictures gallery. New prices apply to future bookings.</p></div>
+            <button type="button" className="admin-btn admin-btn-primary" onClick={() => setShowAddRoom(true)}><Plus size={15} /> Add room</button>
           </div>
-          <form onSubmit={addRoom} className="admin-modal-form admin-inline-form">
+          {showAddRoom && (
+          <div
+            className="modal-overlay"
+            onClick={(event) => { if (event.target === event.currentTarget) closeAddRoom(); }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                closeAddRoom();
+              }
+            }}
+          >
+          <div className="modal-dialog room-edit-dialog room-add-dialog" role="dialog" aria-modal="true" aria-labelledby="room-add-dialog-title">
+          <button className="modal-close-btn" type="button" onClick={closeAddRoom} aria-label="Close add room form" disabled={roomBusy}><X size={18} /></button>
+          <div className="modal-head">
+            <span className="eyebrow"><span className="eyebrow-line" /> ROOM SETUP</span>
+            <h2 id="room-add-dialog-title">Add a room or service</h2>
+            <p>Set the room type, nightly prices, inventory, and select its photos from the Pictures gallery.</p>
+          </div>
+          <form onSubmit={addRoom} className="admin-modal-form">
             <div className="form-grid-2">
-              <label><span>ID (slug)</span><input value={roomForm.id} onChange={(e) => setRoomForm({ ...roomForm, id: e.target.value })} placeholder="e.g. executive" /></label>
+              <label><span>ID (slug)</span><input autoFocus value={roomForm.id} onChange={(e) => setRoomForm({ ...roomForm, id: e.target.value })} placeholder="e.g. executive" /></label>
               <label><span>Name *</span><input required value={roomForm.name} onChange={(e) => setRoomForm({ ...roomForm, name: e.target.value })} placeholder="e.g. Executive Suite" /></label>
             </div>
             <div className="form-grid-2">
@@ -1136,37 +1897,147 @@ export default function AdminPage() {
               <label><span>Monthly discount % (28+ nights)</span><input type="number" value={roomForm.monthlyDiscountPercent} onChange={(e) => setRoomForm({ ...roomForm, monthlyDiscountPercent: e.target.value })} /></label>
               <p style={{ fontSize: 12, opacity: 0.75, alignSelf: "end" }}>New quotes use these. Bookings already made keep the price they were made at.</p>
             </div>
-            <button type="submit" className="admin-btn admin-btn-primary"><Plus size={15} /> Add room / service</button>
+            {renderRoomImagePicker(roomImages, (url, checked) => {
+              setRoomImages((selected) => checked
+                ? selected.includes(url) ? selected : [...selected, url]
+                : selected.filter((imageUrl) => imageUrl !== url));
+            })}
+            <div className="inline-actions menu-edit-actions">
+              <button type="button" className="admin-btn admin-btn-secondary" onClick={closeAddRoom} disabled={roomBusy}>Cancel</button>
+              <button type="submit" className="admin-btn admin-btn-primary" disabled={roomBusy}>
+                {roomBusy ? <><Loader2 size={15} className="spin" /> Adding room…</> : <><Plus size={15} /> Add room / service</>}
+              </button>
+            </div>
           </form>
-          <div className="invoice-list">
-            {roomsList.map((r) => (
-              <div key={r.id} className="invoice-row">
-                <div><strong>{r.name}</strong><small>{r.id} · MWK {r.rate.toLocaleString()}/night</small></div>
-                <div><strong>{r.isActive ? "Live" : "Hidden"}</strong></div>
-                <div className="invoice-actions">
-                  <button className="btn-action" onClick={() => toggleRoom(r.id, !r.isActive)}>{r.isActive ? "Hide" : "Show"}</button>
-                  <button className="btn-action btn-danger-text" onClick={() => removeRoom(r.id)}>Remove</button>
-                </div>
-              </div>
-            ))}
+          </div>
+          </div>
+          )}
+          <div className="room-admin-grid">
+            {roomsList.map((r) => {
+              const images = roomImageUrls(r.images);
+              const galleryImageCount = images.filter((url) => gallery.some((image) => image.category === "Rooms" && image.imageUrl === url)).length;
+              const unlistedImageCount = images.length - galleryImageCount;
+              return (
+                <article key={r.id} className="room-admin-card">
+                  <SafeImage src={images[0]} alt={`${r.name} at Sunrise Motel`} width={640} height={360} className="room-admin-photo" fallbackLabel="Add room photos from Pictures" />
+                  <div className="room-admin-card-content">
+                    <div className="room-admin-card-heading">
+                      <div><h3>{r.name}</h3><small>{r.id} · {r.totalInventory} room{r.totalInventory === 1 ? "" : "s"} in this type</small></div>
+                      <span className={r.isActive ? "room-live-status" : "room-live-status hidden"}>{r.isActive ? "Live" : "Hidden"}</span>
+                    </div>
+                    <strong className="room-admin-rate">{money(r.rate)} <span>/ night</span></strong>
+                    {(r.weekendPrice ?? 0) > 0 && <small className="room-admin-weekend">Weekend · {money(r.weekendPrice ?? 0)} / night</small>}
+                    <small>{galleryImageCount} picture{galleryImageCount === 1 ? "" : "s"} linked from Pictures{unlistedImageCount > 0 ? ` · ${unlistedImageCount} existing photo${unlistedImageCount === 1 ? "" : "s"}` : ""}</small>
+                    <div className="room-admin-actions">
+                      <button type="button" className="admin-btn admin-btn-secondary" onClick={() => openRoomEditor(r)}>Edit price &amp; photos</button>
+                      <button type="button" className="admin-btn" onClick={() => toggleRoom(r.id, !r.isActive)}>{r.isActive ? "Hide" : "Show"}</button>
+                      <button type="button" className="btn-delete-post" onClick={() => removeRoom(r.id)}>Remove</button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </section>
       )}
 
-      {/* ---------------- REPORTS ---------------- */}
-      {tab === "reports" && (
-        <section className="admin-content-section">
-          <div className="section-toolbar">
-            <div className="toolbar-info"><h2>Reports</h2><p>Daily bookings PDF for the office, revenue CSV for Excel.</p></div>
+      {editingRoom && (
+        <div
+          className="modal-overlay"
+          onClick={(event) => { if (event.target === event.currentTarget && !roomBusy) setEditingRoom(null); }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && !roomBusy) {
+              event.preventDefault();
+              setEditingRoom(null);
+            }
+          }}
+        >
+          <div className="modal-dialog room-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="room-edit-dialog-title">
+            <button className="modal-close-btn" type="button" onClick={() => !roomBusy && setEditingRoom(null)} aria-label="Close room editor" disabled={roomBusy}><X size={18} /></button>
+            <div className="modal-head">
+              <span className="eyebrow"><span className="eyebrow-line" /> ROOM PRICING &amp; PHOTOS</span>
+              <h2 id="room-edit-dialog-title">Edit {editingRoom.name}</h2>
+              <p>Update rates and link room photos from the admin Pictures gallery. New prices apply to future quotes; existing bookings keep their agreed price.</p>
+            </div>
+            <form className="admin-modal-form" onSubmit={saveRoom}>
+              <div className="form-grid-2">
+                <label><span>Standard rate (MWK per night) *</span><input autoFocus required type="number" min="1" max="50000000" step="1" value={roomEditForm.rate} onChange={(event) => setRoomEditForm({ ...roomEditForm, rate: event.target.value })} /></label>
+                <label><span>Weekend rate (MWK per night)</span><input type="number" min="0" max="50000000" step="1" value={roomEditForm.weekendPrice} onChange={(event) => setRoomEditForm({ ...roomEditForm, weekendPrice: event.target.value })} /><small>Enter 0 to use the standard rate.</small></label>
+              </div>
+              <label><span>Rooms available in this type</span><input required type="number" min="1" max="1000" step="1" value={roomEditForm.totalInventory} onChange={(event) => setRoomEditForm({ ...roomEditForm, totalInventory: event.target.value })} /></label>
+              {renderRoomImagePicker(roomEditImages, (url, checked) => {
+                setRoomEditImages((selected) => checked
+                  ? selected.includes(url) ? selected : [...selected, url]
+                  : selected.filter((imageUrl) => imageUrl !== url));
+              })}
+              <div className="inline-actions menu-edit-actions">
+                <button type="button" className="admin-btn admin-btn-secondary" onClick={() => setEditingRoom(null)} disabled={roomBusy}>Cancel</button>
+                <button type="submit" className="admin-btn admin-btn-primary" disabled={roomBusy}>
+                  {roomBusy ? <><Loader2 size={15} className="spin" /> Saving…</> : <><FileText size={14} /> Save room changes</>}
+                </button>
+              </div>
+            </form>
           </div>
-          <div className="inline-actions">
-            <a className="admin-btn admin-btn-primary" href="/api/admin/reports" target="_blank" rel="noreferrer"><Printer size={15} /> Daily bookings (print / PDF)</a>
-            <a className="admin-btn admin-btn-secondary" href="/api/admin/reports?format=csv" download><Download size={15} /> Revenue CSV (Excel)</a>
-          </div>
-        </section>
+        </div>
       )}
-      <footer className="admin-foot"><ShieldCheck size={13} /> Staff-only portal · guests never see a login · <Users size={13} /> {bookingsList.length} guest records</footer>
+
+      {/* ---------------- REPORTS ---------------- */}
+          {tab === "reports" && (
+            <section className="admin-content-section admin-reports-page">
+              <div className="section-toolbar admin-reports-heading">
+                <div className="toolbar-info">
+                  <span className="admin-dashboard-eyebrow">OPERATIONS REPORTS</span>
+                  <h2>Reports &amp; exports</h2>
+                  <p>Choose a register to print or export for your records.</p>
+                </div>
+              </div>
+
+              <div className="report-summary" aria-label="Current booking totals">
+                <div><span>Bookings</span><strong>{stats.total}</strong></div>
+                <div><span>Collected</span><strong>{money(stats.collected)}</strong></div>
+                <div><span>Outstanding</span><strong>{money(stats.outstanding)}</strong></div>
+              </div>
+
+              <div className="report-grid">
+                <article className="report-card">
+                  <span className="report-card-icon"><Calendar size={17} /></span>
+                  <h3>Booking register</h3>
+                  <p>Guest details, room, stay dates, status, and payment balances.</p>
+                  <small>{stats.total} booking record{stats.total === 1 ? "" : "s"} · {money(stats.collected)} collected</small>
+                  <div className="report-card-actions">
+                    <a className="admin-btn admin-btn-secondary" href="/api/admin/reports" target="_blank" rel="noreferrer"><Printer size={14} /> Print / PDF</a>
+                    <a className="admin-btn admin-btn-primary" href="/api/admin/reports?format=csv" download><Download size={14} /> CSV</a>
+                  </div>
+                </article>
+
+                <article className="report-card">
+                  <span className="report-card-icon report-card-icon-green"><CreditCard size={17} /></span>
+                  <h3>Night audit</h3>
+                  <p>Stored daily occupancy, room and POS revenue, expenses, and net totals.</p>
+                  <small>Closed days · latest totals first</small>
+                  <div className="report-card-actions">
+                    <a className="admin-btn admin-btn-secondary" href="/api/admin/reports?report=night-audit" target="_blank" rel="noreferrer"><Printer size={14} /> Print / PDF</a>
+                    <a className="admin-btn admin-btn-primary" href="/api/admin/reports?report=night-audit&amp;format=csv" download><Download size={14} /> CSV</a>
+                  </div>
+                </article>
+
+                <article className="report-card">
+                  <span className="report-card-icon report-card-icon-bronze"><FileText size={17} /></span>
+                  <h3>Expense ledger</h3>
+                  <p>Recorded expenses with category, date, payment method, and approver.</p>
+                  <small>All expense entries · newest first</small>
+                  <div className="report-card-actions">
+                    <a className="admin-btn admin-btn-secondary" href="/api/admin/reports?report=expenses" target="_blank" rel="noreferrer"><Printer size={14} /> Print / PDF</a>
+                    <a className="admin-btn admin-btn-primary" href="/api/admin/reports?report=expenses&amp;format=csv" download><Download size={14} /> CSV</a>
+                  </div>
+                </article>
+              </div>
+            </section>
+          )}
+          <footer className="admin-foot"><ShieldCheck size={13} /> Staff-only portal · guests never see a login · <Users size={13} /> {bookingsList.length} guest records</footer>
+        </main>
       </div>
     </div>
+  </div>
   );
 }

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { bookings, guestAccountsTable, guestsTable, roomsTable } from "@/db/schema";
+import { bookings, guestAccountsTable, guestsTable, invitationsTable, roomsTable } from "@/db/schema";
 import { clientIp, logAudit } from "@/lib/audit";
 import { deskActor, requireSuperAdmin } from "@/lib/desk-auth";
 import { resendActivation } from "@/lib/guest-account";
-import { inviteCheckedInGuest } from "@/lib/guest-invitations";
+import { GuestProfileInviteError, inviteCheckedInGuest, inviteGuestProfile } from "@/lib/guest-invitations";
 import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
@@ -19,13 +19,23 @@ export async function GET(request: Request) {
   const auth = await deskActor(request);
   if ("error" in auth) return auth.error;
   try {
-    const [guests, accounts, allBookings, rooms] = await Promise.all([
+    const [guests, accounts, allBookings, rooms, invitations] = await Promise.all([
       db.select().from(guestsTable).orderBy(desc(guestsTable.updatedAt)).limit(500),
       db.select().from(guestAccountsTable),
       db.select().from(bookings).orderBy(desc(bookings.checkIn)).limit(500),
       db.select().from(roomsTable),
+      db.select().from(invitationsTable)
+        .where(eq(invitationsTable.accountType, "guest"))
+        .orderBy(desc(invitationsTable.createdAt))
+        .limit(1000),
     ]);
     const roomById = new Map(rooms.map((r) => [r.id, r]));
+    const latestInvitationByGuest = new Map<string, (typeof invitations)[number]>();
+    for (const invitation of invitations) {
+      if (invitation.guestId && !latestInvitationByGuest.has(invitation.guestId)) {
+        latestInvitationByGuest.set(invitation.guestId, invitation);
+      }
+    }
     const list = guests.map((guest) => {
       const stays = allBookings.filter((b) => b.guestId === guest.id);
       const completed = stays.filter((b) => ["checked_out", "checked_in"].includes(b.status));
@@ -63,6 +73,12 @@ export async function GET(request: Request) {
           lastLoginAt: a.lastLoginAt,
           invitedByLabel: a.invitedByLabel,
         })),
+        invitation: latestInvitationByGuest.has(guest.id)
+          ? {
+              email: latestInvitationByGuest.get(guest.id)!.email,
+              status: latestInvitationByGuest.get(guest.id)!.status,
+            }
+          : null,
         activeStay: stays.find((b) => ["confirmed", "checked_in"].includes(b.status)) ?? null,
       };
     });
@@ -103,6 +119,11 @@ export async function POST(request: Request) {
       password?: string;
       status?: string;
       consent?: boolean;
+      fullName?: string;
+      email?: string;
+      phone?: string;
+      country?: string;
+      notes?: string;
     };
     const action = body.action ?? "";
 
@@ -118,6 +139,27 @@ export async function POST(request: Request) {
       });
       revalidateLiveContent();
       return NextResponse.json({ success: true, result });
+    }
+
+    if (action === "add_guest") {
+      try {
+        const result = await inviteGuestProfile({
+          fullName: body.fullName ?? "",
+          email: body.email ?? "",
+          phone: body.phone,
+          country: body.country,
+          notes: body.notes,
+          actor: auth.user,
+          request,
+        });
+        revalidateLiveContent();
+        return NextResponse.json({ success: true, result });
+      } catch (error) {
+        if (error instanceof GuestProfileInviteError) {
+          return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+        throw error;
+      }
     }
 
     if (action === "register") {

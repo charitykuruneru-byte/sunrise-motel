@@ -23,13 +23,16 @@
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; font-size: 16px; }
-body { background: var(--ivory); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
-button, input, select, textarea { font: inherit; }
-button { border: 0; cursor: pointer; background: none; }
-a { color: inherit; text-decoration: none; }
-img { display: block; max-width: 100%; height: auto; }
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+  * { margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; font-size: 16px; }
+  body { background: var(--ivory); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+  button, input, select, textarea { font: inherit; }
+  button { border: 0; cursor: pointer; background: none; }
+  a { color: inherit; text-decoration: none; }
+  img { display: block; max-width: 100%; height: auto; }
+}
 
 /* ================= ANIMATED SUNRISE LOGO & BRAND ================= */
 .sunrise-logo-brand { display: inline-flex; align-items: center; gap: 12px; }
@@ -674,4 +677,263 @@ input:checked + .toggle-slider:before { transform: translateX(20px); }
   body * { visibility: hidden; }
   #printable-invoice, #printable-invoice * { visibility: visible; }
   #printable-invoice { position: absolute; left: 0; top: 0; width: 100%; }
+}
+
+/* Front-desk workspaces use a brighter, higher-contrast operations theme. */
+.desk-console-shell {
+  background: #f5f2ed;
+  color: #2b241f;
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.55;
+  letter-spacing: 0.005em;
+  font-kerning: normal;
+  text-rendering: optimizeLegibility;
+}
+.desk-console-shell h1,
+.desk-console-shell h2,
+.desk-console-shell h3 {
+  font-family: var(--sans);
+  letter-spacing: -0.018em;
+  line-height: 1.25;
+}
+.desk-console-shell h1 {
+  font-size: 19px !important;
+  font-weight: 700;
+}
+.desk-console-shell h2 {
+  font-size: 20px !important;
+  font-weight: 700;
+}
+.desk-console-shell h3 {
+  font-size: 15px !important;
+  font-weight: 700;
+}
+.desk-console-shell [class~="text-xs"] {
+  font-size: 13px !important;
+  line-height: 1.5;
+}
+.desk-console-shell [class~="text-sm"] {
+  font-size: 15px !important;
+  line-height: 1.45;
+}
+.desk-console-shell .text-\[11px\] {
+  font-size: 13px !important;
+  line-height: 1.5;
+}
+.desk-console-shell .text-\[10px\] {
+  font-size: 12px !important;
+  line-height: 1.45;
+}
+.desk-console-shell .text-\[9px\] {
+  font-size: 11px !important;
+  line-height: 1.4;
+}
+.desk-console-shell [class*="tracking-widest"],
+.desk-console-shell [class*="tracking-[0.16em]"] {
+  letter-spacing: 0.11em;
+}
+.desk-console-shell [class*="bg-[#12100e]"],
+.desk-console-shell [class*="bg-[#171513]"],
+.desk-console-shell [class*="bg-[#201d1a]"] {
+  background-color: #fff !important;
+}
+.desk-console-shell [class*="bg-white"] {
+  background-color: #fff !important;
+}
+.desk-console-shell [class*="bg-black"] {
+  background-color: #f7f4f0 !important;
+}
+.desk-console-shell [class*="border-white"] {
+  border-color: rgba(66, 49, 36, 0.14) !important;
+}
+.desk-console-shell [class*="text-white"] {
+  color: #332a23 !important;
+}
+.desk-console-shell [class*="text-[#f8c66b]"] {
+  color: #98500e !important;
+}
+.desk-console-shell [class*="text-rose-"] {
+  color: #9e2937 !important;
+}
+.desk-console-shell [class*="text-amber-"] {
+  color: #81500b !important;
+}
+.desk-console-shell [class*="text-emerald-"] {
+  color: #176844 !important;
+}
+.desk-console-shell [class*="text-sky-"] {
+  color: #145b87 !important;
+}
+.desk-console-shell [class*="text-teal-"] {
+  color: #126c67 !important;
+}
+.desk-console-shell [class*="text-indigo-"] {
+  color: #4b4c9a !important;
+}
+.desk-console-shell [class*="hover:bg-white"]:hover {
+  background-color: #f2eee8 !important;
+}
+.desk-console-shell .desk-dialog-panel {
+  border-color: rgba(66, 49, 36, 0.14) !important;
+  background-color: #fff !important;
+  color: #2b241f !important;
+}
+.desk-console-shell .desk-dialog-panel input,
+.desk-console-shell .desk-dialog-panel select,
+.desk-console-shell .desk-dialog-panel textarea {
+  border-color: rgba(66, 49, 36, 0.2) !important;
+  background-color: #faf8f5 !important;
+  color: #2b241f !important;
+}
+.desk-console-shell .desk-dialog-panel input::placeholder,
+.desk-console-shell .desk-dialog-panel textarea::placeholder {
+  color: #877b70 !important;
+}
+.desk-console-shell .desk-button {
+  min-height: 42px;
+  padding-inline: 14px !important;
+  border-radius: 10px !important;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+.desk-console-shell .desk-button svg {
+  flex: 0 0 auto;
+}
+.desk-console-shell .desk-button-primary svg {
+  stroke-width: 2.5;
+}
+.desk-console-shell .desk-button-danger svg {
+  stroke-width: 2.2;
+}
+.desk-console-shell .desk-button:not(:disabled):active {
+  transform: translateY(1px);
+}
+.desk-console-shell .desk-button:focus-visible,
+.desk-console-shell .desk-nav-button:focus-visible,
+.desk-console-shell .desk-attention-card:focus-visible {
+  outline: 3px solid rgba(194, 103, 22, 0.45);
+  outline-offset: 2px;
+}
+.desk-console-shell .desk-button-secondary {
+  border: 1px solid rgba(68, 51, 37, 0.17) !important;
+  background: linear-gradient(180deg, #fff 0%, #faf8f5 100%) !important;
+  color: #51463d !important;
+  box-shadow: 0 1px 2px rgba(48, 35, 24, 0.06);
+}
+.desk-console-shell .desk-button-secondary:not(:disabled):hover {
+  border-color: rgba(172, 93, 25, 0.38) !important;
+  background: #fff8ef !important;
+  color: #783e0d !important;
+  box-shadow: 0 3px 10px rgba(48, 35, 24, 0.09);
+}
+.desk-console-shell .desk-button-primary {
+  border: 1px solid #c66a15 !important;
+  background: linear-gradient(135deg, #f9a33b 0%, #e98420 55%, #d66e17 100%) !important;
+  color: #2c1a0b !important;
+  box-shadow: 0 2px 5px rgba(147, 72, 13, 0.2), inset 0 1px rgba(255, 255, 255, 0.3);
+}
+.desk-console-shell .desk-button-primary:not(:disabled):hover {
+  background: linear-gradient(135deg, #ffb351 0%, #f1912e 55%, #df771e 100%) !important;
+  box-shadow: 0 4px 12px rgba(147, 72, 13, 0.25), inset 0 1px rgba(255, 255, 255, 0.35);
+  transform: translateY(-1px);
+}
+.desk-console-shell .desk-button-danger {
+  border: 1px solid #e9b9b8 !important;
+  background: linear-gradient(180deg, #fff 0%, #fff7f6 100%) !important;
+  color: #9e2937 !important;
+}
+.desk-console-shell .desk-button-danger:not(:disabled):hover {
+  border-color: #d98e91 !important;
+  background: #fff0ef !important;
+  box-shadow: 0 3px 10px rgba(130, 36, 42, 0.1);
+}
+.desk-console-shell .desk-nav-button {
+  transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+.desk-console-shell .desk-nav-button[aria-current="page"] {
+  box-shadow: inset 3px 0 #df791c;
+}
+.desk-console-shell .desk-room-card,
+.desk-console-shell .desk-thread-selector {
+  border-radius: 12px !important;
+  box-shadow: 0 1px 3px rgba(48, 35, 24, 0.07);
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+.desk-console-shell .desk-room-card:hover,
+.desk-console-shell .desk-thread-selector:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(48, 35, 24, 0.1);
+}
+.desk-console-shell .desk-room-card[aria-pressed="true"],
+.desk-console-shell .desk-thread-selector[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px rgba(223, 121, 28, 0.2), 0 4px 12px rgba(48, 35, 24, 0.08);
+}
+.desk-console-shell .desk-attention-card {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(68, 51, 37, 0.1) !important;
+  background: linear-gradient(145deg, #fff 0%, #fcfaf7 100%) !important;
+}
+.desk-console-shell .desk-attention-card::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: #b7c5b9;
+  content: "";
+}
+.desk-console-shell .desk-attention-card--warn {
+  border-color: #ead6b6 !important;
+  background: linear-gradient(145deg, #fff 0%, #fffbf4 100%) !important;
+}
+.desk-console-shell .desk-attention-card--warn::before {
+  background: #d49332;
+}
+.desk-console-shell .desk-attention-card--bad {
+  border-color: #e5c2c0 !important;
+  background: linear-gradient(145deg, #fff 0%, #fff8f7 100%) !important;
+}
+.desk-console-shell .desk-attention-card--bad::before {
+  background: #bb4a4c;
+}
+.desk-console-shell .desk-attention-card > p:first-child {
+  font-size: 11px !important;
+  letter-spacing: 0.12em;
+}
+.desk-console-shell .desk-attention-card > div > p:first-child {
+  font-family: var(--sans);
+  font-size: 30px !important;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+.desk-console-shell .desk-attention-card > div > span {
+  font-size: 12px;
+}
+.desk-console-shell .desk-topbar {
+  box-shadow: 0 2px 12px rgba(48, 35, 24, 0.045);
+}
+.desk-console-shell aside nav {
+  padding: 14px !important;
+}
+.desk-console-shell aside .desk-nav-button {
+  min-height: 42px;
+  font-size: 13px !important;
+}
+.desk-console-shell > div > div:last-child > div:last-child > section {
+  border-radius: 16px;
+}
+.desk-console-shell [class~="rounded-lg"],
+.desk-console-shell [class~="rounded-xl"] {
+  border-radius: 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .desk-console-shell .desk-button,
+  .desk-console-shell .desk-nav-button,
+  .desk-console-shell .desk-attention-card,
+  .desk-console-shell .desk-room-card,
+  .desk-console-shell .desk-thread-selector {
+    transition: none;
+  }
 }

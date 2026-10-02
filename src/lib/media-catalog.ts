@@ -1187,9 +1187,9 @@ export const HERO_VIDEO: MediaEntry | null = {
 };
 
 export const HERO_IMAGE: MediaEntry | null = {
-  "src": "/media/organized/building_exterior/cute-and-cozy-place-friendly.jpg",
-  "alt": "The Sunrise Motel facade and its arched sign, with potted plants along the veranda",
-  "title": "Sunrise Motel facade and its arched sign",
+  "src": "/media/organized/building_exterior/520576165.jpg",
+  "alt": "The front of Sunrise Motel, with its arched sign and potted plants along the veranda",
+  "title": "Sunrise Motel facade with its arched sign",
   "category": "building_exterior",
   "tags": [
     "exterior",
@@ -1198,8 +1198,8 @@ export const HERO_IMAGE: MediaEntry | null = {
     "day",
     "plants"
   ],
-  "width": 1400,
-  "height": 800
+  "width": 1024,
+  "height": 512
 };
 
 /** The cover of a category — the first live photo, which is the one the run chose. */

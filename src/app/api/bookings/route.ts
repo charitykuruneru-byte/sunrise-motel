@@ -1,17 +1,17 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { bookings, invoicesTable, roomTypeRatesTable, roomTypesTable } from "@/db/schema";
+import { bookings, invoicesTable, postsTable, roomTypeRatesTable, roomTypesTable } from "@/db/schema";
 import { logBookingEvent } from "@/lib/booking-events";
 import { clientIp, logAudit } from "@/lib/audit";
 import { buildInvoicePdf } from "@/lib/invoice-pdf";
 import { findOrCreateGuest } from "@/lib/hotel";
 import { blockedCountByRoomType } from "@/lib/room-blocks";
 import { adminAlertHtml, guestEmailHtml, sendInvoiceEmail, sendMail } from "@/lib/mail";
-import { bookingMath, calculateStayQuote, nextBookingNumber } from "@/lib/pricing";
+import { calculateStayQuote, calculateVat, nextBookingNumber } from "@/lib/pricing";
 import { malawiShortDate, malawiYear, nowDate } from "@/lib/time";
 import { setting } from "@/lib/settings";
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { revalidateLiveContent } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +36,60 @@ function makeInvoiceNumber() {
 
 type ExtraInput = { label: string; amount: number };
 
+const BREAKFAST_PER_GUEST_PER_NIGHT = 8_500;
+const AIRPORT_TRANSFER_PRICE = 25_000;
+const LATE_CHECKOUT_PRICE = 15_000;
+
+function parseLegacyExtras(raw: unknown, nights: number, maxGuests: number): ExtraInput[] | null {
+  let entries: unknown[] = [];
+  if (Array.isArray(raw)) entries = raw;
+  else if (typeof raw === "string") {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return null;
+      entries = parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  const extras: ExtraInput[] = [];
+  const seen = new Set<string>();
+  for (const entry of entries) {
+    const label = typeof entry === "string"
+      ? entry
+      : entry && typeof entry === "object" && "label" in entry && typeof entry.label === "string"
+        ? entry.label
+        : "";
+    if (!label || seen.has(label)) return null;
+    seen.add(label);
+    if (
+      label === "Kamuzu Airport transfer (one-way)" ||
+      label === "Airport Shuttle (one-way)" ||
+      label === "Airport shuttle (one-way)"
+    ) {
+      extras.push({ label: "Kamuzu Airport transfer (one-way)", amount: AIRPORT_TRANSFER_PRICE });
+      continue;
+    }
+    if (label === "Late check-out until 15:00" || label === "Late check-out (15:00)") {
+      extras.push({ label: "Late check-out until 15:00", amount: LATE_CHECKOUT_PRICE });
+      continue;
+    }
+    const breakfast = /^Daily breakfast × (\d+) guest(?:s)? \(\d+ nights?\)$/.exec(label);
+    if (breakfast) {
+      const quantity = Number(breakfast[1]);
+      if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > maxGuests) return null;
+      extras.push({
+        label: `Daily breakfast × ${quantity} guest${quantity === 1 ? "" : "s"} (${nights} night${nights === 1 ? "" : "s"})`,
+        amount: quantity * BREAKFAST_PER_GUEST_PER_NIGHT * nights,
+      });
+      continue;
+    }
+    return null;
+  }
+  return extras;
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
@@ -51,23 +105,71 @@ export async function POST(request: Request) {
     const children = Math.max(0, Number(body.children) || 0);
     const nights = nightsBetween(checkIn, checkOut);
 
-    let extras: ExtraInput[] = [];
-    if (Array.isArray(body.extras)) {
-      extras = (body.extras as unknown[])
-        .map((e) => (e && typeof e === "object" && "label" in e ? { label: String((e as ExtraInput).label), amount: Number((e as ExtraInput).amount) || 0 } : null))
-        .filter((e): e is ExtraInput => Boolean(e));
-    } else if (typeof body.extras === "string") {
-      try {
-        const parsed = JSON.parse(body.extras) as unknown;
-        if (Array.isArray(parsed)) extras = parsed.map((e) => (typeof e === "string" ? { label: e, amount: 0 } : (e as ExtraInput)));
-      } catch {
-        extras = [];
-      }
-    }
-    const extrasTotal = extras.length ? extras.reduce((s, e) => s + (e.amount || 0), 0) : Number(body.extrasTotal) || 0;
-
     if (!guestName || !phone || !/^\d{4}-\d{2}-\d{2}$/.test(checkIn) || !/^\d{4}-\d{2}-\d{2}$/.test(checkOut) || nights < 1) {
       return NextResponse.json({ error: "Please provide your name, phone number and a valid check-in / check-out date." }, { status: 400 });
+    }
+
+    let extras: ExtraInput[] = [];
+    let offerIds: string[] = [];
+    if (body.extraSelections !== undefined) {
+      const selections = body.extraSelections;
+      if (!selections || typeof selections !== "object" || Array.isArray(selections)) {
+        return NextResponse.json({ error: "Booking extra selections are invalid." }, { status: 400 });
+      }
+      const value = selections as Record<string, unknown>;
+      const breakfastQty = value.breakfastQty ?? 0;
+      const transfer = value.transfer ?? false;
+      const lateCheckout = value.lateCheckout ?? false;
+      const requestedOffers = value.offerIds ?? [];
+      if (!Number.isSafeInteger(breakfastQty) || Number(breakfastQty) < 0 || Number(breakfastQty) > adults + children) {
+        return NextResponse.json({ error: "Breakfast quantity must not exceed the number of guests." }, { status: 400 });
+      }
+      if (typeof transfer !== "boolean" || typeof lateCheckout !== "boolean") {
+        return NextResponse.json({ error: "Choose valid booking extras." }, { status: 400 });
+      }
+      if (!Array.isArray(requestedOffers) || requestedOffers.length > 20 || requestedOffers.some((id) => typeof id !== "string" || !id.trim())) {
+        return NextResponse.json({ error: "Choose valid booking offers." }, { status: 400 });
+      }
+      offerIds = [...new Set((requestedOffers as string[]).map((id) => id.trim()))];
+      if (offerIds.length !== requestedOffers.length) {
+        return NextResponse.json({ error: "A booking offer may only be selected once." }, { status: 400 });
+      }
+      if (Number(breakfastQty) > 0) {
+        extras.push({
+          label: `Daily breakfast × ${Number(breakfastQty)} guest${Number(breakfastQty) === 1 ? "" : "s"} (${nights} night${nights === 1 ? "" : "s"})`,
+          amount: Number(breakfastQty) * BREAKFAST_PER_GUEST_PER_NIGHT * nights,
+        });
+      }
+      if (transfer) extras.push({ label: "Kamuzu Airport transfer (one-way)", amount: AIRPORT_TRANSFER_PRICE });
+      if (lateCheckout) extras.push({ label: "Late check-out until 15:00", amount: LATE_CHECKOUT_PRICE });
+    } else {
+      const legacyExtras = parseLegacyExtras(body.extras, nights, adults + children);
+      if (!legacyExtras || (Number(body.extrasTotal) > 0 && legacyExtras.length === 0)) {
+        return NextResponse.json({ error: "One or more extras are invalid. Please refresh the booking form and try again." }, { status: 400 });
+      }
+      extras = legacyExtras;
+    }
+
+    if (offerIds.length > 0) {
+      const selectedOffers = await db
+        .select({ id: postsTable.id, title: postsTable.title, nightlyPrice: postsTable.bookingAddonPrice })
+        .from(postsTable)
+        .where(and(inArray(postsTable.id, offerIds), eq(postsTable.category, "Offer"), eq(postsTable.isActive, true), isNotNull(postsTable.bookingAddonPrice)));
+      const pricedOffers = selectedOffers.filter(
+        (offer): offer is (typeof selectedOffers)[number] & { nightlyPrice: number } => offer.nightlyPrice !== null,
+      );
+      if (pricedOffers.length !== offerIds.length) {
+        return NextResponse.json({ error: "One or more selected offers are no longer available. Refresh the page and choose again." }, { status: 409 });
+      }
+      extras.push(...pricedOffers.map((offer) => ({
+        label: `${offer.title} (${nights} night${nights === 1 ? "" : "s"} @ MWK ${offer.nightlyPrice.toLocaleString()}/room-night)`,
+        amount: offer.nightlyPrice * nights,
+      })));
+    }
+    const extrasTotal = extras.reduce((sum, extra) => sum + extra.amount, 0);
+    const maxStoredAmount = 2_147_483_647;
+    if (!Number.isSafeInteger(extrasTotal) || extrasTotal > maxStoredAmount) {
+      return NextResponse.json({ error: "The selected extras exceed the maximum billable amount." }, { status: 400 });
     }
 
     // Server is the source of truth for the room name and rate
@@ -116,6 +218,11 @@ export async function POST(request: Request) {
       guests: adults + children,
       taxInclusive,
     });
+    const taxableAmount = quote.subtotal + extrasTotal;
+    const { taxAmount, totalAmount } = calculateVat(taxableAmount, quote.taxRateBp, taxInclusive);
+    if (!Number.isSafeInteger(totalAmount) || totalAmount > maxStoredAmount) {
+      return NextResponse.json({ error: "The total exceeds the maximum billable amount. Please contact the front desk." }, { status: 400 });
+    }
 
     // Anti-overbooking: count overlapping live bookings inside a transaction with a row lock on the room type
     const result = await db.transaction(async (tx) => {
@@ -145,11 +252,6 @@ export async function POST(request: Request) {
       const extensionFee = 0;
       const discount = quote.discount.amount;
       const subtotal = quote.nightlySubtotal;
-      const grossBeforeTax = quote.total + extrasTotal;
-      const taxAmount = taxInclusive
-        ? grossBeforeTax - Math.round((grossBeforeTax * 10_000) / (10_000 + quote.taxRateBp))
-        : Math.round((grossBeforeTax * quote.taxRateBp) / 10_000);
-      const totalAmount = taxInclusive ? grossBeforeTax : grossBeforeTax + taxAmount;
       const bookingId = randomUUID();
       const bookingNumber = await nextBookingNumber(tx as unknown, malawiYear(nowDate()));
 
@@ -192,7 +294,10 @@ export async function POST(request: Request) {
         ...extras.map((e) => ({ description: e.label, amount: e.amount })),
         // VAT is already inside the prices above — this line states the portion, so the
         // guest's total is unchanged while the books can still file the tax.
-        { description: `VAT ${(quote.taxRateBp / 100).toFixed(2)}% (included in the total)`, amount: 0 },
+        {
+          description: `VAT ${(quote.taxRateBp / 100).toFixed(2)}%${taxInclusive ? " (included in the total)" : ""}`,
+          amount: taxAmount,
+        },
       ];
 
       await tx.insert(invoicesTable).values({
@@ -210,6 +315,8 @@ export async function POST(request: Request) {
         subtotal,
         extrasTotal,
         taxAmount,
+        taxRateBp: quote.taxRateBp,
+        taxInclusive,
         totalAmount,
         amountPaid: 0,
         balanceDue: totalAmount,
@@ -263,8 +370,13 @@ export async function POST(request: Request) {
         adults: booking.adults,
         children: booking.children,
         nightlyRate: booking.nightlyRate,
+        roomSubtotal: quote.nightlySubtotal,
+        discountAmount: quote.discount.amount,
         extras: extras.map((e) => ({ label: e.label, amount: e.amount })),
         extrasTotal,
+        taxAmount,
+        taxRateBp: quote.taxRateBp,
+        taxInclusive,
         totalAmount: booking.totalAmount,
         amountPaid: 0,
         requests: booking.requests,
@@ -350,6 +462,9 @@ export async function POST(request: Request) {
           checkOut: booking.checkOut,
           nights: booking.nights,
           totalAmount: booking.totalAmount,
+          taxAmount,
+          taxRateBp: quote.taxRateBp,
+          taxInclusive,
           invoiceNumber: booking.invoiceNumber,
           invoiceUrl: `/api/invoices/${booking.reference}`,
           trackUrl: `/track?ref=${booking.reference}`,

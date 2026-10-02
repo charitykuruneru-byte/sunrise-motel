@@ -1,0 +1,50 @@
+.desk-menu-screen { display: grid; gap: 18px; }
+.desk-menu-heading { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 14px 24px; }
+.desk-menu-heading > div:first-child { min-width: 220px; }
+.desk-menu-eyebrow { display: flex; align-items: center; gap: 7px; color: var(--orange-deep); font-size: 10px; font-weight: 800; letter-spacing: .14em; }
+.desk-menu-heading h2 { margin-top: 7px; color: var(--espresso); font-family: var(--serif); font-size: clamp(25px, 3vw, 34px); font-weight: 400; letter-spacing: -.025em; line-height: 1.05; }
+.desk-menu-heading p { margin-top: 7px; color: var(--muted); font-size: 12px; }
+.desk-menu-count { min-height: 35px; display: inline-flex; align-items: center; gap: 4px; padding: 0 11px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--muted); font-size: 10px; }
+.desk-menu-count strong { color: var(--espresso); }
+.desk-menu-permission-note { display: flex; align-items: flex-start; gap: 9px; padding: 12px 14px; border: 1px solid #d6e3d9; border-radius: 12px; background: #f2f7f3; color: #496453; font-size: 11px; line-height: 1.55; }
+.desk-menu-permission-note svg { flex: 0 0 auto; color: #557962; }
+.desk-menu-category { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,.88); box-shadow: 0 7px 24px rgba(43,36,31,.04); }
+.desk-menu-category-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
+.desk-menu-category-heading h3 { color: var(--espresso); font-family: var(--serif); font-size: 21px; font-weight: 400; }
+.desk-menu-category-heading span { color: var(--muted); font-size: 10px; }
+.desk-menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 265px), 1fr)); gap: 14px; }
+.desk-meal-card { min-width: 0; overflow: hidden; border: 1px solid rgba(48,37,29,.12); border-radius: 14px; background: #fff; box-shadow: 0 4px 14px rgba(43,36,31,.035); }
+.desk-meal-image { position: relative; height: 174px; overflow: hidden; background: #f1e8dc; }
+.desk-meal-image > img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: cover; transition: transform .25s ease; }
+.desk-meal-card:hover .desk-meal-image > img { transform: scale(1.035); }
+.desk-meal-image-fallback { position: absolute; inset: 0; display: grid; place-items: center; color: #9a7958; }
+.desk-meal-special, .desk-meal-sold-badge { position: absolute; z-index: 2; top: 10px; padding: 5px 9px; border-radius: 999px; font-size: 9px; font-weight: 800; }
+.desk-meal-special { left: 10px; background: rgba(255,250,242,.94); color: #80501f; }
+.desk-meal-sold-badge { right: 10px; background: #a33f2d; color: #fff; text-transform: uppercase; }
+.desk-meal-content { display: grid; gap: 9px; padding: 13px; }
+.desk-meal-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.desk-meal-title-row h4 { color: var(--espresso); font-size: 13px; font-weight: 750; line-height: 1.35; }
+.desk-meal-price { flex: 0 0 auto; color: #315746; font-size: 11px; white-space: nowrap; }
+.desk-meal-description { min-height: 34px; color: var(--muted); font-size: 10px; line-height: 1.55; }
+.desk-meal-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding-top: 9px; border-top: 1px solid rgba(48,37,29,.09); }
+.desk-meal-availability { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 9px; font-weight: 650; }
+.desk-meal-availability > span { width: 7px; height: 7px; border-radius: 50%; background: #aa4636; }
+.desk-meal-availability.is-available { color: #426a4a; }
+.desk-meal-availability.is-available > span { background: #5b9565; }
+.desk-meal-availability.is-unavailable { color: #a33f2d; }
+.desk-meal-footer .desk-button { min-height: 32px; padding: 0 9px; font-size: 9px; }
+.desk-meal-card.is-sold-out { border-color: #e9c8c1; }
+.desk-meal-card.is-sold-out .desk-meal-image > img { filter: saturate(.65); }
+.desk-menu-empty { padding: 24px; border: 1px dashed var(--line); border-radius: 14px; color: var(--muted); font-size: 12px; text-align: center; }
+@media (max-width: 540px) {
+  .desk-menu-heading { align-items: flex-start; }
+  .desk-menu-category { padding: 12px; }
+  .desk-menu-grid { grid-template-columns: 1fr; }
+  .desk-meal-card { display: grid; grid-template-columns: 118px minmax(0,1fr); }
+  .desk-meal-image { height: 100%; min-height: 160px; }
+  .desk-meal-content { padding: 10px; }
+  .desk-meal-title-row { flex-wrap: wrap; gap: 4px 8px; }
+  .desk-meal-description { min-height: 0; }
+  .desk-meal-footer { align-items: flex-start; }
+  .desk-meal-footer .desk-button { flex: 1 1 100%; }
+}

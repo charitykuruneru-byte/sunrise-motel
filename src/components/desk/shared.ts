@@ -69,10 +69,10 @@ export const THREAD_STATUS_LABEL: Record<string, string> = {
 
 export const CARD = "rounded-lg border border-white/10 bg-white/[0.03] p-4";
 export const BTN =
-  "inline-flex items-center gap-1.5 rounded border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs font-semibold text-white/90 hover:bg-white/10 disabled:opacity-40";
+  "desk-button desk-button-secondary inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50";
 export const BTN_PRIMARY =
-  "inline-flex items-center gap-1.5 rounded bg-[#f28c18] px-2.5 py-1.5 text-xs font-bold text-[#171513] hover:bg-[#ffa53a] disabled:opacity-40";
+  "desk-button desk-button-primary inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50";
 export const BTN_DANGER =
-  "inline-flex items-center gap-1.5 rounded border border-rose-500/50 bg-rose-500/10 px-2.5 py-1.5 text-xs font-semibold text-rose-200 hover:bg-rose-500/20 disabled:opacity-40";
+  "desk-button desk-button-danger inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50";
 export const INPUT =
   "w-full rounded border border-white/15 bg-black/30 px-2.5 py-1.5 text-sm text-white placeholder-white/35 outline-none focus:border-[#f28c18]";
