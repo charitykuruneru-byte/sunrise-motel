@@ -1,12 +1,12 @@
 {
-  "latestVersionCode": 5,
-  "latestVersionName": "1.4",
+  "latestVersionCode": 6,
+  "latestVersionName": "1.5",
   "apkUrl": "https://github.com/charitykuruneru-byte/sunrise-motel/releases/latest/download/SunriseMotel.apk",
   "forceUpdate": false,
   "whatsNew": [
-    "A refreshed motel experience with a still-photo homepage hero",
-    "More reliable in-app update checks and download handoff",
-    "The existing app identity and signing key are retained so updates replace the installed app"
+    "Fixed: updating the app no longer does nothing after the download — it asks Android for the install permission it needs",
+    "Fewer popups: one install offer on the landing page, and the update notice appears at most every few hours",
+    "The app keeps its identity and signing key, so updates replace the installed app"
   ],
-  "releaseDate": "2026-09-28"
+  "releaseDate": "2026-10-02"
 }

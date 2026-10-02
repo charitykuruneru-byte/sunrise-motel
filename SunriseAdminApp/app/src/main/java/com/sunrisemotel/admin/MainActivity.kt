@@ -30,6 +30,7 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
@@ -62,6 +63,8 @@ class MainActivity : AppCompatActivity() {
     private var fullscreenView: View? = null
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
     private var updateDownloadId: Long = -1L
+    /** Set when the install had to wait for the "allow unknown apps" switch. */
+    private var pendingInstall = false
 
     // Fires the system install prompt when our DownloadManager update finishes.
     // Same applicationId + same keystore signature = "Updating…", not a duplicate.
@@ -70,24 +73,9 @@ class MainActivity : AppCompatActivity() {
             if (intent.action != DownloadManager.ACTION_DOWNLOAD_COMPLETE) return
             val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
             if (id != updateDownloadId) return
-            try {
-                val file = File(
-                    getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
-                    UPDATE_FILE
-                )
-                if (!file.exists()) return
-                val contentUri = FileProvider.getUriForFile(
-                    this@MainActivity, "$packageName.provider", file
-                )
-                val install = Intent(Intent.ACTION_VIEW).apply {
-                    setDataAndType(contentUri, "application/vnd.android.package-archive")
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                startActivity(install)
-            } catch (e: Exception) {
-                Log.w(TAG, "Install prompt failed: ${e.message}")
-            }
+            // The permission check, the Settings detour and the installer launch
+            // all live in installDownloadedUpdate(), so this is just a passthrough.
+            installDownloadedUpdate()
         }
     }
 
@@ -330,6 +318,61 @@ class MainActivity : AppCompatActivity() {
         builder.show()
     }
 
+    /**
+     * Hand the downloaded APK to the system installer.
+     *
+     * Two Android 8+ rules decide whether this works, and the app used to obey
+     * neither: the manifest must declare REQUEST_INSTALL_PACKAGES (it does now),
+     * and the USER must have allowed this app to install unknown apps — a switch
+     * in Settings that no permission can grant. So when the switch is off we say
+     * so, send them to the exact setting, and retry the moment they come back.
+     * If the install is refused despite all that, the reason is visible instead
+     * of a log line nobody reads.
+     */
+    private fun installDownloadedUpdate() {
+        val file = File(
+            getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
+            UPDATE_FILE
+        )
+        if (!file.exists()) {
+            Toast.makeText(this, "The update did not download. Check your connection and try again.", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
+            pendingInstall = true
+            AlertDialog.Builder(this)
+                .setTitle("Allow installs from Sunrise Manager")
+                .setMessage("Android needs your permission before it can install the update. Tap Settings, switch on \"Allow from this source\", then come back — the install starts by itself.")
+                .setPositiveButton("Open Settings") { _, _ ->
+                    try {
+                        startActivity(
+                            Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))
+                        )
+                    } catch (_: Exception) {
+                        Toast.makeText(this, "Open Settings > Apps > Sunrise Manager > Install unknown apps.", Toast.LENGTH_LONG).show()
+                    }
+                }
+                .setNegativeButton("Later", null)
+                .show()
+            return
+        }
+        try {
+            val contentUri = FileProvider.getUriForFile(
+                this, "$packageName.provider", file
+            )
+            val install = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(contentUri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(install)
+            pendingInstall = false
+        } catch (e: Exception) {
+            Toast.makeText(this, "Android refused to install this update. If you installed the app before with a different build, uninstall it once and install again.", Toast.LENGTH_LONG).show()
+            Log.w(TAG, "Install prompt failed: ${e.message}")
+        }
+    }
+
     // DownloadManager fetches the APK into the app's own files dir, then
     // updateReceiver (top of this class) fires the system install prompt.
     private fun startInAppUpdate(apkUrl: String) {
@@ -347,11 +390,6 @@ class MainActivity : AppCompatActivity() {
                 setMimeType("application/vnd.android.package-archive")
             }
             updateDownloadId = manager.enqueue(request)
-            AlertDialog.Builder(this)
-                .setTitle("Downloading update…")
-                .setMessage("Keep the app open. The install prompt appears automatically.")
-                .setPositiveButton("OK", null)
-                .show()
         } catch (e: Exception) {
             Log.w(TAG, "In-app download failed, opening browser: ${e.message}")
             try {
@@ -386,12 +424,15 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (pendingInstall) installDownloadedUpdate()
         try {
             if (Build.VERSION.SDK_INT >= 33) {
+                // The broadcast is sent by the download provider, a system component,
+                // so a NOT_EXPORTED receiver would silently never see it on API 33+.
                 registerReceiver(
                     updateReceiver,
                     IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-                    Context.RECEIVER_NOT_EXPORTED
+                    Context.RECEIVER_EXPORTED
                 )
             } else {
                 @Suppress("UnspecifiedRegisterReceiverFlag")

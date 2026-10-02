@@ -1287,6 +1287,8 @@ does not send an invitation email; use the portal's invitation workflow for rout
 | Uploaded photos vanish after a deploy | They went to `./uploads` via the legacy `/api/admin/upload`. Use the *Pictures* tab (which calls `/api/upload`) so images land in Blob or Postgres |
 | "Firebase not configured" in App push | Add `FIREBASE_SERVICE_ACCOUNT_JSON` (+ `FIREBASE_PROJECT_ID`) and redeploy. Use **Test configuration** first — it validates without notifying anyone |
 | Push works but no phone buzzes | The installed app must be a build that includes the `firebase-messaging` dependency and `google-services.json` and has subscribed to `all_users` |
+| "Update Now" downloads the APK but no install prompt ever appears | The app was missing `REQUEST_INSTALL_PACKAGES`, so Android 8+ refused the installer intent outright (and the failure landed in a log line). Fixed in v1.5 / v1.2 (code 6 / 3). An installed app that predates that update cannot fix itself — uninstall it once and install the new APK. Also confirm Settings → Apps → _Sunrise Motel_ → Install unknown apps is allowed, which the app now asks for itself |
+| Android says "App not installed" when installing an update | Signature conflict: the installed copy was built with a different key (e.g. the old debug-signed era). These releases keep the same release keystore; uninstall the old copy once, then install the new APK |
 | Android app shows two icons | An APK signed with a different keystore was installed. Same keystore + `applicationId` = "Updating…". Keep the newest, uninstall the old |
 | Router cache / page errors during local dev | Stop the server, delete `.next/`, restart |
 | "Multiple lockfiles" workspace warning | Already silenced by `turbopack.root` in `next.config.ts` |

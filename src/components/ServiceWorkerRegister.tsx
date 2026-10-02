@@ -74,7 +74,12 @@ export default function ServiceWorkerRegister() {
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
 
-    if (!isInstalled && !isWrappedApp && !sessionStorage.getItem(installDismissKey)) {
+    // The guest-facing pages own the one auto install offer (InstallAppPopup on
+    // the landing page). This dialog exists for the manager portal only, so a
+    // guest on the landing page never gets two install popups stacked on top of
+    // each other — which is exactly what "too many popups" meant.
+    if (pathname.startsWith('/admin') && !isInstalled &&
+      !isWrappedApp && !sessionStorage.getItem(installDismissKey)) {
       installTimer = window.setTimeout(() => setShowInstall(true), 1200);
     }
 
@@ -89,6 +94,12 @@ export default function ServiceWorkerRegister() {
     if (!('serviceWorker' in navigator)) return;
     const showUpdate = (worker: ServiceWorker | null) => {
       if (shownRef.current || document.getElementById('sw-update-banner')) return;
+      // Every deploy creates a waiting worker, so without a throttle the card
+      // reappears on the next visit after each release — another slice of the
+      // "too many popups" complaint. One offer per rolling six hours is plenty.
+      const lastOffer = Number(sessionStorage.getItem('sw-update-offered') || 0);
+      if (Date.now() - lastOffer < 6 * 60 * 60 * 1000) return;
+      sessionStorage.setItem('sw-update-offered', String(Date.now()));
       shownRef.current = true;
       workerRef.current = worker;
       setWaiting(worker);

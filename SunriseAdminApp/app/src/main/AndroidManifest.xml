@@ -6,6 +6,15 @@
          grants one file at a time and nothing more. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!--
+      In-app updates. Android 8.0 (API 26) and newer refuse the package-installer
+      intent outright unless the app declares this permission, so without it
+      "Update Now" downloaded the APK and then did nothing at all — the failure
+      landed in a log line nobody reads. The user additionally has to allow
+      "install unknown apps" for this app in Settings; MainActivity asks for that
+      and re-runs the install when they come back.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:label="Sunrise Manager"
